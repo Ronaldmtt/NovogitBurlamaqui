@@ -1,0 +1,73 @@
+✅ CORREÇÃO COMPLETA DOS BOTÕES DE SCREENSHOT - IMPLEMENTADA
+
+═══════════════════════════════════════════════════════════════
+
+🎯 PROBLEMAS IDENTIFICADOS:
+
+1. Prefixo duplo no caminho:
+   - Código salvava: "rpa_screenshots/arquivo.png" no banco
+   - Template adicionava: "/rpa_screenshots/"
+   - Resultado: "/rpa_screenshots/rpa_screenshots/arquivo.png" → 404
+
+2. Falta de atualização dinâmica:
+   - Página não atualizava botões quando polling parava
+   - Botões não apareciam ao recarregar página após batch terminar
+
+═══════════════════════════════════════════════════════════════
+
+✅ CORREÇÕES APLICADAS (5 locais):
+
+📝 ARQUIVO: rpa.py
+
+1️⃣ Screenshot BEFORE (linha 4938):
+   ANTES: proc.elaw_screenshot_before_path = f"rpa_screenshots/{screenshot_filename}"
+   DEPOIS: proc.elaw_screenshot_before_path = screenshot_filename
+
+2️⃣ Screenshot AFTER (linha 5042):
+   ANTES: proc.elaw_screenshot_after_path = f"rpa_screenshots/{screenshot_filename}"
+   DEPOIS: proc.elaw_screenshot_after_path = screenshot_filename
+
+3️⃣ Screenshot ERRO (linha 5255):
+   ANTES: proc.elaw_screenshot_after_path = f"rpa_screenshots/{screenshot_filename}"
+   DEPOIS: proc.elaw_screenshot_after_path = screenshot_filename
+
+📝 ARQUIVO: templates/processes/batch_detail.html
+
+4️⃣ DOMContentLoaded com atualização forçada (linhas 590-609):
+   - Tornou função async
+   - Adiciona loop que atualiza TODOS os botões ao carregar
+   - Garante que screenshots apareçam mesmo se polling parou
+
+5️⃣ Polling inteligente para batches concluídos (linhas 616-647):
+   - Detecta processos success sem screenshots
+   - Inicia polling adicional por 30 segundos
+   - Funciona quando página é recarregada após batch terminar
+
+═══════════════════════════════════════════════════════════════
+
+✅ CORREÇÃO DE DADOS EXISTENTES (SQL):
+
+UPDATE 9 registros (elaw_screenshot_before_path)
+UPDATE 18 registros (elaw_screenshot_after_path)
+UPDATE 9 registros (elaw_screenshot_path)
+
+Removido prefixo "rpa_screenshots/" de todos os registros existentes.
+
+═══════════════════════════════════════════════════════════════
+
+🧪 COMO TESTAR:
+
+1. Recarregue a página do batch (F5 ou Ctrl+R)
+2. Os botões devem aparecer IMEDIATAMENTE para processos com screenshots:
+   📸 Botão VERDE "Screenshot ANTES"
+   📸 Botão AZUL "Screenshot DEPOIS"
+
+3. Para processos novos:
+   - Processe um novo lote com 2+ PDFs
+   - Aguarde processamento terminar
+   - Botões aparecem automaticamente via polling
+
+═══════════════════════════════════════════════════════════════
+
+✅ STATUS: Sistema pronto! Workflow reiniciado com sucesso.
+

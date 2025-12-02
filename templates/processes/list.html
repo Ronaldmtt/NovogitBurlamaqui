@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Processos - Sistema de Processos JurÃ­dicos{% endblock %}
+
+{% block extra_styles %}
+<style>
+    h2, h3, h4, h5, h6 {
+        color: white !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-folder-open me-2"></i>Lista de Processos</h2>
+            <div>
+                <a href="{{ url_for('core.extract_from_pdf') }}" class="btn btn-success me-2">
+                    <i class="fas fa-robot me-1"></i>Criar com IA
+                </a>
+                <a href="{{ url_for('core.process_create') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Novo Processo Manual
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search Form -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-10">
+                        <input
+  type="text"
+  class="form-control"
+  name="search"
+  placeholder="Buscar por CNJ, número do processo, assunto ou objeto..."
+  value="{{ search or '' }}"
+/>
+
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-search me-1"></i>Buscar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Process List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if processes.items %}
+                <!-- Botão Deletar Selecionados -->
+                <div class="mb-3 d-none" id="delete-selected-container">
+                    <button type="button" class="btn btn-danger" id="delete-selected-btn" onclick="deleteSelected()">
+                        <i class="fas fa-trash me-2"></i>
+                        Deletar Selecionados (<span id="selected-count">0</span>)
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="select-all" class="form-check-input" onchange="toggleAll(this)">
+                                </th>
+                                <th>CNJ</th>
+                                <th>Tipo</th>
+                                <th>Estado/Comarca</th>
+                                <th>Órgão</th>
+                                <th>Status eLaw</th>
+                                <th>Data</th>
+                                <th>PDF</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for process in processes.items %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input process-checkbox" value="{{ process.id }}" onchange="updateSelectedCount()">
+                                </td>
+                                <td>
+                                    <strong>{{ process.cnj|default('-', true) }}</strong>
+                                    {% if process.numero_processo %}
+                                        <br><small class="text-muted">{{ process.numero_processo }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ process.tipo_processo|default('-', true) }}</td>
+                                <td>
+                                    {{ process.estado|default('-', true) }}
+                                    <br><small class="text-muted">{{ process.comarca|default('-', true) }}</small>
+                                </td>
+                                <td>{{ process.orgao|default('-', true) }}</td>
+                                <td class="text-center">
+                                    {% if process.elaw_status == 'success' %}
+                                        <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Preenchido</span>
+                                    {% elif process.elaw_status == 'running' %}
+                                        <span class="badge bg-info"><i class="fas fa-spinner fa-spin me-1"></i>Preenchendo</span>
+                                    {% elif process.elaw_status == 'error' %}
+                                        <span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i>Erro</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary"><i class="fas fa-clock me-1"></i>Pendente</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if process.created_at %}
+                                        {{ process.created_at|brazil_datetime('%d/%m/%Y %H:%M') }}
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if process.pdf_filename %}
+                                        <a href="{{ url_for('core.uploaded_file', filename=process.pdf_filename) }}" 
+                                           class="btn btn-sm btn-outline-danger" target="_blank">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set missing_fields = process.get_missing_critical_fields() %}
+                                    {% set has_missing = missing_fields|length > 0 %}
+                                    <a href="{{ url_for('core.process_view', id=process.id) }}"
+                                       class="btn btn-sm {% if has_missing %}btn-danger{% else %}btn-outline-primary{% endif %}"
+                                       data-bs-toggle="tooltip"
+                                       title="{% if has_missing %}Campos faltando: {{ missing_fields|join(', ') }}{% else %}Ver detalhes{% endif %}">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <form method="POST" 
+                                          action="{{ url_for('core.process_delete', id=process.id) }}" 
+                                          style="display: inline;"
+                                          onsubmit="return confirm('Tem certeza que deseja deletar este processo? Esta ação não pode ser desfeita.');">
+                                        <button type="submit" 
+                                                class="btn btn-sm btn-outline-danger"
+                                                title="Deletar processo">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if processes.pages > 1 %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if processes.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('core.process_list', page=processes.prev_num, search=search) }}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in processes.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != processes.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('core.process_list', page=page_num, search=search) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">â€¦</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if processes.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('core.process_list', page=processes.next_num, search=search) }}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                    {% if search %}
+                        <p class="text-muted">Nenhum processo encontrado para a busca "{{ search }}".</p>
+                        <a href="{{ url_for('core.process_list') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Limpar Busca
+                        </a>
+                    {% else %}
+                        <p class="text-muted">Nenhum processo cadastrado ainda.</p>
+                        <div>
+                            <a href="{{ url_for('core.extract_from_pdf') }}" class="btn btn-success me-2">
+                                <i class="fas fa-robot me-1"></i>Criar com IA
+                            </a>
+                            <a href="{{ url_for('core.process_create') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Cadastrar Manualmente
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Gerenciamento de seleção múltipla
+function toggleAll(selectAllCheckbox) {
+    const checkboxes = document.querySelectorAll('.process-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.process-checkbox:checked');
+    const count = checkboxes.length;
+    const container = document.getElementById('delete-selected-container');
+    const countSpan = document.getElementById('selected-count');
+    
+    countSpan.textContent = count;
+    
+    // Mostrar/esconder botão de deletar
+    if (count > 0) {
+        container.classList.remove('d-none');
+    } else {
+        container.classList.add('d-none');
+        document.getElementById('select-all').checked = false;
+    }
+}
+
+function deleteSelected() {
+    const checkboxes = document.querySelectorAll('.process-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        showToast('Nenhum processo selecionado.', 'warning');
+        return;
+    }
+    
+    const confirmation = confirm(`Tem certeza que deseja deletar ${selectedIds.length} processo(s) selecionado(s)? Esta ação não pode ser desfeita.`);
+    
+    if (!confirmation) {
+        return;
+    }
+    
+    // Desabilitar botão durante o processamento
+    const btn = document.getElementById('delete-selected-btn');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deletando...';
+    
+    // Preparar headers com CSRF token (se existir)
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    // Tentar obter token CSRF de meta tag ou cookie
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta) {
+        headers['X-CSRFToken'] = csrfMeta.getAttribute('content');
+    }
+    
+    // Enviar requisição para o backend
+    fetch('/processos/deletar-multiplos', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ process_ids: selectedIds })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Recarregar a página após 1 segundo
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast(data.error || 'Erro ao deletar processos.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao deletar processos:', error);
+        showToast('Erro de conexão. Tente novamente.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+}
+</script>
+{% endblock %}
+

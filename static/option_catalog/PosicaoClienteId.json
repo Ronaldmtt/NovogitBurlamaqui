@@ -1,0 +1,490 @@
+[
+  {
+    "text": "ADVOGADO",
+    "normalized": "advogado"
+  },
+  {
+    "text": "ADVOGADO",
+    "normalized": "advogado"
+  },
+  {
+    "text": "AGRAVADO",
+    "normalized": "agravado"
+  },
+  {
+    "text": "AGRAVADO",
+    "normalized": "agravado"
+  },
+  {
+    "text": "AGRAVANTE",
+    "normalized": "agravante"
+  },
+  {
+    "text": "AGRAVANTE",
+    "normalized": "agravante"
+  },
+  {
+    "text": "ALIMENTANTE",
+    "normalized": "alimentante"
+  },
+  {
+    "text": "ALIMENTANTE",
+    "normalized": "alimentante"
+  },
+  {
+    "text": "APELADO",
+    "normalized": "apelado"
+  },
+  {
+    "text": "APELADO",
+    "normalized": "apelado"
+  },
+  {
+    "text": "APELANTE",
+    "normalized": "apelante"
+  },
+  {
+    "text": "APELANTE",
+    "normalized": "apelante"
+  },
+  {
+    "text": "AUTOR",
+    "normalized": "autor"
+  },
+  {
+    "text": "AUTOR",
+    "normalized": "autor"
+  },
+  {
+    "text": "AUTUADO",
+    "normalized": "autuado"
+  },
+  {
+    "text": "AUTUADO",
+    "normalized": "autuado"
+  },
+  {
+    "text": "AUTUANTE",
+    "normalized": "autuante"
+  },
+  {
+    "text": "AUTUANTE",
+    "normalized": "autuante"
+  },
+  {
+    "text": "BENEFICIÁRIO",
+    "normalized": "beneficiario"
+  },
+  {
+    "text": "BENEFICIÁRIO",
+    "normalized": "beneficiario"
+  },
+  {
+    "text": "CONFINANTE",
+    "normalized": "confinante"
+  },
+  {
+    "text": "CONFINANTE",
+    "normalized": "confinante"
+  },
+  {
+    "text": "CONSIGNADOV",
+    "normalized": "consignadov"
+  },
+  {
+    "text": "CONSIGNADOV",
+    "normalized": "consignadov"
+  },
+  {
+    "text": "CONSIGNANTE",
+    "normalized": "consignante"
+  },
+  {
+    "text": "CONSIGNANTE",
+    "normalized": "consignante"
+  },
+  {
+    "text": "CREDOR",
+    "normalized": "credor"
+  },
+  {
+    "text": "CREDOR",
+    "normalized": "credor"
+  },
+  {
+    "text": "DEMANDADO",
+    "normalized": "demandado"
+  },
+  {
+    "text": "DEMANDADO",
+    "normalized": "demandado"
+  },
+  {
+    "text": "DEMANDANTE",
+    "normalized": "demandante"
+  },
+  {
+    "text": "DEMANDANTE",
+    "normalized": "demandante"
+  },
+  {
+    "text": "DENUNCIADO",
+    "normalized": "denunciado"
+  },
+  {
+    "text": "DENUNCIADO",
+    "normalized": "denunciado"
+  },
+  {
+    "text": "DENUNCIANTE",
+    "normalized": "denunciante"
+  },
+  {
+    "text": "DENUNCIANTE",
+    "normalized": "denunciante"
+  },
+  {
+    "text": "DEPRECADO",
+    "normalized": "deprecado"
+  },
+  {
+    "text": "DEPRECADO",
+    "normalized": "deprecado"
+  },
+  {
+    "text": "DEPRECANTE",
+    "normalized": "deprecante"
+  },
+  {
+    "text": "DEPRECANTE",
+    "normalized": "deprecante"
+  },
+  {
+    "text": "DEVEDOR",
+    "normalized": "devedor"
+  },
+  {
+    "text": "DEVEDOR",
+    "normalized": "devedor"
+  },
+  {
+    "text": "EMBARGADO",
+    "normalized": "embargado"
+  },
+  {
+    "text": "EMBARGADO",
+    "normalized": "embargado"
+  },
+  {
+    "text": "EMBARGANTE",
+    "normalized": "embargante"
+  },
+  {
+    "text": "EMBARGANTE",
+    "normalized": "embargante"
+  },
+  {
+    "text": "EXCEPTO",
+    "normalized": "excepto"
+  },
+  {
+    "text": "EXCEPTO",
+    "normalized": "excepto"
+  },
+  {
+    "text": "EXCIPIENTE",
+    "normalized": "excipiente"
+  },
+  {
+    "text": "EXCIPIENTE",
+    "normalized": "excipiente"
+  },
+  {
+    "text": "EXECUTADO",
+    "normalized": "executado"
+  },
+  {
+    "text": "EXECUTADO",
+    "normalized": "executado"
+  },
+  {
+    "text": "EXEQUENTE",
+    "normalized": "exequente"
+  },
+  {
+    "text": "EXEQUENTE",
+    "normalized": "exequente"
+  },
+  {
+    "text": "FALÊNCIA",
+    "normalized": "falencia"
+  },
+  {
+    "text": "FALÊNCIA",
+    "normalized": "falencia"
+  },
+  {
+    "text": "HABILITADA",
+    "normalized": "habilitada"
+  },
+  {
+    "text": "HABILITADA",
+    "normalized": "habilitada"
+  },
+  {
+    "text": "HABILITANTE",
+    "normalized": "habilitante"
+  },
+  {
+    "text": "HABILITANTE",
+    "normalized": "habilitante"
+  },
+  {
+    "text": "HABTE",
+    "normalized": "habte"
+  },
+  {
+    "text": "HABTE",
+    "normalized": "habte"
+  },
+  {
+    "text": "IMPETRANTE",
+    "normalized": "impetrante"
+  },
+  {
+    "text": "IMPETRANTE",
+    "normalized": "impetrante"
+  },
+  {
+    "text": "IMPETTRADO",
+    "normalized": "impettrado"
+  },
+  {
+    "text": "IMPETTRADO",
+    "normalized": "impettrado"
+  },
+  {
+    "text": "IMPUGNADO",
+    "normalized": "impugnado"
+  },
+  {
+    "text": "IMPUGNADO",
+    "normalized": "impugnado"
+  },
+  {
+    "text": "IMPUGNANTE",
+    "normalized": "impugnante"
+  },
+  {
+    "text": "IMPUGNANTE",
+    "normalized": "impugnante"
+  },
+  {
+    "text": "INTERDITADO",
+    "normalized": "interditado"
+  },
+  {
+    "text": "INTERDITADO",
+    "normalized": "interditado"
+  },
+  {
+    "text": "INTERDITANTE",
+    "normalized": "interditante"
+  },
+  {
+    "text": "INTERDITANTE",
+    "normalized": "interditante"
+  },
+  {
+    "text": "INTERPELADO",
+    "normalized": "interpelado"
+  },
+  {
+    "text": "INTERPELADO",
+    "normalized": "interpelado"
+  },
+  {
+    "text": "INTERPELANTE",
+    "normalized": "interpelante"
+  },
+  {
+    "text": "INTERPELANTE",
+    "normalized": "interpelante"
+  },
+  {
+    "text": "INVENT",
+    "normalized": "invent"
+  },
+  {
+    "text": "INVENT",
+    "normalized": "invent"
+  },
+  {
+    "text": "INVENTARIADO",
+    "normalized": "inventariado"
+  },
+  {
+    "text": "INVENTARIADO",
+    "normalized": "inventariado"
+  },
+  {
+    "text": "INVENTARIANTE",
+    "normalized": "inventariante"
+  },
+  {
+    "text": "INVENTARIANTE",
+    "normalized": "inventariante"
+  },
+  {
+    "text": "NOTIFICADO",
+    "normalized": "notificado"
+  },
+  {
+    "text": "NOTIFICADO",
+    "normalized": "notificado"
+  },
+  {
+    "text": "NOTIFICANTE",
+    "normalized": "notificante"
+  },
+  {
+    "text": "NOTIFICANTE",
+    "normalized": "notificante"
+  },
+  {
+    "text": "OPOENTE",
+    "normalized": "opoente"
+  },
+  {
+    "text": "OPOENTE",
+    "normalized": "opoente"
+  },
+  {
+    "text": "OPOSTO",
+    "normalized": "oposto"
+  },
+  {
+    "text": "OPOSTO",
+    "normalized": "oposto"
+  },
+  {
+    "text": "PARTES",
+    "normalized": "partes"
+  },
+  {
+    "text": "PARTES",
+    "normalized": "partes"
+  },
+  {
+    "text": "RECLAMADO",
+    "normalized": "reclamado"
+  },
+  {
+    "text": "RECLAMADO",
+    "normalized": "reclamado"
+  },
+  {
+    "text": "RECLAMANTE",
+    "normalized": "reclamante"
+  },
+  {
+    "text": "RECLAMANTE",
+    "normalized": "reclamante"
+  },
+  {
+    "text": "RECORRENTE",
+    "normalized": "recorrente"
+  },
+  {
+    "text": "RECORRENTE",
+    "normalized": "recorrente"
+  },
+  {
+    "text": "RECORRIDO",
+    "normalized": "recorrido"
+  },
+  {
+    "text": "RECORRIDO",
+    "normalized": "recorrido"
+  },
+  {
+    "text": "RECOVINDO",
+    "normalized": "recovindo"
+  },
+  {
+    "text": "RECOVINDO",
+    "normalized": "recovindo"
+  },
+  {
+    "text": "RECOVINTE",
+    "normalized": "recovinte"
+  },
+  {
+    "text": "RECOVINTE",
+    "normalized": "recovinte"
+  },
+  {
+    "text": "REQT",
+    "normalized": "reqt"
+  },
+  {
+    "text": "REQT",
+    "normalized": "reqt"
+  },
+  {
+    "text": "REQUENTE",
+    "normalized": "requente"
+  },
+  {
+    "text": "REQUENTE",
+    "normalized": "requente"
+  },
+  {
+    "text": "REQUERENTE",
+    "normalized": "requerente"
+  },
+  {
+    "text": "REQUERENTE",
+    "normalized": "requerente"
+  },
+  {
+    "text": "REQUERIDO",
+    "normalized": "requerido"
+  },
+  {
+    "text": "REQUERIDO",
+    "normalized": "requerido"
+  },
+  {
+    "text": "REU",
+    "normalized": "reu"
+  },
+  {
+    "text": "REU",
+    "normalized": "reu"
+  },
+  {
+    "text": "SUSCITADO",
+    "normalized": "suscitado"
+  },
+  {
+    "text": "SUSCITADO",
+    "normalized": "suscitado"
+  },
+  {
+    "text": "SUSCITANTE",
+    "normalized": "suscitante"
+  },
+  {
+    "text": "SUSCITANTE",
+    "normalized": "suscitante"
+  },
+  {
+    "text": "TERCEIRO INTERESSADO",
+    "normalized": "terceiro interessado"
+  },
+  {
+    "text": "TERCEIRO INTERESSADO",
+    "normalized": "terceiro interessado"
+  }
+]

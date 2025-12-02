@@ -1,0 +1,41 @@
+# === Core Web App (Flask) ===
+Flask==3.0.3
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+email-validator==2.2.0
+python-dotenv==1.0.1
+
+# === Database ===
+psycopg2-binary==2.9.9
+
+# === PDF Processing (lightweight) ===
+PyPDF2==3.0.1
+
+# === AI/LLM ===
+openai>=1.35.0,<2.0.0
+tiktoken==0.7.0
+
+# === Text Processing ===
+rapidfuzz==3.10.1
+python-slugify>=8.0
+lxml>=5.0
+
+# === Documents ===
+python-docx==1.1.2
+
+# === HTTP ===
+requests>=2.31
+
+# === WebSockets ===
+websockets>=12.0
+
+# === Production Server ===
+gunicorn==21.2.0
+jinja2
+playwright
+sqlalchemy
+urllib3
+werkzeug
+wtforms

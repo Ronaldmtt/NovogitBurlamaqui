@@ -1,0 +1,177 @@
+{
+  "_description": "Mapeamento TRT → Estado/UF para extração de PDFs trabalhistas. TRTs multi-estado usam 'ufs' como lista.",
+  "_usage": "Use o código TRT (01-24) para obter nome do estado, sigla UF, e variações de texto. Para TRTs multi-estado, use 'ufs' para disambiguar.",
+  
+  "01": {
+    "estado": "Rio de Janeiro",
+    "uf": "RJ",
+    "ufs": ["RJ"],
+    "trt_nome": "TRT da 1ª Região",
+    "variantes": ["Rio de Janeiro", "RJ", "TRT-1", "TRT1", "TRT da 1ª Região", "1ª Região"]
+  },
+  "02": {
+    "estado": "São Paulo",
+    "uf": "SP",
+    "ufs": ["SP"],
+    "trt_nome": "TRT da 2ª Região",
+    "variantes": ["São Paulo", "SP", "TRT-2", "TRT2", "TRT da 2ª Região", "2ª Região", "Grande São Paulo"]
+  },
+  "03": {
+    "estado": "Minas Gerais",
+    "uf": "MG",
+    "ufs": ["MG"],
+    "trt_nome": "TRT da 3ª Região",
+    "variantes": ["Minas Gerais", "MG", "TRT-3", "TRT3", "TRT da 3ª Região", "3ª Região"]
+  },
+  "04": {
+    "estado": "Rio Grande do Sul",
+    "uf": "RS",
+    "ufs": ["RS"],
+    "trt_nome": "TRT da 4ª Região",
+    "variantes": ["Rio Grande do Sul", "RS", "TRT-4", "TRT4", "TRT da 4ª Região", "4ª Região"]
+  },
+  "05": {
+    "estado": "Bahia",
+    "uf": "BA",
+    "ufs": ["BA"],
+    "trt_nome": "TRT da 5ª Região",
+    "variantes": ["Bahia", "BA", "TRT-5", "TRT5", "TRT da 5ª Região", "5ª Região"]
+  },
+  "06": {
+    "estado": "Pernambuco",
+    "uf": "PE",
+    "ufs": ["PE"],
+    "trt_nome": "TRT da 6ª Região",
+    "variantes": ["Pernambuco", "PE", "TRT-6", "TRT6", "TRT da 6ª Região", "6ª Região"]
+  },
+  "07": {
+    "estado": "Ceará",
+    "uf": "CE",
+    "ufs": ["CE"],
+    "trt_nome": "TRT da 7ª Região",
+    "variantes": ["Ceará", "CE", "TRT-7", "TRT7", "TRT da 7ª Região", "7ª Região"]
+  },
+  "08": {
+    "estado": "Pará",
+    "uf": "PA",
+    "ufs": ["PA", "AP"],
+    "trt_nome": "TRT da 8ª Região",
+    "variantes": ["Pará", "PA", "TRT-8", "TRT8", "TRT da 8ª Região", "8ª Região", "Amapá", "AP"],
+    "estados_alt": {"AP": "Amapá"}
+  },
+  "09": {
+    "estado": "Paraná",
+    "uf": "PR",
+    "ufs": ["PR"],
+    "trt_nome": "TRT da 9ª Região",
+    "variantes": ["Paraná", "PR", "TRT-9", "TRT9", "TRT da 9ª Região", "9ª Região"]
+  },
+  "10": {
+    "estado": "Distrito Federal",
+    "uf": "DF",
+    "ufs": ["DF", "TO"],
+    "trt_nome": "TRT da 10ª Região",
+    "variantes": ["Distrito Federal", "DF", "Brasília", "TRT-10", "TRT10", "TRT da 10ª Região", "10ª Região", "Tocantins", "TO"],
+    "estados_alt": {"TO": "Tocantins"}
+  },
+  "11": {
+    "estado": "Amazonas",
+    "uf": "AM",
+    "ufs": ["AM", "RR"],
+    "trt_nome": "TRT da 11ª Região",
+    "variantes": ["Amazonas", "AM", "TRT-11", "TRT11", "TRT da 11ª Região", "11ª Região", "Roraima", "RR"],
+    "estados_alt": {"RR": "Roraima"}
+  },
+  "12": {
+    "estado": "Santa Catarina",
+    "uf": "SC",
+    "ufs": ["SC"],
+    "trt_nome": "TRT da 12ª Região",
+    "variantes": ["Santa Catarina", "SC", "TRT-12", "TRT12", "TRT da 12ª Região", "12ª Região"]
+  },
+  "13": {
+    "estado": "Paraíba",
+    "uf": "PB",
+    "ufs": ["PB"],
+    "trt_nome": "TRT da 13ª Região",
+    "variantes": ["Paraíba", "PB", "TRT-13", "TRT13", "TRT da 13ª Região", "13ª Região", "João Pessoa"]
+  },
+  "14": {
+    "estado": "Rondônia",
+    "uf": "RO",
+    "ufs": ["RO", "AC"],
+    "trt_nome": "TRT da 14ª Região",
+    "variantes": ["Rondônia", "RO", "TRT-14", "TRT14", "TRT da 14ª Região", "14ª Região", "Acre", "AC"],
+    "estados_alt": {"AC": "Acre"}
+  },
+  "15": {
+    "estado": "São Paulo",
+    "uf": "SP",
+    "ufs": ["SP"],
+    "trt_nome": "TRT da 15ª Região",
+    "variantes": ["São Paulo", "SP", "TRT-15", "TRT15", "TRT da 15ª Região", "15ª Região", "Campinas", "Interior de São Paulo"]
+  },
+  "16": {
+    "estado": "Maranhão",
+    "uf": "MA",
+    "ufs": ["MA"],
+    "trt_nome": "TRT da 16ª Região",
+    "variantes": ["Maranhão", "MA", "TRT-16", "TRT16", "TRT da 16ª Região", "16ª Região"]
+  },
+  "17": {
+    "estado": "Espírito Santo",
+    "uf": "ES",
+    "ufs": ["ES"],
+    "trt_nome": "TRT da 17ª Região",
+    "variantes": ["Espírito Santo", "ES", "TRT-17", "TRT17", "TRT da 17ª Região", "17ª Região"]
+  },
+  "18": {
+    "estado": "Goiás",
+    "uf": "GO",
+    "ufs": ["GO"],
+    "trt_nome": "TRT da 18ª Região",
+    "variantes": ["Goiás", "GO", "TRT-18", "TRT18", "TRT da 18ª Região", "18ª Região"]
+  },
+  "19": {
+    "estado": "Alagoas",
+    "uf": "AL",
+    "ufs": ["AL"],
+    "trt_nome": "TRT da 19ª Região",
+    "variantes": ["Alagoas", "AL", "TRT-19", "TRT19", "TRT da 19ª Região", "19ª Região"]
+  },
+  "20": {
+    "estado": "Sergipe",
+    "uf": "SE",
+    "ufs": ["SE"],
+    "trt_nome": "TRT da 20ª Região",
+    "variantes": ["Sergipe", "SE", "TRT-20", "TRT20", "TRT da 20ª Região", "20ª Região"]
+  },
+  "21": {
+    "estado": "Rio Grande do Norte",
+    "uf": "RN",
+    "ufs": ["RN"],
+    "trt_nome": "TRT da 21ª Região",
+    "variantes": ["Rio Grande do Norte", "RN", "TRT-21", "TRT21", "TRT da 21ª Região", "21ª Região"]
+  },
+  "22": {
+    "estado": "Piauí",
+    "uf": "PI",
+    "ufs": ["PI"],
+    "trt_nome": "TRT da 22ª Região",
+    "variantes": ["Piauí", "PI", "TRT-22", "TRT22", "TRT da 22ª Região", "22ª Região"]
+  },
+  "23": {
+    "estado": "Mato Grosso",
+    "uf": "MT",
+    "ufs": ["MT"],
+    "trt_nome": "TRT da 23ª Região",
+    "variantes": ["Mato Grosso", "MT", "TRT-23", "TRT23", "TRT da 23ª Região", "23ª Região"]
+  },
+  "24": {
+    "estado": "Mato Grosso do Sul",
+    "uf": "MS",
+    "ufs": ["MS"],
+    "trt_nome": "TRT da 24ª Região",
+    "variantes": ["Mato Grosso do Sul", "MS", "TRT-24", "TRT24", "TRT da 24ª Região", "24ª Região"]
+  }
+}

@@ -1,0 +1,44 @@
+✅ CORREÇÃO FINAL DOS BOTÕES DE SCREENSHOT - IMPLEMENTADA
+
+Data: $(date '+%Y-%m-%d %H:%M:%S UTC')
+
+═══════════════════════════════════════════════════════════════
+
+🎯 PROBLEMA IDENTIFICADO:
+Botões "Screenshot ANTES" e "Screenshot DEPOIS" não apareciam na 
+interface do batch, mesmo com os arquivos PNG salvos corretamente.
+
+🔍 CAUSA RAIZ:
+- Código salvava: "rpa_screenshots/process_123_before.png" no banco
+- Template HTML adicionava: "/rpa_screenshots/" no link
+- Resultado: "/rpa_screenshots/rpa_screenshots/..." → 404 Not Found
+
+✅ SOLUÇÃO APLICADA:
+Salvar APENAS o nome do arquivo no banco de dados, sem o prefixo.
+O template HTML já adiciona o prefixo automaticamente.
+
+📝 CORREÇÕES IMPLEMENTADAS (3 locais no rpa.py):
+
+1️⃣ Screenshot BEFORE (linha 4938):
+   ANTES: proc.elaw_screenshot_before_path = f"rpa_screenshots/{screenshot_filename}"
+   DEPOIS: proc.elaw_screenshot_before_path = screenshot_filename
+
+2️⃣ Screenshot AFTER (linha 5042):
+   ANTES: proc.elaw_screenshot_after_path = f"rpa_screenshots/{screenshot_filename}"
+   DEPOIS: proc.elaw_screenshot_after_path = screenshot_filename
+
+3️⃣ Screenshot de ERRO (linha 5255):
+   ANTES: proc.elaw_screenshot_after_path = f"rpa_screenshots/{screenshot_filename}"
+   DEPOIS: proc.elaw_screenshot_after_path = screenshot_filename
+
+🧪 COMO VALIDAR:
+1. Processar um novo lote com 2+ PDFs
+2. Aguardar processamento terminar
+3. Acessar página de detalhes do batch
+4. Verificar botões aparecem:
+   📸 Botão verde "Screenshot ANTES"
+   📸 Botão azul "Screenshot DEPOIS"
+
+✅ STATUS: Workflow reiniciado, sistema pronto para teste!
+
+═══════════════════════════════════════════════════════════════

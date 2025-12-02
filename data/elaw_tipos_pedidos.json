@@ -1,0 +1,2407 @@
+[
+  {
+    "value": "11484",
+    "text": "Inconstitucionalidade do art.790",
+    "text_lower": "inconstitucionalidade do art.790"
+  },
+  {
+    "value": "11571",
+    "text": "0100328-84.2024.5.01.0343",
+    "text_lower": "0100328-84.2024.5.01.0343"
+  },
+  {
+    "value": "149",
+    "text": "Abono Assiduidade",
+    "text_lower": "abono assiduidade"
+  },
+  {
+    "value": "150",
+    "text": "Abono Convenção",
+    "text_lower": "abono convenção"
+  },
+  {
+    "value": "534",
+    "text": "ABONO PECUNIÁRIO",
+    "text_lower": "abono pecuniário"
+  },
+  {
+    "value": "189",
+    "text": "Ação Anulatória",
+    "text_lower": "ação anulatória"
+  },
+  {
+    "value": "128",
+    "text": "Ação Rescisória",
+    "text_lower": "ação rescisória"
+  },
+  {
+    "value": "108",
+    "text": "Acidentes Pessoais Passageiro",
+    "text_lower": "acidentes pessoais passageiro"
+  },
+  {
+    "value": "11510",
+    "text": "Acolhimento do tempo para aposentadoria especial",
+    "text_lower": "acolhimento do tempo para aposentadoria especial"
+  },
+  {
+    "value": "366",
+    "text": "ACORDO",
+    "text_lower": "acordo"
+  },
+  {
+    "value": "635",
+    "text": "Acordo coletivo",
+    "text_lower": "acordo coletivo"
+  },
+  {
+    "value": "447",
+    "text": "ACRÉSCIMO SALARIAL",
+    "text_lower": "acréscimo salarial"
+  },
+  {
+    "value": "11377",
+    "text": "Acúmulo de funções",
+    "text_lower": "acúmulo de funções"
+  },
+  {
+    "value": "11378",
+    "text": "Adicional de assiduidade",
+    "text_lower": "adicional de assiduidade"
+  },
+  {
+    "value": "132",
+    "text": "Adicional de Dupla Função",
+    "text_lower": "adicional de dupla função"
+  },
+  {
+    "value": "153",
+    "text": "Adicional de Insalubridade",
+    "text_lower": "adicional de insalubridade"
+  },
+  {
+    "value": "11379",
+    "text": "adicional de insalubridade diferença",
+    "text_lower": "adicional de insalubridade diferença"
+  },
+  {
+    "value": "11380",
+    "text": "adicional de insalubridade integração",
+    "text_lower": "adicional de insalubridade integração"
+  },
+  {
+    "value": "11568",
+    "text": "Adicional de inspeção e fiscalização de produtos",
+    "text_lower": "adicional de inspeção e fiscalização de produtos"
+  },
+  {
+    "value": "11381",
+    "text": "adicional de periculosidade",
+    "text_lower": "adicional de periculosidade"
+  },
+  {
+    "value": "133",
+    "text": "Adicional de Periculosidade - Tanque de Combustível",
+    "text_lower": "adicional de periculosidade - tanque de combustível"
+  },
+  {
+    "value": "11382",
+    "text": "adicional de periculosidade diferença",
+    "text_lower": "adicional de periculosidade diferença"
+  },
+  {
+    "value": "11383",
+    "text": "adicional de periculosidade integração",
+    "text_lower": "adicional de periculosidade integração"
+  },
+  {
+    "value": "291",
+    "text": "ADICIONAL DE QUEBRA DE CAIXA",
+    "text_lower": "adicional de quebra de caixa"
+  },
+  {
+    "value": "11555",
+    "text": "Adicional de risco",
+    "text_lower": "adicional de risco"
+  },
+  {
+    "value": "11534",
+    "text": "Adicional de transferência",
+    "text_lower": "adicional de transferência"
+  },
+  {
+    "value": "134",
+    "text": "Adicional Noturno",
+    "text_lower": "adicional noturno"
+  },
+  {
+    "value": "11384",
+    "text": "Adicional por tempo de serviço",
+    "text_lower": "adicional por tempo de serviço"
+  },
+  {
+    "value": "11385",
+    "text": "Adicional por tempo de serviço diferença",
+    "text_lower": "adicional por tempo de serviço diferença"
+  },
+  {
+    "value": "11386",
+    "text": "Adicional por tempo de serviço integração",
+    "text_lower": "adicional por tempo de serviço integração"
+  },
+  {
+    "value": "485",
+    "text": "ajuda de custo",
+    "text_lower": "ajuda de custo"
+  },
+  {
+    "value": "1497",
+    "text": "Ajuda de custo diferença",
+    "text_lower": "ajuda de custo diferença"
+  },
+  {
+    "value": "678",
+    "text": "Ajuda de custo integração",
+    "text_lower": "ajuda de custo integração"
+  },
+  {
+    "value": "11566",
+    "text": "Aluguel de motocicleta",
+    "text_lower": "aluguel de motocicleta"
+  },
+  {
+    "value": "57",
+    "text": "Antecipação de Tutela",
+    "text_lower": "antecipação de tutela"
+  },
+  {
+    "value": "11387",
+    "text": "Anulação de justa causa",
+    "text_lower": "anulação de justa causa"
+  },
+  {
+    "value": "11388",
+    "text": "Art.467 da CLT",
+    "text_lower": "art.467 da clt"
+  },
+  {
+    "value": "135",
+    "text": "Assédio Moral",
+    "text_lower": "assédio moral"
+  },
+  {
+    "value": "137",
+    "text": "Assédio Sexual",
+    "text_lower": "assédio sexual"
+  },
+  {
+    "value": "11390",
+    "text": "Assistência médica",
+    "text_lower": "assistência médica"
+  },
+  {
+    "value": "11392",
+    "text": "Assistência médica - manutenção de plano",
+    "text_lower": "assistência médica - manutenção de plano"
+  },
+  {
+    "value": "11391",
+    "text": "Assistência médica indenização",
+    "text_lower": "assistência médica indenização"
+  },
+  {
+    "value": "1175",
+    "text": "Auto de infração",
+    "text_lower": "auto de infração"
+  },
+  {
+    "value": "100",
+    "text": "Auxílio Alimentação",
+    "text_lower": "auxílio alimentação"
+  },
+  {
+    "value": "11393",
+    "text": "Auxílio alimentação diferença",
+    "text_lower": "auxílio alimentação diferença"
+  },
+  {
+    "value": "11394",
+    "text": "Auxílio alimentação integração",
+    "text_lower": "auxílio alimentação integração"
+  },
+  {
+    "value": "82",
+    "text": "Auxílio Doença",
+    "text_lower": "auxílio doença"
+  },
+  {
+    "value": "11395",
+    "text": "Auxílio maternidade",
+    "text_lower": "auxílio maternidade"
+  },
+  {
+    "value": "1279",
+    "text": "Auxílio Moradia",
+    "text_lower": "auxílio moradia"
+  },
+  {
+    "value": "11396",
+    "text": "Auxílio refeição",
+    "text_lower": "auxílio refeição"
+  },
+  {
+    "value": "11399",
+    "text": "Auxílio refeição - domingos e feriados",
+    "text_lower": "auxílio refeição - domingos e feriados"
+  },
+  {
+    "value": "1130",
+    "text": "Aviso prévio",
+    "text_lower": "aviso prévio"
+  },
+  {
+    "value": "1584",
+    "text": "AVISO PRÉVIO DIFERENÇA",
+    "text_lower": "aviso prévio diferença"
+  },
+  {
+    "value": "11481",
+    "text": "aviso prévio indenizado",
+    "text_lower": "aviso prévio indenizado"
+  },
+  {
+    "value": "10148",
+    "text": "aviso prévio integração",
+    "text_lower": "aviso prévio integração"
+  },
+  {
+    "value": "1184",
+    "text": "Aviso prévio proporcional",
+    "text_lower": "aviso prévio proporcional"
+  },
+  {
+    "value": "858",
+    "text": "BÔNUS",
+    "text_lower": "bônus"
+  },
+  {
+    "value": "11499",
+    "text": "Cálculo homologado",
+    "text_lower": "cálculo homologado"
+  },
+  {
+    "value": "11501",
+    "text": "Cálculo reclamada",
+    "text_lower": "cálculo reclamada"
+  },
+  {
+    "value": "11500",
+    "text": "Cálculo reclamante",
+    "text_lower": "cálculo reclamante"
+  },
+  {
+    "value": "1212",
+    "text": "CAT",
+    "text_lower": "cat"
+  },
+  {
+    "value": "4001",
+    "text": "Cesta básica",
+    "text_lower": "cesta básica"
+  },
+  {
+    "value": "1220",
+    "text": "citação dos sócios",
+    "text_lower": "citação dos sócios"
+  },
+  {
+    "value": "10184",
+    "text": "Comissão",
+    "text_lower": "comissão"
+  },
+  {
+    "value": "1870",
+    "text": "Comissão diferença",
+    "text_lower": "comissão diferença"
+  },
+  {
+    "value": "1639",
+    "text": "COMISSÃO INTEGRAÇÃO",
+    "text_lower": "comissão integração"
+  },
+  {
+    "value": "1040",
+    "text": "Complementação de aposentadoria",
+    "text_lower": "complementação de aposentadoria"
+  },
+  {
+    "value": "1970",
+    "text": "Comprovante de pagamento",
+    "text_lower": "comprovante de pagamento"
+  },
+  {
+    "value": "1972",
+    "text": "Conciliação prévia",
+    "text_lower": "conciliação prévia"
+  },
+  {
+    "value": "11494",
+    "text": "consignação em pagamento",
+    "text_lower": "consignação em pagamento"
+  },
+  {
+    "value": "11497",
+    "text": "Contingência acordão TRT",
+    "text_lower": "contingência acordão trt"
+  },
+  {
+    "value": "11495",
+    "text": "Contingência inicial",
+    "text_lower": "contingência inicial"
+  },
+  {
+    "value": "11496",
+    "text": "Contingência sentença",
+    "text_lower": "contingência sentença"
+  },
+  {
+    "value": "4046",
+    "text": "Contrato de aprendizagem",
+    "text_lower": "contrato de aprendizagem"
+  },
+  {
+    "value": "2570",
+    "text": "Contribuição sindical",
+    "text_lower": "contribuição sindical"
+  },
+  {
+    "value": "4049",
+    "text": "Contribuições assistenciais",
+    "text_lower": "contribuições assistenciais"
+  },
+  {
+    "value": "2629",
+    "text": "Contribuições previdenciárias",
+    "text_lower": "contribuições previdenciárias"
+  },
+  {
+    "value": "1905",
+    "text": "CTPS anotação",
+    "text_lower": "ctps anotação"
+  },
+  {
+    "value": "10221",
+    "text": "CTPS baixa",
+    "text_lower": "ctps baixa"
+  },
+  {
+    "value": "2008",
+    "text": "CTPS retificação",
+    "text_lower": "ctps retificação"
+  },
+  {
+    "value": "11513",
+    "text": "Dano extrapatrimoniais",
+    "text_lower": "dano extrapatrimoniais"
+  },
+  {
+    "value": "11514",
+    "text": "Dano patrimonial",
+    "text_lower": "dano patrimonial"
+  },
+  {
+    "value": "11527",
+    "text": "Danos emergenciais",
+    "text_lower": "danos emergenciais"
+  },
+  {
+    "value": "11537",
+    "text": "Danos materiais por acidente de trabalho",
+    "text_lower": "danos materiais por acidente de trabalho"
+  },
+  {
+    "value": "11525",
+    "text": "Danos materiais por doença ocupacional",
+    "text_lower": "danos materiais por doença ocupacional"
+  },
+  {
+    "value": "11536",
+    "text": "Danos morais por acidente de trabalho",
+    "text_lower": "danos morais por acidente de trabalho"
+  },
+  {
+    "value": "11526",
+    "text": "Danos morais por dispensa discriminatória",
+    "text_lower": "danos morais por dispensa discriminatória"
+  },
+  {
+    "value": "11524",
+    "text": "Danos morais por doença ocupacional",
+    "text_lower": "danos morais por doença ocupacional"
+  },
+  {
+    "value": "11550",
+    "text": "Danos morais por não emissão de CAT",
+    "text_lower": "danos morais por não emissão de cat"
+  },
+  {
+    "value": "11538",
+    "text": "Danos morais por perda de uma chance",
+    "text_lower": "danos morais por perda de uma chance"
+  },
+  {
+    "value": "11556",
+    "text": "Danos morais por risco de morte",
+    "text_lower": "danos morais por risco de morte"
+  },
+  {
+    "value": "11549",
+    "text": "Danos morais por transporte de valores",
+    "text_lower": "danos morais por transporte de valores"
+  },
+  {
+    "value": "11376",
+    "text": "Décimo quarto salário",
+    "text_lower": "décimo quarto salário"
+  },
+  {
+    "value": "11374",
+    "text": "décimo terceiro salário",
+    "text_lower": "décimo terceiro salário"
+  },
+  {
+    "value": "4642",
+    "text": "Décimo terceiro salário diferença",
+    "text_lower": "décimo terceiro salário diferença"
+  },
+  {
+    "value": "1951",
+    "text": "décimo terceiro salário integração",
+    "text_lower": "décimo terceiro salário integração"
+  },
+  {
+    "value": "11375",
+    "text": "décimo terceiro salário proporcional",
+    "text_lower": "décimo terceiro salário proporcional"
+  },
+  {
+    "value": "2047",
+    "text": "Declaração",
+    "text_lower": "declaração"
+  },
+  {
+    "value": "11480",
+    "text": "declaração de ilegalidade da escala",
+    "text_lower": "declaração de ilegalidade da escala"
+  },
+  {
+    "value": "1955",
+    "text": "DECLARAÇÃO DE NULIDADE",
+    "text_lower": "declaração de nulidade"
+  },
+  {
+    "value": "1443",
+    "text": "Depoimento pessoal",
+    "text_lower": "depoimento pessoal"
+  },
+  {
+    "value": "2347",
+    "text": "Depósito FGTS",
+    "text_lower": "depósito fgts"
+  },
+  {
+    "value": "11400",
+    "text": "Depósito FGTS",
+    "text_lower": "depósito fgts"
+  },
+  {
+    "value": "4671",
+    "text": "Descanso semanal remunerado",
+    "text_lower": "descanso semanal remunerado"
+  },
+  {
+    "value": "11401",
+    "text": "Descanso semanal remunerado diferença",
+    "text_lower": "descanso semanal remunerado diferença"
+  },
+  {
+    "value": "2351",
+    "text": "Descanso semanal remunerado integração",
+    "text_lower": "descanso semanal remunerado integração"
+  },
+  {
+    "value": "4182",
+    "text": "desconsideração da personalidade jurídica",
+    "text_lower": "desconsideração da personalidade jurídica"
+  },
+  {
+    "value": "11402",
+    "text": "Descontos indevidos",
+    "text_lower": "descontos indevidos"
+  },
+  {
+    "value": "2060",
+    "text": "Descontos TRCT",
+    "text_lower": "descontos trct"
+  },
+  {
+    "value": "4186",
+    "text": "despesas com perícia",
+    "text_lower": "despesas com perícia"
+  },
+  {
+    "value": "4679",
+    "text": "Despesas médicas",
+    "text_lower": "despesas médicas"
+  },
+  {
+    "value": "11491",
+    "text": "Despesas processuais",
+    "text_lower": "despesas processuais"
+  },
+  {
+    "value": "2563",
+    "text": "Desvio de função",
+    "text_lower": "desvio de função"
+  },
+  {
+    "value": "1461",
+    "text": "Devolução de descontos indevidos",
+    "text_lower": "devolução de descontos indevidos"
+  },
+  {
+    "value": "11553",
+    "text": "Devolução de indenização por danos morais",
+    "text_lower": "devolução de indenização por danos morais"
+  },
+  {
+    "value": "11403",
+    "text": "Diária de viagem",
+    "text_lower": "diária de viagem"
+  },
+  {
+    "value": "11487",
+    "text": "Diferença adicional noturno",
+    "text_lower": "diferença adicional noturno"
+  },
+  {
+    "value": "11488",
+    "text": "diferença depósito FGTS",
+    "text_lower": "diferença depósito fgts"
+  },
+  {
+    "value": "11516",
+    "text": "Diferença diária de viagem",
+    "text_lower": "diferença diária de viagem"
+  },
+  {
+    "value": "11517",
+    "text": "Diferença dos pagamentos feriados",
+    "text_lower": "diferença dos pagamentos feriados"
+  },
+  {
+    "value": "11474",
+    "text": "diferença PLR",
+    "text_lower": "diferença plr"
+  },
+  {
+    "value": "2181",
+    "text": "Diferença salarial",
+    "text_lower": "diferença salarial"
+  },
+  {
+    "value": "2142",
+    "text": "diferença salarial - acúmulo de função",
+    "text_lower": "diferença salarial - acúmulo de função"
+  },
+  {
+    "value": "11554",
+    "text": "Diferenças salariais por isonomia",
+    "text_lower": "diferenças salariais por isonomia"
+  },
+  {
+    "value": "11547",
+    "text": "Diferenças salariais por piso normativo",
+    "text_lower": "diferenças salariais por piso normativo"
+  },
+  {
+    "value": "11404",
+    "text": "Dissídio coletivo",
+    "text_lower": "dissídio coletivo"
+  },
+  {
+    "value": "2197",
+    "text": "Dissídio diferença",
+    "text_lower": "dissídio diferença"
+  },
+  {
+    "value": "2827",
+    "text": "Domingos e feriados trabalhados",
+    "text_lower": "domingos e feriados trabalhados"
+  },
+  {
+    "value": "11472",
+    "text": "emissão CAT",
+    "text_lower": "emissão cat"
+  },
+  {
+    "value": "2483",
+    "text": "ENQUADRAMENTO SINDICAL",
+    "text_lower": "enquadramento sindical"
+  },
+  {
+    "value": "11406",
+    "text": "Entrega chave de conectividade",
+    "text_lower": "entrega chave de conectividade"
+  },
+  {
+    "value": "11405",
+    "text": "Entrega CTPS",
+    "text_lower": "entrega ctps"
+  },
+  {
+    "value": "10427",
+    "text": "Entrega de documentos",
+    "text_lower": "entrega de documentos"
+  },
+  {
+    "value": "11407",
+    "text": "Equipamento de proteção individual - EPI",
+    "text_lower": "equipamento de proteção individual - epi"
+  },
+  {
+    "value": "6274",
+    "text": "EQUIPARAÇÃO SALARIAL",
+    "text_lower": "equiparação salarial"
+  },
+  {
+    "value": "5880",
+    "text": "ESTABILIDADE",
+    "text_lower": "estabilidade"
+  },
+  {
+    "value": "11522",
+    "text": "Estabilidade acidentária",
+    "text_lower": "estabilidade acidentária"
+  },
+  {
+    "value": "2714",
+    "text": "ESTABILIDADE CIPA",
+    "text_lower": "estabilidade cipa"
+  },
+  {
+    "value": "11505",
+    "text": "Estabilidade de emprego",
+    "text_lower": "estabilidade de emprego"
+  },
+  {
+    "value": "11564",
+    "text": "Estabilidade pré aposentadoria",
+    "text_lower": "estabilidade pré aposentadoria"
+  },
+  {
+    "value": "11518",
+    "text": "Execução de título extrajudicial",
+    "text_lower": "execução de título extrajudicial"
+  },
+  {
+    "value": "11408",
+    "text": "Execução provisória",
+    "text_lower": "execução provisória"
+  },
+  {
+    "value": "3061",
+    "text": "Execução provisória em autos suplementares",
+    "text_lower": "execução provisória em autos suplementares"
+  },
+  {
+    "value": "10459",
+    "text": "Execução sócio",
+    "text_lower": "execução sócio"
+  },
+  {
+    "value": "11520",
+    "text": "exibição de áudio e vídeo",
+    "text_lower": "exibição de áudio e vídeo"
+  },
+  {
+    "value": "11469",
+    "text": "exibição de documentos e produção antecpada de provas",
+    "text_lower": "exibição de documentos e produção antecpada de provas"
+  },
+  {
+    "value": "11521",
+    "text": "expedição de alvará judicial",
+    "text_lower": "expedição de alvará judicial"
+  },
+  {
+    "value": "10462",
+    "text": "EXPEDIÇÃO DE OFÍCIOS",
+    "text_lower": "expedição de ofícios"
+  },
+  {
+    "value": "3166",
+    "text": "EXPEDIÇÃO DE OFÍCIOS E ORGÃOS REGULADORES",
+    "text_lower": "expedição de ofícios e orgãos reguladores"
+  },
+  {
+    "value": "11551",
+    "text": "Extinção do contrato por acordo entre empregado e empregador",
+    "text_lower": "extinção do contrato por acordo entre empregado e empregador"
+  },
+  {
+    "value": "11397",
+    "text": "Feriado",
+    "text_lower": "feriado"
+  },
+  {
+    "value": "11398",
+    "text": "Feriado integração",
+    "text_lower": "feriado integração"
+  },
+  {
+    "value": "10483",
+    "text": "FERIADO TRABALHADO",
+    "text_lower": "feriado trabalhado"
+  },
+  {
+    "value": "7219",
+    "text": "Férias",
+    "text_lower": "férias"
+  },
+  {
+    "value": "3375",
+    "text": "Férias abono",
+    "text_lower": "férias abono"
+  },
+  {
+    "value": "2738",
+    "text": "Férias adicional 1/3",
+    "text_lower": "férias adicional 1/3"
+  },
+  {
+    "value": "3190",
+    "text": "Férias diferença",
+    "text_lower": "férias diferença"
+  },
+  {
+    "value": "2741",
+    "text": "Férias em dobro",
+    "text_lower": "férias em dobro"
+  },
+  {
+    "value": "3680",
+    "text": "Férias indenizadas",
+    "text_lower": "férias indenizadas"
+  },
+  {
+    "value": "11482",
+    "text": "férias integração + 1/3",
+    "text_lower": "férias integração + 1/3"
+  },
+  {
+    "value": "7222",
+    "text": "FÉRIAS PROPORCIONAIS",
+    "text_lower": "férias proporcionais"
+  },
+  {
+    "value": "3683",
+    "text": "FÉRIAS VENCIDAS",
+    "text_lower": "férias vencidas"
+  },
+  {
+    "value": "3202",
+    "text": "FGTS + 40%",
+    "text_lower": "fgts + 40%"
+  },
+  {
+    "value": "3693",
+    "text": "FGTS diferença",
+    "text_lower": "fgts diferença"
+  },
+  {
+    "value": "3695",
+    "text": "FGTS diferença de multa",
+    "text_lower": "fgts diferença de multa"
+  },
+  {
+    "value": "3388",
+    "text": "FGTS guias para saque",
+    "text_lower": "fgts guias para saque"
+  },
+  {
+    "value": "2775",
+    "text": "FGTS indenização",
+    "text_lower": "fgts indenização"
+  },
+  {
+    "value": "7229",
+    "text": "FGTS integração + 40%",
+    "text_lower": "fgts integração + 40%"
+  },
+  {
+    "value": "11410",
+    "text": "Formulário ppp - sb40",
+    "text_lower": "formulário ppp - sb40"
+  },
+  {
+    "value": "2305",
+    "text": "Gorjetas",
+    "text_lower": "gorjetas"
+  },
+  {
+    "value": "10538",
+    "text": "Gratificação",
+    "text_lower": "gratificação"
+  },
+  {
+    "value": "7277",
+    "text": "Gratificação de função",
+    "text_lower": "gratificação de função"
+  },
+  {
+    "value": "6612",
+    "text": "Gratificação de natal",
+    "text_lower": "gratificação de natal"
+  },
+  {
+    "value": "3245",
+    "text": "Gratificação diferença",
+    "text_lower": "gratificação diferença"
+  },
+  {
+    "value": "10543",
+    "text": "Gratificação integração",
+    "text_lower": "gratificação integração"
+  },
+  {
+    "value": "3903",
+    "text": "Gratificação por tempo de serviço",
+    "text_lower": "gratificação por tempo de serviço"
+  },
+  {
+    "value": "3517",
+    "text": "Gratuidade de justiça",
+    "text_lower": "gratuidade de justiça"
+  },
+  {
+    "value": "10551",
+    "text": "Guias CD",
+    "text_lower": "guias cd"
+  },
+  {
+    "value": "11411",
+    "text": "Guias CD/SD",
+    "text_lower": "guias cd/sd"
+  },
+  {
+    "value": "7288",
+    "text": "Guias TRCT",
+    "text_lower": "guias trct"
+  },
+  {
+    "value": "121",
+    "text": "Homologação de Acordo Extrajudicial",
+    "text_lower": "homologação de acordo extrajudicial"
+  },
+  {
+    "value": "3422",
+    "text": "Honorários advocatícios",
+    "text_lower": "honorários advocatícios"
+  },
+  {
+    "value": "3588",
+    "text": "Honorários contratuais",
+    "text_lower": "honorários contratuais"
+  },
+  {
+    "value": "10629",
+    "text": "Honorários de sucubências",
+    "text_lower": "honorários de sucubências"
+  },
+  {
+    "value": "10631",
+    "text": "Honorários periciais",
+    "text_lower": "honorários periciais"
+  },
+  {
+    "value": "3156",
+    "text": "Hora extra",
+    "text_lower": "hora extra"
+  },
+  {
+    "value": "10633",
+    "text": "Hora extra 100%",
+    "text_lower": "hora extra 100%"
+  },
+  {
+    "value": "3158",
+    "text": "Hora extra 50%",
+    "text_lower": "hora extra 50%"
+  },
+  {
+    "value": "5078",
+    "text": "Hora extra 8ª hora diária",
+    "text_lower": "hora extra 8ª hora diária"
+  },
+  {
+    "value": "3792",
+    "text": "Hora extra adicional",
+    "text_lower": "hora extra adicional"
+  },
+  {
+    "value": "7318",
+    "text": "Hora extra cargo de confiança",
+    "text_lower": "hora extra cargo de confiança"
+  },
+  {
+    "value": "3793",
+    "text": "Hora extra diária",
+    "text_lower": "hora extra diária"
+  },
+  {
+    "value": "3590",
+    "text": "Hora extra diferença",
+    "text_lower": "hora extra diferença"
+  },
+  {
+    "value": "7879",
+    "text": "Hora extra excedente 44ª hora semanal",
+    "text_lower": "hora extra excedente 44ª hora semanal"
+  },
+  {
+    "value": "10636",
+    "text": "Hora extra feriado/ domingo",
+    "text_lower": "hora extra feriado/ domingo"
+  },
+  {
+    "value": "7320",
+    "text": "Hora extra integração",
+    "text_lower": "hora extra integração"
+  },
+  {
+    "value": "11412",
+    "text": "Hora extra interjonada (intervalo)",
+    "text_lower": "hora extra interjonada (intervalo)"
+  },
+  {
+    "value": "11544",
+    "text": "Hora extra intervalo de descanso motorista",
+    "text_lower": "hora extra intervalo de descanso motorista"
+  },
+  {
+    "value": "11413",
+    "text": "hora extra intrajornada (intervalo)",
+    "text_lower": "hora extra intrajornada (intervalo)"
+  },
+  {
+    "value": "7323",
+    "text": "Hora extra noturna",
+    "text_lower": "hora extra noturna"
+  },
+  {
+    "value": "11414",
+    "text": "Hora extra noturna prorrogação",
+    "text_lower": "hora extra noturna prorrogação"
+  },
+  {
+    "value": "11415",
+    "text": "Hora extra RSR",
+    "text_lower": "hora extra rsr"
+  },
+  {
+    "value": "11416",
+    "text": "hora in intinere",
+    "text_lower": "hora in intinere"
+  },
+  {
+    "value": "11417",
+    "text": "Hora in intinere diferença",
+    "text_lower": "hora in intinere diferença"
+  },
+  {
+    "value": "11418",
+    "text": "Hora in intinere integração",
+    "text_lower": "hora in intinere integração"
+  },
+  {
+    "value": "3796",
+    "text": "Hora noturna",
+    "text_lower": "hora noturna"
+  },
+  {
+    "value": "5083",
+    "text": "Hora noturna integração",
+    "text_lower": "hora noturna integração"
+  },
+  {
+    "value": "3797",
+    "text": "Hora sobreaviso",
+    "text_lower": "hora sobreaviso"
+  },
+  {
+    "value": "3600",
+    "text": "Hora sobreaviso diferença",
+    "text_lower": "hora sobreaviso diferença"
+  },
+  {
+    "value": "7326",
+    "text": "Hora sobreaviso integração",
+    "text_lower": "hora sobreaviso integração"
+  },
+  {
+    "value": "4812",
+    "text": "Hora suplementar",
+    "text_lower": "hora suplementar"
+  },
+  {
+    "value": "11565",
+    "text": "Horas de transbordo",
+    "text_lower": "horas de transbordo"
+  },
+  {
+    "value": "22",
+    "text": "Horas Extras",
+    "text_lower": "horas extras"
+  },
+  {
+    "value": "11535",
+    "text": "Horas extras tempo de espera motorista",
+    "text_lower": "horas extras tempo de espera motorista"
+  },
+  {
+    "value": "11548",
+    "text": "Horas in itinere",
+    "text_lower": "horas in itinere"
+  },
+  {
+    "value": "11519",
+    "text": "impugnação de cálculos",
+    "text_lower": "impugnação de cálculos"
+  },
+  {
+    "value": "11509",
+    "text": "Incapacidade permamente",
+    "text_lower": "incapacidade permamente"
+  },
+  {
+    "value": "10673",
+    "text": "INDENIZAÇÃO",
+    "text_lower": "indenização"
+  },
+  {
+    "value": "7371",
+    "text": "indenização acidente de trabalho",
+    "text_lower": "indenização acidente de trabalho"
+  },
+  {
+    "value": "4292",
+    "text": "indenização adicional",
+    "text_lower": "indenização adicional"
+  },
+  {
+    "value": "11421",
+    "text": "indenização assédio moral",
+    "text_lower": "indenização assédio moral"
+  },
+  {
+    "value": "5124",
+    "text": "indenização compensatória",
+    "text_lower": "indenização compensatória"
+  },
+  {
+    "value": "11420",
+    "text": "indenização dano existencial",
+    "text_lower": "indenização dano existencial"
+  },
+  {
+    "value": "3863",
+    "text": "indenização dano material",
+    "text_lower": "indenização dano material"
+  },
+  {
+    "value": "5126",
+    "text": "indenização dano moral",
+    "text_lower": "indenização dano moral"
+  },
+  {
+    "value": "5134",
+    "text": "indenização diária",
+    "text_lower": "indenização diária"
+  },
+  {
+    "value": "4860",
+    "text": "indenização estabilidade provisória",
+    "text_lower": "indenização estabilidade provisória"
+  },
+  {
+    "value": "4101",
+    "text": "indenização gestante",
+    "text_lower": "indenização gestante"
+  },
+  {
+    "value": "3870",
+    "text": "indenização perdas e danos",
+    "text_lower": "indenização perdas e danos"
+  },
+  {
+    "value": "11426",
+    "text": "indenização PIS",
+    "text_lower": "indenização pis"
+  },
+  {
+    "value": "11511",
+    "text": "Indenização por danos estéticos",
+    "text_lower": "indenização por danos estéticos"
+  },
+  {
+    "value": "11512",
+    "text": "Indenização por danos psicológicos",
+    "text_lower": "indenização por danos psicológicos"
+  },
+  {
+    "value": "11545",
+    "text": "Indenização por não fornecimento de lanche",
+    "text_lower": "indenização por não fornecimento de lanche"
+  },
+  {
+    "value": "11419",
+    "text": "indenização seguro desemprego",
+    "text_lower": "indenização seguro desemprego"
+  },
+  {
+    "value": "3873",
+    "text": "indenização substitutiva",
+    "text_lower": "indenização substitutiva"
+  },
+  {
+    "value": "11422",
+    "text": "indenização substitutivas",
+    "text_lower": "indenização substitutivas"
+  },
+  {
+    "value": "4870",
+    "text": "inquérito civil público",
+    "text_lower": "inquérito civil público"
+  },
+  {
+    "value": "7905",
+    "text": "INSS - Diferença",
+    "text_lower": "inss - diferença"
+  },
+  {
+    "value": "4132",
+    "text": "integração à remuneração",
+    "text_lower": "integração à remuneração"
+  },
+  {
+    "value": "11423",
+    "text": "integração integração ajuda de custo",
+    "text_lower": "integração integração ajuda de custo"
+  },
+  {
+    "value": "11424",
+    "text": "integração salarial",
+    "text_lower": "integração salarial"
+  },
+  {
+    "value": "11425",
+    "text": "interrupção prescrição",
+    "text_lower": "interrupção prescrição"
+  },
+  {
+    "value": "8514",
+    "text": "intervalo interjornada",
+    "text_lower": "intervalo interjornada"
+  },
+  {
+    "value": "4348",
+    "text": "intervalo intrajornada",
+    "text_lower": "intervalo intrajornada"
+  },
+  {
+    "value": "11572",
+    "text": "Intervalo para recuperação térmica",
+    "text_lower": "intervalo para recuperação térmica"
+  },
+  {
+    "value": "4144",
+    "text": "intimação pessoal do ministério público do trabalho",
+    "text_lower": "intimação pessoal do ministério público do trabalho"
+  },
+  {
+    "value": "11502",
+    "text": "Invalidade do acordo de suspensão do contrato de trabalho",
+    "text_lower": "invalidade do acordo de suspensão do contrato de trabalho"
+  },
+  {
+    "value": "7924",
+    "text": "inversão do ônus da prova",
+    "text_lower": "inversão do ônus da prova"
+  },
+  {
+    "value": "10734",
+    "text": "IR pagamento pelo empregador",
+    "text_lower": "ir pagamento pelo empregador"
+  },
+  {
+    "value": "4351",
+    "text": "IRRF",
+    "text_lower": "irrf"
+  },
+  {
+    "value": "7937",
+    "text": "Juros de mora e correção monetária",
+    "text_lower": "juros de mora e correção monetária"
+  },
+  {
+    "value": "4435",
+    "text": "liberação das guias",
+    "text_lower": "liberação das guias"
+  },
+  {
+    "value": "4356",
+    "text": "Licença maternidade",
+    "text_lower": "licença maternidade"
+  },
+  {
+    "value": "1679",
+    "text": "Licença paternidade",
+    "text_lower": "licença paternidade"
+  },
+  {
+    "value": "7949",
+    "text": "liminar",
+    "text_lower": "liminar"
+  },
+  {
+    "value": "10762",
+    "text": "LTCAT",
+    "text_lower": "ltcat"
+  },
+  {
+    "value": "35",
+    "text": "Lucros Cessantes",
+    "text_lower": "lucros cessantes"
+  },
+  {
+    "value": "11560",
+    "text": "Manutenção do veículo",
+    "text_lower": "manutenção do veículo"
+  },
+  {
+    "value": "8422",
+    "text": "multa anotação CTPS",
+    "text_lower": "multa anotação ctps"
+  },
+  {
+    "value": "11428",
+    "text": "multa art 435 da CLT",
+    "text_lower": "multa art 435 da clt"
+  },
+  {
+    "value": "1678",
+    "text": "Multa art 467 da CLT",
+    "text_lower": "multa art 467 da clt"
+  },
+  {
+    "value": "764",
+    "text": "Multa art 477 §§ 6º e 8º da clt",
+    "text_lower": "multa art 477 §§ 6º e 8º da clt"
+  },
+  {
+    "value": "1677",
+    "text": "Multa art 477 da CLT § 8º da clt",
+    "text_lower": "multa art 477 da clt § 8º da clt"
+  },
+  {
+    "value": "11427",
+    "text": "multa art 479 da CLT",
+    "text_lower": "multa art 479 da clt"
+  },
+  {
+    "value": "11389",
+    "text": "Multa Art. 477 da CLT",
+    "text_lower": "multa art. 477 da clt"
+  },
+  {
+    "value": "11409",
+    "text": "Multa convenção coletiva",
+    "text_lower": "multa convenção coletiva"
+  },
+  {
+    "value": "11430",
+    "text": "multa convencionais",
+    "text_lower": "multa convencionais"
+  },
+  {
+    "value": "8431",
+    "text": "multa diária",
+    "text_lower": "multa diária"
+  },
+  {
+    "value": "8575",
+    "text": "multa dissídio coletivo",
+    "text_lower": "multa dissídio coletivo"
+  },
+  {
+    "value": "8433",
+    "text": "multa indenizatória",
+    "text_lower": "multa indenizatória"
+  },
+  {
+    "value": "8434",
+    "text": "multa pecuniária",
+    "text_lower": "multa pecuniária"
+  },
+  {
+    "value": "11529",
+    "text": "Multa por falta de recolhimento FGTS",
+    "text_lower": "multa por falta de recolhimento fgts"
+  },
+  {
+    "value": "11546",
+    "text": "Multa por não emissão de CAT",
+    "text_lower": "multa por não emissão de cat"
+  },
+  {
+    "value": "5448",
+    "text": "multa rescisória",
+    "text_lower": "multa rescisória"
+  },
+  {
+    "value": "10813",
+    "text": "multa resilitória",
+    "text_lower": "multa resilitória"
+  },
+  {
+    "value": "4902",
+    "text": "nulidade",
+    "text_lower": "nulidade"
+  },
+  {
+    "value": "4926",
+    "text": "nulidade banco de horas",
+    "text_lower": "nulidade banco de horas"
+  },
+  {
+    "value": "11432",
+    "text": "nulidade cartões de ponto",
+    "text_lower": "nulidade cartões de ponto"
+  },
+  {
+    "value": "6424",
+    "text": "NULIDADE DA DISPENSA",
+    "text_lower": "nulidade da dispensa"
+  },
+  {
+    "value": "11563",
+    "text": "Nulidade do acordo para terminação contratual",
+    "text_lower": "nulidade do acordo para terminação contratual"
+  },
+  {
+    "value": "11543",
+    "text": "Nulidade do aviso prévio",
+    "text_lower": "nulidade do aviso prévio"
+  },
+  {
+    "value": "11542",
+    "text": "Nulidade do contrato de aprendizagem",
+    "text_lower": "nulidade do contrato de aprendizagem"
+  },
+  {
+    "value": "11561",
+    "text": "Nulidade do contrato de estágio",
+    "text_lower": "nulidade do contrato de estágio"
+  },
+  {
+    "value": "11557",
+    "text": "Nulidade do contrato de experiência",
+    "text_lower": "nulidade do contrato de experiência"
+  },
+  {
+    "value": "11541",
+    "text": "Nulidade do contrato de prestação de serviços",
+    "text_lower": "nulidade do contrato de prestação de serviços"
+  },
+  {
+    "value": "11552",
+    "text": "Nulidade do contrato intermitente",
+    "text_lower": "nulidade do contrato intermitente"
+  },
+  {
+    "value": "11431",
+    "text": "nulidade justa causa",
+    "text_lower": "nulidade justa causa"
+  },
+  {
+    "value": "8483",
+    "text": "nulidade pedido de demissão",
+    "text_lower": "nulidade pedido de demissão"
+  },
+  {
+    "value": "6321",
+    "text": "nulidade recibos de pagamento",
+    "text_lower": "nulidade recibos de pagamento"
+  },
+  {
+    "value": "43",
+    "text": "Obrigação de fazer",
+    "text_lower": "obrigação de fazer"
+  },
+  {
+    "value": "8917",
+    "text": "obrigação de não fazer",
+    "text_lower": "obrigação de não fazer"
+  },
+  {
+    "value": "11439",
+    "text": "ofício aos órgãos competentes",
+    "text_lower": "ofício aos órgãos competentes"
+  },
+  {
+    "value": "6445",
+    "text": "ofício da secretaria nacional",
+    "text_lower": "ofício da secretaria nacional"
+  },
+  {
+    "value": "4949",
+    "text": "ofício DRF",
+    "text_lower": "ofício drf"
+  },
+  {
+    "value": "6447",
+    "text": "ofício DRT",
+    "text_lower": "ofício drt"
+  },
+  {
+    "value": "6335",
+    "text": "ofício INSS",
+    "text_lower": "ofício inss"
+  },
+  {
+    "value": "4951",
+    "text": "ofício ministério do trabalho",
+    "text_lower": "ofício ministério do trabalho"
+  },
+  {
+    "value": "8921",
+    "text": "ofício MP",
+    "text_lower": "ofício mp"
+  },
+  {
+    "value": "5292",
+    "text": "ofício MPF",
+    "text_lower": "ofício mpf"
+  },
+  {
+    "value": "5019",
+    "text": "ofício MPT",
+    "text_lower": "ofício mpt"
+  },
+  {
+    "value": "6449",
+    "text": "OFÍCIO MTE",
+    "text_lower": "ofício mte"
+  },
+  {
+    "value": "6451",
+    "text": "ofício PF",
+    "text_lower": "ofício pf"
+  },
+  {
+    "value": "5293",
+    "text": "ofício previdência social",
+    "text_lower": "ofício previdência social"
+  },
+  {
+    "value": "6340",
+    "text": "OFÍCIO RECEITA FEDERAL",
+    "text_lower": "ofício receita federal"
+  },
+  {
+    "value": "8922",
+    "text": "ofício RF",
+    "text_lower": "ofício rf"
+  },
+  {
+    "value": "5020",
+    "text": "ofício secretaria da fazenda",
+    "text_lower": "ofício secretaria da fazenda"
+  },
+  {
+    "value": "11435",
+    "text": "ofício secretaria da fazenda nacional",
+    "text_lower": "ofício secretaria da fazenda nacional"
+  },
+  {
+    "value": "6452",
+    "text": "ofício secretaria vara do trabalho",
+    "text_lower": "ofício secretaria vara do trabalho"
+  },
+  {
+    "value": "5021",
+    "text": "ofício SGT",
+    "text_lower": "ofício sgt"
+  },
+  {
+    "value": "10879",
+    "text": "ofício SRF",
+    "text_lower": "ofício srf"
+  },
+  {
+    "value": "11434",
+    "text": "ofíco CEF",
+    "text_lower": "ofíco cef"
+  },
+  {
+    "value": "11440",
+    "text": "ordem de serviço",
+    "text_lower": "ordem de serviço"
+  },
+  {
+    "value": "6459",
+    "text": "pagamento",
+    "text_lower": "pagamento"
+  },
+  {
+    "value": "8932",
+    "text": "pagamento da diferença",
+    "text_lower": "pagamento da diferença"
+  },
+  {
+    "value": "11442",
+    "text": "pagamento das diferenças salariais",
+    "text_lower": "pagamento das diferenças salariais"
+  },
+  {
+    "value": "11559",
+    "text": "Pagamento de café da manhã",
+    "text_lower": "pagamento de café da manhã"
+  },
+  {
+    "value": "11533",
+    "text": "Pagamento de depreciação do veículo",
+    "text_lower": "pagamento de depreciação do veículo"
+  },
+  {
+    "value": "4956",
+    "text": "pagamento de hora extra",
+    "text_lower": "pagamento de hora extra"
+  },
+  {
+    "value": "5037",
+    "text": "pagamento de indenização",
+    "text_lower": "pagamento de indenização"
+  },
+  {
+    "value": "11531",
+    "text": "Pagamento de IPVA",
+    "text_lower": "pagamento de ipva"
+  },
+  {
+    "value": "8502",
+    "text": "pagamento de multa",
+    "text_lower": "pagamento de multa"
+  },
+  {
+    "value": "11532",
+    "text": "Pagamento de seguro total do veículo",
+    "text_lower": "pagamento de seguro total do veículo"
+  },
+  {
+    "value": "5301",
+    "text": "pagamento diferença",
+    "text_lower": "pagamento diferença"
+  },
+  {
+    "value": "11443",
+    "text": "pagamento do acréscimo salarial",
+    "text_lower": "pagamento do acréscimo salarial"
+  },
+  {
+    "value": "11444",
+    "text": "pagamento do plus salarial",
+    "text_lower": "pagamento do plus salarial"
+  },
+  {
+    "value": "11445",
+    "text": "pagamento feriado laborado",
+    "text_lower": "pagamento feriado laborado"
+  },
+  {
+    "value": "8935",
+    "text": "pagamento FGTS",
+    "text_lower": "pagamento fgts"
+  },
+  {
+    "value": "11465",
+    "text": "pagamento INSS",
+    "text_lower": "pagamento inss"
+  },
+  {
+    "value": "11464",
+    "text": "pagamento IRFF",
+    "text_lower": "pagamento irff"
+  },
+  {
+    "value": "11446",
+    "text": "pagamento premio",
+    "text_lower": "pagamento premio"
+  },
+  {
+    "value": "11447",
+    "text": "pagamento salarial",
+    "text_lower": "pagamento salarial"
+  },
+  {
+    "value": "10901",
+    "text": "participação nos lucros diferença",
+    "text_lower": "participação nos lucros diferença"
+  },
+  {
+    "value": "4978",
+    "text": "participação nos lucros e resultados",
+    "text_lower": "participação nos lucros e resultados"
+  },
+  {
+    "value": "6365",
+    "text": "participação nos lucros integração",
+    "text_lower": "participação nos lucros integração"
+  },
+  {
+    "value": "8958",
+    "text": "PCMAT",
+    "text_lower": "pcmat"
+  },
+  {
+    "value": "11452",
+    "text": "PCMSO",
+    "text_lower": "pcmso"
+  },
+  {
+    "value": "11448",
+    "text": "pedido de liminar",
+    "text_lower": "pedido de liminar"
+  },
+  {
+    "value": "11449",
+    "text": "pensão",
+    "text_lower": "pensão"
+  },
+  {
+    "value": "87",
+    "text": "Pensão por Morte",
+    "text_lower": "pensão por morte"
+  },
+  {
+    "value": "5318",
+    "text": "PENSÃO VENCIDAS",
+    "text_lower": "pensão vencidas"
+  },
+  {
+    "value": "6828",
+    "text": "pensão vincendas",
+    "text_lower": "pensão vincendas"
+  },
+  {
+    "value": "11450",
+    "text": "pensão vitálicia",
+    "text_lower": "pensão vitálicia"
+  },
+  {
+    "value": "11451",
+    "text": "perícia",
+    "text_lower": "perícia"
+  },
+  {
+    "value": "5070",
+    "text": "perícia contábil",
+    "text_lower": "perícia contábil"
+  },
+  {
+    "value": "10918",
+    "text": "perícia médica",
+    "text_lower": "perícia médica"
+  },
+  {
+    "value": "11483",
+    "text": "Perícia técnica",
+    "text_lower": "perícia técnica"
+  },
+  {
+    "value": "11493",
+    "text": "PGR (programa de gerenciamento de risco)",
+    "text_lower": "pgr (programa de gerenciamento de risco)"
+  },
+  {
+    "value": "7140",
+    "text": "plano de saude",
+    "text_lower": "plano de saude"
+  },
+  {
+    "value": "5341",
+    "text": "plano de saúde aposentado",
+    "text_lower": "plano de saúde aposentado"
+  },
+  {
+    "value": "9245",
+    "text": "plano de saúde dependente",
+    "text_lower": "plano de saúde dependente"
+  },
+  {
+    "value": "11507",
+    "text": "Plano de saúde vitalício",
+    "text_lower": "plano de saúde vitalício"
+  },
+  {
+    "value": "5347",
+    "text": "plano odontológico",
+    "text_lower": "plano odontológico"
+  },
+  {
+    "value": "5354",
+    "text": "PLR proporcional",
+    "text_lower": "plr proporcional"
+  },
+  {
+    "value": "8747",
+    "text": "PPP",
+    "text_lower": "ppp"
+  },
+  {
+    "value": "5486",
+    "text": "PPPR",
+    "text_lower": "pppr"
+  },
+  {
+    "value": "5558",
+    "text": "PPRA",
+    "text_lower": "ppra"
+  },
+  {
+    "value": "10970",
+    "text": "quinquenio",
+    "text_lower": "quinquenio"
+  },
+  {
+    "value": "11530",
+    "text": "Quotas de vendas",
+    "text_lower": "quotas de vendas"
+  },
+  {
+    "value": "5596",
+    "text": "readmissão",
+    "text_lower": "readmissão"
+  },
+  {
+    "value": "11453",
+    "text": "reajuste salarial",
+    "text_lower": "reajuste salarial"
+  },
+  {
+    "value": "11454",
+    "text": "reativação e manutenção plano de saúde",
+    "text_lower": "reativação e manutenção plano de saúde"
+  },
+  {
+    "value": "11506",
+    "text": "Recibos de pagamentos",
+    "text_lower": "recibos de pagamentos"
+  },
+  {
+    "value": "5602",
+    "text": "recolhimento de quotas",
+    "text_lower": "recolhimento de quotas"
+  },
+  {
+    "value": "5603",
+    "text": "recolhimento do FGTS",
+    "text_lower": "recolhimento do fgts"
+  },
+  {
+    "value": "10981",
+    "text": "recolhimento fiscais",
+    "text_lower": "recolhimento fiscais"
+  },
+  {
+    "value": "11455",
+    "text": "recolhimento imposto de renda",
+    "text_lower": "recolhimento imposto de renda"
+  },
+  {
+    "value": "11456",
+    "text": "recolhimento previdenciarios",
+    "text_lower": "recolhimento previdenciarios"
+  },
+  {
+    "value": "5513",
+    "text": "reconhecimento acidente de trabalho",
+    "text_lower": "reconhecimento acidente de trabalho"
+  },
+  {
+    "value": "11539",
+    "text": "Reconhecimento de atividade especial",
+    "text_lower": "reconhecimento de atividade especial"
+  },
+  {
+    "value": "11558",
+    "text": "Reconhecimento de contrato por prazo indeterminado",
+    "text_lower": "reconhecimento de contrato por prazo indeterminado"
+  },
+  {
+    "value": "11504",
+    "text": "Reconhecimento de doença ocupacional",
+    "text_lower": "reconhecimento de doença ocupacional"
+  },
+  {
+    "value": "8969",
+    "text": "reconhecimento de função",
+    "text_lower": "reconhecimento de função"
+  },
+  {
+    "value": "11457",
+    "text": "reconhecimento do vínculo empregatício",
+    "text_lower": "reconhecimento do vínculo empregatício"
+  },
+  {
+    "value": "11503",
+    "text": "Reconhecimento e aplicação divisor 180H",
+    "text_lower": "reconhecimento e aplicação divisor 180h"
+  },
+  {
+    "value": "11470",
+    "text": "Reembolso",
+    "text_lower": "reembolso"
+  },
+  {
+    "value": "11458",
+    "text": "reembolso de combustível",
+    "text_lower": "reembolso de combustível"
+  },
+  {
+    "value": "10992",
+    "text": "reembolso de despesa",
+    "text_lower": "reembolso de despesa"
+  },
+  {
+    "value": "8979",
+    "text": "reembolso de despesa médica",
+    "text_lower": "reembolso de despesa médica"
+  },
+  {
+    "value": "7193",
+    "text": "REFLEXO ADICIONAL DE INSALUBRIDADE",
+    "text_lower": "reflexo adicional de insalubridade"
+  },
+  {
+    "value": "6906",
+    "text": "reflexo adicional de periculosidade",
+    "text_lower": "reflexo adicional de periculosidade"
+  },
+  {
+    "value": "8985",
+    "text": "reflexo adIcional de sobreaviso",
+    "text_lower": "reflexo adicional de sobreaviso"
+  },
+  {
+    "value": "11459",
+    "text": "reflexo adicional noturno",
+    "text_lower": "reflexo adicional noturno"
+  },
+  {
+    "value": "8986",
+    "text": "reflexo auxilio alimentação",
+    "text_lower": "reflexo auxilio alimentação"
+  },
+  {
+    "value": "11006",
+    "text": "reflexo das férias",
+    "text_lower": "reflexo das férias"
+  },
+  {
+    "value": "6907",
+    "text": "reflexo das horas extras",
+    "text_lower": "reflexo das horas extras"
+  },
+  {
+    "value": "11441",
+    "text": "reflexo das horas in intinere",
+    "text_lower": "reflexo das horas in intinere"
+  },
+  {
+    "value": "5619",
+    "text": "reflexo das verbas contratuais",
+    "text_lower": "reflexo das verbas contratuais"
+  },
+  {
+    "value": "6908",
+    "text": "reflexo das verbas rescisórias",
+    "text_lower": "reflexo das verbas rescisórias"
+  },
+  {
+    "value": "11438",
+    "text": "reflexo de acúmulo de funções",
+    "text_lower": "reflexo de acúmulo de funções"
+  },
+  {
+    "value": "11433",
+    "text": "reflexo de comissões",
+    "text_lower": "reflexo de comissões"
+  },
+  {
+    "value": "5528",
+    "text": "reflexo décimo terceiro",
+    "text_lower": "reflexo décimo terceiro"
+  },
+  {
+    "value": "11436",
+    "text": "reflexo décimo terceiro salário",
+    "text_lower": "reflexo décimo terceiro salário"
+  },
+  {
+    "value": "6909",
+    "text": "reflexo descanso semanal remunerado",
+    "text_lower": "reflexo descanso semanal remunerado"
+  },
+  {
+    "value": "11437",
+    "text": "reflexo desconto indevido",
+    "text_lower": "reflexo desconto indevido"
+  },
+  {
+    "value": "7717",
+    "text": "reflexo diferença salarial",
+    "text_lower": "reflexo diferença salarial"
+  },
+  {
+    "value": "11429",
+    "text": "reflexo dos DSR e feriados",
+    "text_lower": "reflexo dos dsr e feriados"
+  },
+  {
+    "value": "11461",
+    "text": "reflexo equiparação salarial",
+    "text_lower": "reflexo equiparação salarial"
+  },
+  {
+    "value": "11489",
+    "text": "Reflexo estabilidade provisória",
+    "text_lower": "reflexo estabilidade provisória"
+  },
+  {
+    "value": "5794",
+    "text": "reflexo FGTS",
+    "text_lower": "reflexo fgts"
+  },
+  {
+    "value": "11007",
+    "text": "reflexo hora extra intervalo intrajornada",
+    "text_lower": "reflexo hora extra intervalo intrajornada"
+  },
+  {
+    "value": "8989",
+    "text": "reflexo hora extra RSR",
+    "text_lower": "reflexo hora extra rsr"
+  },
+  {
+    "value": "11485",
+    "text": "reflexo intervalo interjornada",
+    "text_lower": "reflexo intervalo interjornada"
+  },
+  {
+    "value": "11008",
+    "text": "reflexo quebra de caixa",
+    "text_lower": "reflexo quebra de caixa"
+  },
+  {
+    "value": "11492",
+    "text": "Reflexo repouso semanal remunerado",
+    "text_lower": "reflexo repouso semanal remunerado"
+  },
+  {
+    "value": "11460",
+    "text": "reflexo salário diferença",
+    "text_lower": "reflexo salário diferença"
+  },
+  {
+    "value": "5530",
+    "text": "reflexo salário por fora",
+    "text_lower": "reflexo salário por fora"
+  },
+  {
+    "value": "144",
+    "text": "Reintegração",
+    "text_lower": "reintegração"
+  },
+  {
+    "value": "5821",
+    "text": "remuneração mensal",
+    "text_lower": "remuneração mensal"
+  },
+  {
+    "value": "11508",
+    "text": "Reparação de danos extrapatrimoniais",
+    "text_lower": "reparação de danos extrapatrimoniais"
+  },
+  {
+    "value": "9024",
+    "text": "repouso semanal remunerado",
+    "text_lower": "repouso semanal remunerado"
+  },
+  {
+    "value": "11462",
+    "text": "repouso semanal remunerado diferença",
+    "text_lower": "repouso semanal remunerado diferença"
+  },
+  {
+    "value": "9026",
+    "text": "repouso semanal remunerado integração",
+    "text_lower": "repouso semanal remunerado integração"
+  },
+  {
+    "value": "9028",
+    "text": "requalificação profissional",
+    "text_lower": "requalificação profissional"
+  },
+  {
+    "value": "9037",
+    "text": "rescisão contratual",
+    "text_lower": "rescisão contratual"
+  },
+  {
+    "value": "6110",
+    "text": "rescisão da decisão",
+    "text_lower": "rescisão da decisão"
+  },
+  {
+    "value": "145",
+    "text": "Rescisão Indireta",
+    "text_lower": "rescisão indireta"
+  },
+  {
+    "value": "5953",
+    "text": "responsabilidade solidária",
+    "text_lower": "responsabilidade solidária"
+  },
+  {
+    "value": "11466",
+    "text": "responsabilidade subsidiária",
+    "text_lower": "responsabilidade subsidiária"
+  },
+  {
+    "value": "11471",
+    "text": "Ressarcimento",
+    "text_lower": "ressarcimento"
+  },
+  {
+    "value": "11467",
+    "text": "ressarcimento despesa",
+    "text_lower": "ressarcimento despesa"
+  },
+  {
+    "value": "11468",
+    "text": "restabelecimento plano de saúde",
+    "text_lower": "restabelecimento plano de saúde"
+  },
+  {
+    "value": "11569",
+    "text": "Restauração de autos",
+    "text_lower": "restauração de autos"
+  },
+  {
+    "value": "6146",
+    "text": "retenções fiscais",
+    "text_lower": "retenções fiscais"
+  },
+  {
+    "value": "7501",
+    "text": "retificação CNIS",
+    "text_lower": "retificação cnis"
+  },
+  {
+    "value": "11490",
+    "text": "retificação PPP",
+    "text_lower": "retificação ppp"
+  },
+  {
+    "value": "7782",
+    "text": "Retificação RAIS",
+    "text_lower": "retificação rais"
+  },
+  {
+    "value": "5969",
+    "text": "Retificação TRCT",
+    "text_lower": "retificação trct"
+  },
+  {
+    "value": "9331",
+    "text": "Reversão da justa causa",
+    "text_lower": "reversão da justa causa"
+  },
+  {
+    "value": "6154",
+    "text": "Reversão da rescisão contratual",
+    "text_lower": "reversão da rescisão contratual"
+  },
+  {
+    "value": "5985",
+    "text": "salário",
+    "text_lower": "salário"
+  },
+  {
+    "value": "11473",
+    "text": "salário adIcional",
+    "text_lower": "salário adicional"
+  },
+  {
+    "value": "6059",
+    "text": "salário diferença",
+    "text_lower": "salário diferença"
+  },
+  {
+    "value": "7536",
+    "text": "salário diferença acúmulo de função",
+    "text_lower": "salário diferença acúmulo de função"
+  },
+  {
+    "value": "11087",
+    "text": "salário diferença desvio de função",
+    "text_lower": "salário diferença desvio de função"
+  },
+  {
+    "value": "11475",
+    "text": "salário diferença equiparação salaria integração",
+    "text_lower": "salário diferença equiparação salaria integração"
+  },
+  {
+    "value": "9490",
+    "text": "salário diferença equiparação salarial",
+    "text_lower": "salário diferença equiparação salarial"
+  },
+  {
+    "value": "9361",
+    "text": "salário diferença integração",
+    "text_lower": "salário diferença integração"
+  },
+  {
+    "value": "11562",
+    "text": "Salário em dobro – lei nº 9.029",
+    "text_lower": "salário em dobro – lei nº 9.029"
+  },
+  {
+    "value": "7996",
+    "text": "salário família",
+    "text_lower": "salário família"
+  },
+  {
+    "value": "8328",
+    "text": "salário in natura",
+    "text_lower": "salário in natura"
+  },
+  {
+    "value": "8330",
+    "text": "salário in natura integração",
+    "text_lower": "salário in natura integração"
+  },
+  {
+    "value": "86",
+    "text": "Salário Maternidade",
+    "text_lower": "salário maternidade"
+  },
+  {
+    "value": "8331",
+    "text": "SALÁRIO POR FORA",
+    "text_lower": "salário por fora"
+  },
+  {
+    "value": "5994",
+    "text": "salário saldo",
+    "text_lower": "salário saldo"
+  },
+  {
+    "value": "8005",
+    "text": "salário substituição",
+    "text_lower": "salário substituição"
+  },
+  {
+    "value": "8334",
+    "text": "salário vencidos",
+    "text_lower": "salário vencidos"
+  },
+  {
+    "value": "8340",
+    "text": "salários vincendos",
+    "text_lower": "salários vincendos"
+  },
+  {
+    "value": "9633",
+    "text": "seguro de vida",
+    "text_lower": "seguro de vida"
+  },
+  {
+    "value": "94",
+    "text": "Seguro Desemprego",
+    "text_lower": "seguro desemprego"
+  },
+  {
+    "value": "6006",
+    "text": "seguro desemprego diferença",
+    "text_lower": "seguro desemprego diferença"
+  },
+  {
+    "value": "8016",
+    "text": "seguro desemprego guias",
+    "text_lower": "seguro desemprego guias"
+  },
+  {
+    "value": "6664",
+    "text": "seguro desemprego indenização",
+    "text_lower": "seguro desemprego indenização"
+  },
+  {
+    "value": "8353",
+    "text": "seguro desemprego multa por atraso",
+    "text_lower": "seguro desemprego multa por atraso"
+  },
+  {
+    "value": "11567",
+    "text": "Taxas de entrega",
+    "text_lower": "taxas de entrega"
+  },
+  {
+    "value": "11463",
+    "text": "termo de rescisão de contrato de trabalho",
+    "text_lower": "termo de rescisão de contrato de trabalho"
+  },
+  {
+    "value": "11477",
+    "text": "tratamento médico",
+    "text_lower": "tratamento médico"
+  },
+  {
+    "value": "9141",
+    "text": "tributos previdenciários",
+    "text_lower": "tributos previdenciários"
+  },
+  {
+    "value": "147",
+    "text": "Unicidade Contratual",
+    "text_lower": "unicidade contratual"
+  },
+  {
+    "value": "7647",
+    "text": "uso indevido de imagem",
+    "text_lower": "uso indevido de imagem"
+  },
+  {
+    "value": "11478",
+    "text": "vale cultura",
+    "text_lower": "vale cultura"
+  },
+  {
+    "value": "9893",
+    "text": "vale refeição",
+    "text_lower": "vale refeição"
+  },
+  {
+    "value": "9896",
+    "text": "vale refeição diferença",
+    "text_lower": "vale refeição diferença"
+  },
+  {
+    "value": "9787",
+    "text": "vale refeição integração",
+    "text_lower": "vale refeição integração"
+  },
+  {
+    "value": "7619",
+    "text": "vale transporte",
+    "text_lower": "vale transporte"
+  },
+  {
+    "value": "11515",
+    "text": "Vale transporte diferença",
+    "text_lower": "vale transporte diferença"
+  },
+  {
+    "value": "11540",
+    "text": "Validação de laudo ambiental",
+    "text_lower": "validação de laudo ambiental"
+  },
+  {
+    "value": "11486",
+    "text": "VALOR TOTAL PEDIDOS",
+    "text_lower": "valor total pedidos"
+  },
+  {
+    "value": "9793",
+    "text": "verba indenizatória",
+    "text_lower": "verba indenizatória"
+  },
+  {
+    "value": "9985",
+    "text": "verbas",
+    "text_lower": "verbas"
+  },
+  {
+    "value": "6996",
+    "text": "verbas fundiárias",
+    "text_lower": "verbas fundiárias"
+  },
+  {
+    "value": "11288",
+    "text": "verbas incontroversas",
+    "text_lower": "verbas incontroversas"
+  },
+  {
+    "value": "8088",
+    "text": "verbas previdenciárias",
+    "text_lower": "verbas previdenciárias"
+  },
+  {
+    "value": "36",
+    "text": "Verbas Rescisórias",
+    "text_lower": "verbas rescisórias"
+  },
+  {
+    "value": "11528",
+    "text": "Verbas rescisórias da dispensa imotivada",
+    "text_lower": "verbas rescisórias da dispensa imotivada"
+  },
+  {
+    "value": "11303",
+    "text": "VERBAS RESCISÓRIAS DIFERENÇA",
+    "text_lower": "verbas rescisórias diferença"
+  },
+  {
+    "value": "11570",
+    "text": "Verbas rescisórias por morte",
+    "text_lower": "verbas rescisórias por morte"
+  },
+  {
+    "value": "11479",
+    "text": "verbas rescisórias rescisão indireta",
+    "text_lower": "verbas rescisórias rescisão indireta"
+  },
+  {
+    "value": "9194",
+    "text": "verbas trabalhistas",
+    "text_lower": "verbas trabalhistas"
+  },
+  {
+    "value": "148",
+    "text": "Vínculo Empregatício",
+    "text_lower": "vínculo empregatício"
+  },
+  {
+    "value": "3236",
+    "text": "Vínculo empregatício",
+    "text_lower": "vínculo empregatício"
+  },
+  {
+    "value": "11476",
+    "text": "vínculo empregatício reflexo",
+    "text_lower": "vínculo empregatício reflexo"
+  }
+]

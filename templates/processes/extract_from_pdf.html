@@ -1,0 +1,216 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Criar Processo via PDF - Sistema de Processos Jurídicos{% endblock %}
+
+{% block extra_styles %}
+<style>
+    h2, h3, h4, h5, h6 {
+        color: white !important;
+    }
+    .breadcrumb {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 10px 15px;
+        border-radius: 8px;
+    }
+    .breadcrumb-item, .breadcrumb-item a {
+        color: rgba(255, 255, 255, 0.9) !important;
+    }
+    .breadcrumb-item.active {
+        color: white !important;
+    }
+    .breadcrumb-item + .breadcrumb-item::before {
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <h2><i class="fas fa-file-upload me-2"></i>Criar Processo via PDF</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('core.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('core.process_list') }}">Processos</a></li>
+                <li class="breadcrumb-item active">Criar via PDF</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-robot me-2"></i>Extração Automática de Dados</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <i class="fas fa-upload fa-3x text-primary mb-2"></i>
+                            <h6>1. Upload</h6>
+                            <small class="text-muted">Envie seu PDF</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <i class="fas fa-brain fa-3x text-info mb-2"></i>
+                            <h6>2. Processamento IA</h6>
+                            <small class="text-muted">IA extrai dados automaticamente</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <i class="fas fa-check fa-3x text-success mb-2"></i>
+                            <h6>3. Confirmação</h6>
+                            <small class="text-muted">Revise e salve o processo</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    
+                    <div class="mb-4">
+                        <label for="pdf_file" class="form-label">
+                            <i class="fas fa-file-pdf me-2 text-danger"></i>Selecione o arquivo PDF
+                        </label>
+                        <input type="file" 
+                               class="form-control form-control-lg" 
+                               id="pdf_file" 
+                               name="pdf_file" 
+                               accept=".pdf"
+                               required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Arquivos PDF de até 16MB. A IA extrairá automaticamente informações como CNJ, comarca, Órgão, etc.
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Como funciona:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Nossa IA lê todo o conteúdo do PDF</li>
+                            <li>Identifica automaticamente campos como CNJ, comarca, Órgão, etc.</li>
+                            <li>Extrai o assunto principal e objeto do processo</li>
+                            <li>Você poderá revisar e editar antes de salvar</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="fas fa-upload me-2"></i>Enviar PDF e Extrair Dados
+                        </button>
+                        <a href="{{ url_for('core.process_create') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-edit me-2"></i>Ou criar processo manualmente
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6><i class="fas fa-question-circle me-2"></i>Perguntas Frequentes</h6>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                Que tipos de PDF funcionam melhor?
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <small>
+                                    PDFs com texto pesquisável funcionam melhor. Documentos escaneados também funcionam, mas podem ter menor precisão na extração.
+                                    Ideais: petições, sentenças, decisões judiciais, contratos com dados estruturados.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                Quanto tempo leva o processamento?
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <small>
+                                    Normalmente de 10 a 30 segundos, dependendo do tamanho do PDF. 
+                                    Arquivos maiores podem levar até 1 minuto.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                Posso editar os dados extraídos?
+                            </button>
+                        </h2>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <small>
+                                    Sim! Após a extração, você verá todos os dados encontrados e poderá editá-los antes de salvar o processo.
+                                    A IA é muito boa, mas sempre recomendamos revisar os dados.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('pdf_file');
+    
+    if (fileInput.files.length > 0) {
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processando PDF...';
+        submitBtn.disabled = true;
+        
+        // Show processing message
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-warning mt-3';
+        alert.innerHTML = '<i class="fas fa-cog fa-spin me-2"></i>Processando PDF com IA... Por favor, aguarde.';
+        document.querySelector('.card-body').appendChild(alert);
+    }
+});
+
+// File validation
+document.getElementById('pdf_file').addEventListener('change', function() {
+    const file = this.files[0];
+    if (file) {
+        const fileSize = file.size / 1024 / 1024; // MB
+        const fileName = file.name.toLowerCase();
+        
+        if (!fileName.endsWith('.pdf')) {
+            alert('Por favor, selecione apenas arquivos PDF.');
+            this.value = '';
+            return;
+        }
+        
+        if (fileSize > 16) {
+            alert('O arquivo é muito grande. Máximo permitido: 16MB.');
+            this.value = '';
+            return;
+        }
+        
+        // Update UI to show selected file
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Processar ' + file.name;
+    }
+});
+</script>
+{% endblock %}

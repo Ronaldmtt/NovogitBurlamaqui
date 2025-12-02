@@ -1,0 +1,61 @@
+[
+  {
+    "cell": "Trabalhista GPA",
+    "aliases": [
+      "Companhia Brasileira de Distribuicao",
+      "GPA",
+      "Grupo Pao de Acucar",
+      "grupopaodeacucar.com.br",
+      "pao de acucar"
+    ]
+  },
+  {
+    "cell": "Trabalhista Casas Bahia",
+    "aliases": [
+      "Via Varejo",
+      "Casas Bahia",
+      "viavarejo.com.br",
+      "via"
+    ]
+  },
+  {
+    "cell": "Trabalhista CSN",
+    "aliases": [
+      "Companhia Siderurgica Nacional",
+      "CSN",
+      "csn.com.br"
+    ]
+  },
+  {
+    "cell": "Trabalhista Pro Pharma",
+    "aliases": [
+      "Profarma",
+      "Pro Pharma",
+      "profarma.com.br"
+    ]
+  },
+  {
+    "cell": "Trabalhista Prudential",
+    "aliases": [
+      "Prudential do Brasil",
+      "Prudential",
+      "prudential.com.br"
+    ]
+  },
+  {
+    "cell": "Trabalhista Outros Clientes",
+    "aliases": [
+      "Outros",
+      "Diversos",
+      "N/A"
+    ]
+  },
+  {
+    "cell": "Em Segredo",
+    "aliases": [
+      "Sigiloso",
+      "Em segredo",
+      "Confidencial"
+    ]
+  }
+]

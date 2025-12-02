@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Upload em Lote - Sistema Jurídico{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="card shadow-lg">
+            <div class="card-header bg-gradient text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>
+                    Upload em Lote de Processos
+                </h4>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Processamento Automático:</strong> Envie múltiplos PDFs de uma vez. 
+                    O sistema irá extrair os dados de cada PDF e criar os processos automaticamente.
+                </div>
+
+                <form id="upload-form" method="POST" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="pdfs" class="form-label fw-bold">
+                            <i class="fas fa-file-pdf text-danger me-2"></i>
+                            Selecione os PDFs (máximo 20 arquivos)
+                        </label>
+                        <input type="file" class="form-control form-control-lg" id="pdfs" name="pdfs" 
+                               multiple accept=".pdf" required>
+                        <div class="form-text">
+                            <i class="fas fa-exclamation-circle text-warning me-1"></i>
+                            Cada arquivo deve ter no máximo 16MB. Formatos aceitos: PDF
+                        </div>
+                    </div>
+
+                    <div id="file-list" class="mb-4"></div>
+
+                    <!-- Barra de progresso do upload -->
+                    <div id="upload-progress-container" class="mb-4" style="display: none;">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-cloud-upload-alt me-2 text-primary"></i>
+                                    <span id="upload-status-text">Enviando arquivos...</span>
+                                </h6>
+                                <div class="progress" style="height: 25px;">
+                                    <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                                         role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                        0%
+                                    </div>
+                                </div>
+                                <div class="mt-2 d-flex justify-content-between">
+                                    <small class="text-muted" id="upload-speed">Calculando velocidade...</small>
+                                    <small class="text-muted" id="upload-eta">Tempo restante: calculando...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg">
+                            <i class="fas fa-rocket me-2"></i>
+                            Enviar e Processar
+                        </button>
+                        <a href="{{ url_for('batch.batch_list') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list me-2"></i>
+                            Ver Batches Anteriores
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const submitBtn = document.getElementById('submit-btn');
+const pdfInput = document.getElementById('pdfs');
+const uploadForm = document.getElementById('upload-form');
+const progressContainer = document.getElementById('upload-progress-container');
+const progressBar = document.getElementById('upload-progress-bar');
+const statusText = document.getElementById('upload-status-text');
+const speedText = document.getElementById('upload-speed');
+const etaText = document.getElementById('upload-eta');
+
+let uploadStartTime = null;
+
+pdfInput.addEventListener('change', function(e) {
+    const fileList = document.getElementById('file-list');
+    const files = Array.from(e.target.files);
+    
+    if (files.length === 0) {
+        fileList.innerHTML = '';
+        submitBtn.disabled = false;
+        return;
+    }
+    
+    let totalSize = 0;
+    files.forEach(file => totalSize += file.size);
+    const totalMB = (totalSize / (1024 * 1024)).toFixed(1);
+    const maxTotalMB = 350;
+    const totalExceeded = totalSize > maxTotalMB * 1024 * 1024;
+    
+    if (totalExceeded) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-ban me-2"></i>Limite Excedido - Remova Arquivos';
+        submitBtn.classList.remove('btn-primary');
+        submitBtn.classList.add('btn-danger');
+    } else {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Enviar e Processar';
+        submitBtn.classList.remove('btn-danger');
+        submitBtn.classList.add('btn-primary');
+    }
+    
+    let html = '<div class="card bg-light"><div class="card-body">';
+    html += `<h6 class="card-title"><i class="fas fa-list me-2"></i>Arquivos Selecionados (${files.length}):</h6>`;
+    
+    if (totalExceeded) {
+        html += `<div class="alert alert-danger mb-3">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Limite excedido!</strong> Total: ${totalMB}MB (máximo: ${maxTotalMB}MB)
+        </div>`;
+    } else {
+        html += `<div class="alert alert-info mb-3">
+            <i class="fas fa-info-circle me-2"></i>
+            Tamanho total: <strong>${totalMB}MB</strong> de ${maxTotalMB}MB
+        </div>`;
+    }
+    
+    html += '<ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">';
+    
+    files.forEach((file, index) => {
+        const size = (file.size / (1024 * 1024)).toFixed(2);
+        const icon = '<i class="fas fa-file-pdf text-danger me-2"></i>';
+        const sizeClass = file.size > 16 * 1024 * 1024 ? 'text-danger' : 'text-muted';
+        
+        html += `<li class="list-group-item d-flex justify-content-between align-items-center py-1">
+            <span class="small">${icon}${file.name}</span>
+            <span class="${sizeClass} small">${size} MB</span>
+        </li>`;
+    });
+    
+    html += '</ul></div></div>';
+    fileList.innerHTML = html;
+});
+
+uploadForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const files = Array.from(pdfInput.files);
+    if (files.length === 0) return;
+    
+    let totalSize = 0;
+    files.forEach(file => totalSize += file.size);
+    
+    if (totalSize > 350 * 1024 * 1024) {
+        alert('Erro: O tamanho total dos arquivos excede 350MB.');
+        return false;
+    }
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Preparando upload...';
+    
+    progressContainer.style.display = 'block';
+    uploadStartTime = Date.now();
+    
+    const formData = new FormData(uploadForm);
+    
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', function(e) {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressBar.textContent = percentComplete + '%';
+            progressBar.setAttribute('aria-valuenow', percentComplete);
+            
+            const elapsedTime = (Date.now() - uploadStartTime) / 1000;
+            const bytesPerSecond = e.loaded / elapsedTime;
+            const speedMBps = (bytesPerSecond / (1024 * 1024)).toFixed(2);
+            speedText.textContent = `Velocidade: ${speedMBps} MB/s`;
+            
+            if (bytesPerSecond > 0) {
+                const remainingBytes = e.total - e.loaded;
+                const remainingSeconds = remainingBytes / bytesPerSecond;
+                
+                if (remainingSeconds < 60) {
+                    etaText.textContent = `Tempo restante: ${Math.round(remainingSeconds)}s`;
+                } else {
+                    const minutes = Math.floor(remainingSeconds / 60);
+                    const seconds = Math.round(remainingSeconds % 60);
+                    etaText.textContent = `Tempo restante: ${minutes}m ${seconds}s`;
+                }
+            }
+            
+            const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(1);
+            const totalMB = (e.total / (1024 * 1024)).toFixed(1);
+            statusText.textContent = `Enviando: ${uploadedMB}MB de ${totalMB}MB (${files.length} arquivos)`;
+        }
+    });
+    
+    xhr.addEventListener('load', function() {
+        if (xhr.status >= 200 && xhr.status < 400) {
+            progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+            progressBar.classList.add('bg-success');
+            progressBar.textContent = '100% - Redirecionando...';
+            statusText.textContent = 'Upload concluído! Redirecionando...';
+            
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xhr.responseText, 'text/html');
+            
+            if (xhr.responseURL && xhr.responseURL.includes('/batch/')) {
+                window.location.href = xhr.responseURL;
+            } else {
+                const match = xhr.responseText.match(/\/processos\/batch\/(\d+)/);
+                if (match) {
+                    window.location.href = '/processos/batch/' + match[1] + '/progress';
+                } else {
+                    window.location.href = '/processos/batch/list';
+                }
+            }
+        } else {
+            progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+            progressBar.classList.add('bg-danger');
+            progressBar.textContent = 'Erro no upload';
+            statusText.textContent = 'Erro ao enviar arquivos. Tente novamente.';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Tentar Novamente';
+        }
+    });
+    
+    xhr.addEventListener('error', function() {
+        progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+        progressBar.classList.add('bg-danger');
+        progressBar.textContent = 'Erro de conexão';
+        statusText.textContent = 'Erro de conexão. Verifique sua internet.';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Tentar Novamente';
+    });
+    
+    xhr.open('POST', uploadForm.action || window.location.href, true);
+    xhr.send(formData);
+});
+</script>
+
+<style>
+.bg-gradient {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+</style>
+{% endblock %}

@@ -1,0 +1,283 @@
+﻿{% extends "base.html" %}
+{% block title %}Cadastrar Processo - Sistema Jurídico Inteligente{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="fas fa-edit"></i> Cadastrar Processo</h1>
+  <p class="text-muted mb-0 mt-2">Preencha os dados do processo. Campos com * são obrigatórios.</p>
+</div>
+
+<form method="POST" enctype="multipart/form-data" class="row g-3">
+  {{ form.hidden_tag() if form is defined }}
+
+  <!-- Requeridos -->
+  <div class="col-md-4">
+    <label class="form-label">CNJ *</label>
+    <input type="text" class="form-control" name="cnj" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Tipo de Processo *</label>
+    <input type="text" class="form-control" name="tipo_processo" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Estado *</label>
+    <input type="text" class="form-control" name="estado" required>
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label">Comarca *</label>
+    <input type="text" class="form-control" name="comarca" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Origem *</label>
+    <input type="text" class="form-control" name="origem" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Órgão *</label>
+    <input type="text" class="form-control" name="orgao" required>
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label">Célula *</label>
+    <input type="text" class="form-control" name="celula" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Foro *</label>
+    <input type="text" class="form-control" name="foro" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Instância *</label>
+    <input type="text" class="form-control" name="instancia" required>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label">Assunto *</label>
+    <textarea class="form-control" name="assunto" rows="2" required></textarea>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Objeto *</label>
+    <textarea class="form-control" name="objeto" rows="2" required></textarea>
+  </div>
+
+  <!-- Opcionais originais -->
+  <div class="col-md-4">
+    <label class="form-label">Número do Processo</label>
+    <input type="text" class="form-control" name="numero_processo">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Número do Processo Antigo</label>
+    <input type="text" class="form-control" name="numero_processo_antigo">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Sistema Eletrônico</label>
+    <input type="text" class="form-control" name="sistema_eletronico">
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label">Área do Direito</label>
+    <input type="text" class="form-control" name="area_direito">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Subárea do Direito</label>
+    <input type="text" class="form-control" name="sub_area_direito">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Número do Órgão</label>
+    <input type="text" class="form-control" name="numero_orgao">
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label">NPC</label>
+    <input type="text" class="form-control" name="npc">
+  </div>
+  <div class="col-md-8">
+    <label class="form-label">Subobjeto</label>
+    <textarea class="form-control" name="sub_objeto" rows="2"></textarea>
+  </div>
+
+  <!-- Novos campos -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0"><i class="fas fa-user-tie me-2"></i>Partes e Representação</h5></div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Cliente</label>
+          <input type="text" class="form-control" name="cliente">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Parte (posição no processo)</label>
+          <input type="text" class="form-control" name="parte" placeholder="AUTOR / RÉU / TERCEIRO...">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Advogado do Autor/Cliente</label>
+          <input type="text" class="form-control" name="advogado_autor">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Advogado do Réu/Parte</label>
+          <input type="text" class="form-control" name="advogado_reu">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Posição Parte Interessada</label>
+          <input type="text" class="form-control" name="posicao_parte_interessada" placeholder="AUTOR / REU">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Parte Interessada</label>
+          <input type="text" class="form-control" name="parte_interessada">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Parte Adversa (tipo)</label>
+          <input type="text" class="form-control" name="parte_adversa_tipo" placeholder="FISICA / JURIDICA">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Nome Parte Adversa</label>
+          <input type="text" class="form-control" name="parte_adversa_nome">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Escritório Parte Adversa</label>
+          <input type="text" class="form-control" name="escritorio_parte_adversa">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">UF OAB Adv. Adverso</label>
+          <input type="text" class="form-control" name="uf_oab_advogado_adverso" maxlength="2">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">CPF/CNPJ Parte Adversa</label>
+          <input type="text" class="form-control" name="cpf_cnpj_parte_adversa">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Telefone Parte Adversa</label>
+          <input type="text" class="form-control" name="telefone_parte_adversa">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Email Parte Adversa</label>
+          <input type="email" class="form-control" name="email_parte_adversa">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Endereço Parte Adversa</label>
+          <input type="text" class="form-control" name="endereco_parte_adversa">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0"><i class="fas fa-gavel me-2"></i>Prazos, Audiência e Decisões</h5></div>
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Prazo</label>
+          <input type="text" class="form-control" name="prazo" placeholder="ex.: 15 dias; até 10/10/2025">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Audiência Inicial (Data/Hora)</label>
+          <input type="datetime-local" class="form-control" name="audiencia_inicial">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo de Notificação</label>
+          <input type="text" class="form-control" name="tipo_notificacao">
+        </div>
+
+        <div class="col-md-12">
+          <label class="form-label">Resultado da Audiência</label>
+          <textarea class="form-control" name="resultado_audiencia" rows="2"></textarea>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Prazos Derivados da Audiência</label>
+          <textarea class="form-control" name="prazos_derivados_audiencia" rows="2"></textarea>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Tipo de Decisão</label>
+          <input type="text" class="form-control" name="decisao_tipo" placeholder="Sentença / AcÃ³rdÃ£o">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Resultado da Decisão</label>
+          <input type="text" class="form-control" name="decisao_resultado" placeholder="Deferido / Indeferido">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Fundamentação Resumida</label>
+          <textarea class="form-control" name="decisao_fundamentacao_resumida" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0"><i class="fas fa-flag me-2"></i>Estratégia e Índices</h5></div>
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Estratégia</label>
+          <input type="text" class="form-control" name="estrategia">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Índice de Atualização</label>
+          <input type="text" class="form-control" name="indice_atualizacao">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">ID Interno Hilo</label>
+          <input type="text" class="form-control" name="id_interno_hilo">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Outras Informações</h5></div>
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Data de Distribuição (dd/mm/aaaa)</label>
+          <input type="text" class="form-control" name="data_distribuicao">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Data de Citação (dd/mm/aaaa)</label>
+          <input type="text" class="form-control" name="data_citacao">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Risco</label>
+          <input type="text" class="form-control" name="risco" placeholder="Baixo / MÃ©dio / Alto">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Valor da Causa</label>
+          <input type="text" class="form-control" name="valor_causa">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Rito</label>
+          <input type="text" class="form-control" name="rito">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Observação</label>
+          <input type="text" class="form-control" name="observacao">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label d-block">Cadastrar Primeira Audiência?</label>
+          <input class="form-check-input" type="checkbox" name="cadastrar_primeira_audiencia" value="y" id="chkAud">
+          <label class="form-check-label ms-2" for="chkAud">Sim</label>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Data/Hora Cadastro Manual</label>
+          <input type="datetime-local" class="form-control" name="data_hora_cadastro_manual">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF -->
+  <div class="col-md-12">
+    <label class="form-label">Anexar PDF (opcional)</label>
+    <input type="file" class="form-control" name="pdf">
+  </div>
+
+  <div class="col-12 d-flex gap-2 mt-3">
+    <a href="{{ url_for('core.process_list') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Cancelar</a>
+    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Cadastrar Processo</button>
+  </div>
+</form>
+{% endblock %}

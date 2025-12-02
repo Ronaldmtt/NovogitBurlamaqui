@@ -1,0 +1,62 @@
+modules = ["python-3.11", "web", "postgresql-16"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["gitFull", "libiconv", "libxcrypt", "poppler", "poppler_utils", "unzip", "zlib", "chromium"]
+
+[deployment]
+deploymentTarget = "vm"
+run = ["gunicorn", "--bind", "0.0.0.0:5000", "--reuse-port", "main:app"]
+build = ["bash", "build.sh"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 6379
+externalPort = 3002
+
+[[ports]]
+localPort = 35249
+externalPort = 3003
+
+[[ports]]
+localPort = 37081
+externalPort = 3001
+
+[[ports]]
+localPort = 46681
+externalPort = 3000
+
+[agent]
+integrations = ["styling_replit==1.0.0", "python_database==1.0.0", "python_openai==1.0.0"]
+expertMode = true
+
+[userenv]
+
+[userenv.shared]
+REPLIT_PYTHON_PACKAGE_LAYER = "1"
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+PLAYWRIGHT_BROWSERS_PATH = "0"

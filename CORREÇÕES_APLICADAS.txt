@@ -1,0 +1,40 @@
+✅ CORREÇÕES DE BUGS CRÍTICOS - CONCLUÍDAS
+
+Data: 2025-11-21 21:54:34 UTC
+
+═══════════════════════════════════════════════════════════════
+
+ARQUIVOS MODIFICADOS:
+- rpa.py (4 correções aplicadas)
+- replit.md (documentação atualizada)
+
+CORREÇÕES IMPLEMENTADAS:
+
+1. ✅ Removida definição duplicada de _get_screenshot_path
+   → Mantida apenas versão robusta com process_id opcional
+
+2. ✅ Screenshots salvos no banco - CONFIRMADO
+   → Código já estava implementado e funcionando
+   → Linhas 4897-4912 (before) e 5001-5029 (after)
+
+3. ✅ Navegação robusta entre processos (ensure_on_new_process_form)
+   → about:blank → dashboard → formulário
+   → Retry com detecção de redirect para login
+
+4. ✅ Toggle forçado do rádio Eletrônico (set_tipo_processo_virtual)
+   → Força eventos via JavaScript click()
+   → wait_network_quiet(800ms) após clicar em Físico
+   → Garante AJAX completar antes de remarcar Eletrônico
+
+LIMITAÇÕES CONHECIDAS:
+- Sessão expirada: Levanta RuntimeError (caller superior deve tratar)
+- iCheck: JavaScript pode não funcionar 100% com plugins customizados
+
+TESTING RECOMENDADO:
+✓ Batch com ≥2 processos
+✓ Campo CNJ aparece após AJAX
+✓ Screenshots before/after na UI
+✓ Logs para toggle de rádio
+✓ Sessão de longa duração
+
+═══════════════════════════════════════════════════════════════

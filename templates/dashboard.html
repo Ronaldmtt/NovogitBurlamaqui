@@ -1,0 +1,148 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Dashboard - Sistema Jurídico Inteligente{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>
+            <i class="fas fa-chart-line"></i>
+            Dashboard
+        </h1>
+        <p class="text-muted mb-0 mt-2">Bem-vindo ao Sistema de Gestão de Processos Jurídicos com IA</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('core.extract_from_pdf') }}" class="btn btn-primary">
+            <i class="fas fa-file-pdf me-1"></i>Upload PDF
+        </a>
+        <a href="{{ url_for('batch.batch_new') }}" class="btn btn-info">
+            <i class="fas fa-cloud-upload-alt me-1"></i>Upload em Lote
+        </a>
+        <a href="{{ url_for('batch.batch_list') }}" class="btn btn-warning">
+            <i class="fas fa-layer-group me-1"></i>Ver Batches
+        </a>
+        <a href="{{ url_for('core.process_create') }}" class="btn btn-success">
+            <i class="fas fa-edit me-1"></i>Criar Manual
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <i class="fas fa-folder-open"></i>
+            <h3>{{ total_processes|default(0, true) }}</h3>
+            <p>Total de Processos</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg, #16a085 0%, #27ae60 100%);">
+            <i class="fas fa-user-check"></i>
+            <h3>{{ user_processes|default(0, true) }}</h3>
+            <p>Meus Processos</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);">
+            <i class="fas fa-file-pdf"></i>
+            <h3>IA</h3>
+            <p>Extração Automática</p>
+        </div>
+    </div>
+</div>
+
+{% if recent_processes %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Processos Recentes</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-hashtag me-1"></i>CNJ</th>
+                                <th><i class="fas fa-file me-1"></i>Tipo</th>
+                                <th><i class="fas fa-map-marker-alt me-1"></i>Estado</th>
+                                <th><i class="fas fa-calendar me-1"></i>Criado em</th>
+                                <th><i class="fas fa-info-circle me-1"></i>Status eLaw</th>
+                                <th class="text-center"><i class="fas fa-cog me-1"></i>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for process in recent_processes %}
+                            <tr>
+                                <td><strong>{{ process.cnj|default('-', true) }}</strong></td>
+                                <td>
+                                    <span class="badge bg-{{ 'primary' if process.tipo_processo == 'Eletrônico' else 'secondary' }}">
+                                        {{ process.tipo_processo|default('-', true) }}
+                                    </span>
+                                </td>
+                                <td>{{ process.estado|default('-', true) }}</td>
+                                <td>
+                                    {% if process.created_at %}
+                                        {{ process.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if process.elaw_status == 'success' %}
+                                        <span class="badge bg-success"><i class="fas fa-check-circle"></i></span>
+                                    {% elif process.elaw_status == 'running' %}
+                                        <span class="badge bg-info"><i class="fas fa-spinner fa-spin"></i></span>
+                                    {% elif process.elaw_status == 'error' %}
+                                        <span class="badge bg-danger"><i class="fas fa-times-circle"></i></span>
+                                    {% else %}
+                                        <span class="badge bg-secondary"><i class="fas fa-clock"></i></span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('core.process_view', id=process.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('core.process_list') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-2"></i>Ver todos os processos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center" style="padding: 60px 20px;">
+                <i class="fas fa-inbox fa-4x mb-3" style="color: #ccc;"></i>
+                <h5 class="text-muted">Nenhum processo cadastrado ainda</h5>
+                <p class="text-muted">Comece criando seu primeiro processo!</p>
+                <div class="mt-4">
+                    <a href="{{ url_for('core.extract_from_pdf') }}" class="btn btn-primary me-2">
+                        <i class="fas fa-file-pdf me-1"></i>Upload PDF
+                    </a>
+                    <a href="{{ url_for('batch.batch_new') }}" class="btn btn-info me-2">
+                        <i class="fas fa-cloud-upload-alt me-1"></i>Upload em Lote
+                    </a>
+                    <a href="{{ url_for('batch.batch_list') }}" class="btn btn-warning me-2">
+                        <i class="fas fa-layer-group me-1"></i>Ver Batches
+                    </a>
+                    <a href="{{ url_for('core.process_create') }}" class="btn btn-success">
+                        <i class="fas fa-edit me-1"></i>Criar Manual
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

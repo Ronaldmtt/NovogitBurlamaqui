@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+rpa_monitor_client/__init__.py
+rpa_monitor_client/_client.py
+rpa_monitor_client/_config.py
+rpa_monitor_client/_logging_api.py
+rpa_monitor_client.egg-info/PKG-INFO
+rpa_monitor_client.egg-info/SOURCES.txt
+rpa_monitor_client.egg-info/dependency_links.txt
+rpa_monitor_client.egg-info/requires.txt
+rpa_monitor_client.egg-info/top_level.txt

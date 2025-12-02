@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Re-extração OCR - Sistema Jurídico{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="text-white mb-1">
+                        <i class="fas fa-file-image me-2"></i>Re-extração OCR Seletiva
+                    </h2>
+                    <p class="text-white-50 mb-0">
+                        Recuperar campos vazios de PDFs com anexos escaneados (TRCT, contracheques)
+                    </p>
+                </div>
+                <a href="{{ url_for('batch.batch_list') }}" class="btn btn-outline-light">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar
+                </a>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white shadow-sm">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ stats.total }}</h3>
+                            <small>Total de Processos</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark shadow-sm">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ stats.sem_salario }}</h3>
+                            <small><i class="fas fa-dollar-sign me-1"></i>Sem Salário</small>
+                            <div class="small mt-1">{{ "%.1f"|format(stats.sem_salario / stats.total * 100 if stats.total > 0 else 0) }}%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white shadow-sm">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ stats.sem_pis }}</h3>
+                            <small><i class="fas fa-id-card me-1"></i>Sem PIS</small>
+                            <div class="small mt-1">{{ "%.1f"|format(stats.sem_pis / stats.total * 100 if stats.total > 0 else 0) }}%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-secondary text-white shadow-sm">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">{{ stats.sem_ctps }}</h3>
+                            <small><i class="fas fa-briefcase me-1"></i>Sem CTPS</small>
+                            <div class="small mt-1">{{ "%.1f"|format(stats.sem_ctps / stats.total * 100 if stats.total > 0 else 0) }}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-lg">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0">
+                        <i class="fas fa-magic me-2"></i>Iniciar Re-extração em Lote
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Como funciona:</strong> O sistema identifica páginas com anexos escaneados (TRCT, contracheques) 
+                        e aplica OCR apenas nessas páginas específicas, extraindo campos que não foram encontrados pelo texto nativo.
+                        <br><small class="text-muted">Tempo estimado: 5-15 segundos por processo (apenas páginas relevantes são processadas)</small>
+                    </div>
+
+                    <form method="POST" id="reextractForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Campos a recuperar:</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check form-check-lg">
+                                        <input class="form-check-input" type="checkbox" name="fields" value="salario" id="field_salario" checked>
+                                        <label class="form-check-label" for="field_salario">
+                                            <i class="fas fa-dollar-sign text-success me-1"></i>Salário
+                                            <span class="badge bg-warning text-dark ms-2">{{ stats.sem_salario }} vazios</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-check-lg">
+                                        <input class="form-check-input" type="checkbox" name="fields" value="pis" id="field_pis" checked>
+                                        <label class="form-check-label" for="field_pis">
+                                            <i class="fas fa-id-card text-info me-1"></i>PIS
+                                            <span class="badge bg-info ms-2">{{ stats.sem_pis }} vazios</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check form-check-lg">
+                                        <input class="form-check-input" type="checkbox" name="fields" value="ctps" id="field_ctps" checked>
+                                        <label class="form-check-label" for="field_ctps">
+                                            <i class="fas fa-briefcase text-secondary me-1"></i>CTPS
+                                            <span class="badge bg-secondary ms-2">{{ stats.sem_ctps }} vazios</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="limit" class="form-label fw-bold">Quantidade de processos:</label>
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <input type="range" class="form-range" id="limitRange" min="5" max="50" step="5" value="20" 
+                                           oninput="document.getElementById('limit').value = this.value; document.getElementById('limitDisplay').textContent = this.value;">
+                                </div>
+                                <div class="col-md-2">
+                                    <input type="number" class="form-control" id="limit" name="limit" value="20" min="1" max="100">
+                                </div>
+                                <div class="col-md-6">
+                                    <small class="text-muted">
+                                        Processar até <strong id="limitDisplay">20</strong> processos com campos vazios
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-lg btn-primary" id="submitBtn">
+                                <i class="fas fa-play me-2"></i>Iniciar Re-extração OCR
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4 shadow">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-question-circle me-2"></i>Sobre OCR Seletivo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Quando usar?</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i>PDFs com anexos escaneados (TRCT/contracheques)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Campos vazios após extração normal</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Documentos híbridos (texto + imagem)</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Estratégia</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-crosshairs text-info me-2"></i>Identifica páginas de TRCT e contracheques</li>
+                                <li><i class="fas fa-bolt text-warning me-2"></i>Processa apenas páginas relevantes</li>
+                                <li><i class="fas fa-search text-secondary me-2"></i>Regex otimizado para documentos trabalhistas</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('reextractForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processando...';
+});
+</script>
+{% endblock %}

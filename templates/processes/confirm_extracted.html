@@ -1,0 +1,425 @@
+﻿{% extends "base.html" %}
+{% block title %}Confirmar Dados - Extração por IA{% endblock %}
+
+{% block content %}
+<div class="alert alert-success d-flex align-items-center">
+  <i class="fas fa-robot me-2"></i>
+  <div><strong>Dados extraídos com sucesso!</strong> Revise as informações abaixo e faça ajustes se necessário antes de salvar o processo.</div>
+</div>
+
+<form id="confirmForm" method="POST" action="{{ url_for('core.confirm_extracted') }}">
+<div class="row g-4">
+  <!-- Coluna principal -->
+  <div class="col-lg-9">
+
+    <!-- Identificação do Processo -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Identificação do Processo</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <!-- CNJ (Sim/Não) -->
+          <div class="col-md-3">
+            <label class="form-label d-block">CNJ <span class="text-danger">*</span></label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" id="cnj_sim" name="cnj" value="Sim"
+                {% if data.cnj == 'Sim' %}checked{% endif %}>
+              <label class="form-check-label" for="cnj_sim">Sim</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" id="cnj_nao" name="cnj" value="Não"
+                {% if data.cnj == 'Não' %}checked{% endif %}>
+              <label class="form-check-label" for="cnj_nao">Não</label>
+            </div>
+          </div>
+
+          <!-- Tipo de Processo -->
+          <div class="col-md-3">
+            <label class="form-label d-block">Tipo do Processo <span class="text-danger">*</span></label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" id="tp_ele" name="tipo_processo" value="Eletrônico"
+                {% if data.tipo_processo == 'Eletrônico' %}checked{% endif %}>
+              <label class="form-check-label" for="tp_ele">Eletrônico</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" id="tp_fis" name="tipo_processo" value="Físico"
+                {% if data.tipo_processo == 'Físico' %}checked{% endif %}>
+              <label class="form-check-label" for="tp_fis">Físico</label>
+            </div>
+          </div>
+
+          <!-- Número do Processo -->
+          <div class="col-md-6">
+            <label class="form-label">Número do Processo</label>
+            <input type="text" class="form-control" name="numero_processo" value="{{ data.numero_processo or '' }}">
+          </div>
+
+          <!-- Número do Processo Antigo -->
+          <div class="col-md-6">
+            <label class="form-label">Número do Processo Antigo</label>
+            <input type="text" class="form-control" name="numero_processo_antigo" value="{{ data.numero_processo_antigo or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sistema e Área Jurídica -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Sistema e Área Jurídica</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Sistema Eletrônico</label>
+            <input class="form-control" name="sistema_eletronico" value="{{ data.sistema_eletronico or '' }}">
+            <small class="text-muted">E-PROC, PJE, PROJUDI, TRT, etc.</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Área do Direito</label>
+            <input class="form-control" name="area_direito" value="{{ data.area_direito or '' }}">
+            <small class="text-muted">Cível, Criminal, Trabalhista, etc.</small>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Sub Área do Direito</label>
+            <input class="form-control" name="sub_area_direito" value="{{ data.sub_area_direito or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Localização -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-location-dot me-2"></i>Localização</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Estado <span class="text-danger">*</span></label>
+            <input class="form-control" name="estado" value="{{ data.estado or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Comarca <span class="text-danger">*</span></label>
+            <input class="form-control" name="comarca" value="{{ data.comarca or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Número do Órgão</label>
+            <input class="form-control" name="numero_orgao" value="{{ data.numero_orgao or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Órgão Judicial -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-gavel me-2"></i>Órgão Judicial</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Origem <span class="text-danger">*</span></label>
+            <input class="form-control" name="origem" value="{{ data.origem or '' }}">
+            <small class="text-muted">TRT, TST, STF, JF, etc.</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Órgão <span class="text-danger">*</span></label>
+            <input class="form-control" name="orgao" value="{{ data.orgao or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Vara</label>
+            <input class="form-control" name="vara" value="{{ data.vara or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Célula</label>
+            <input class="form-control" name="celula" value="{{ data.celula or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Foro <span class="text-danger">*</span></label>
+            <input class="form-control" name="foro" value="{{ data.foro or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Instância <span class="text-danger">*</span></label>
+            <input class="form-control" name="instancia" value="{{ data.instancia or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detalhes do Processo -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Detalhes do Processo</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Assunto <span class="text-danger">*</span></label>
+            <textarea class="form-control" rows="2" name="assunto">{{ data.assunto or '' }}</textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">NPC</label>
+            <input class="form-control" name="npc" value="{{ data.npc or '' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Objeto <span class="text-danger">*</span></label>
+            <textarea class="form-control" rows="2" name="objeto">{{ data.objeto or '' }}</textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Sub-Objeto</label>
+            <textarea class="form-control" rows="2" name="sub_objeto">{{ data.sub_objeto or '' }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Partes e Representação -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-people-group me-2"></i>Partes e Representação</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+  <label class="form-label">Cliente</label>
+  <input class="form-control" name="cliente"
+         value="{{ data.cliente or data.cliente_grupo or '' }}">
+</div>
+          <div class="col-md-6">
+            <label class="form-label">Parte (posição)</label>
+            <input class="form-control" name="parte" value="{{ data.parte or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Advogado do Autor/Cliente</label>
+            <input class="form-control" name="advogado_autor" value="{{ data.advogado_autor or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Advogado do Réu/Parte</label>
+            <input class="form-control" name="advogado_reu" value="{{ data.advogado_reu or '' }}">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Posição Parte Interessada</label>
+            <input class="form-control" name="posicao_parte_interessada" value="{{ data.posicao_parte_interessada or '' }}">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Parte Interessada</label>
+            <input class="form-control" name="parte_interessada" value="{{ data.parte_interessada or '' }}">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Parte Adversa (tipo)</label>
+            <input class="form-control" name="parte_adversa_tipo" value="{{ data.parte_adversa_tipo or '' }}">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Nome Parte Adversa</label>
+            <input class="form-control" name="parte_adversa_nome" value="{{ data.parte_adversa_nome or '' }}">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">UF OAB Adv. Adverso</label>
+            <input class="form-control" name="uf_oab_advogado_adverso" value="{{ data.uf_oab_advogado_adverso or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">CPF/CNPJ Parte Adversa</label>
+            <input class="form-control" name="cpf_cnpj_parte_adversa" value="{{ data.cpf_cnpj_parte_adversa or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Telefone Parte Adversa</label>
+            <input class="form-control" name="telefone_parte_adversa" value="{{ data.telefone_parte_adversa or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Email Parte Adversa</label>
+            <input class="form-control" name="email_parte_adversa" value="{{ data.email_parte_adversa or '' }}">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Endereço Parte Adversa</label>
+            <input class="form-control" name="endereco_parte_adversa" value="{{ data.endereco_parte_adversa or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prazos / Decisões -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>Prazos e Decisões</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Data de Distribuição (dd/mm/aaaa)</label>
+            <input class="form-control" name="data_distribuicao" value="{{ data.data_distribuicao or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Audiência Inicial (dd/mm/aaaa hh:mm)</label>
+            <input class="form-control" name="audiencia_inicial" value="{{ data.audiencia_inicial or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">SubTipo Audiência</label>
+            <input class="form-control" name="subtipo_audiencia" value="{{ data.subtipo_audiencia or '' }}" placeholder="Ex: Una">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Envolvidos</label>
+            <input class="form-control" name="envolvido_audiencia" value="{{ data.envolvido_audiencia or '' }}" placeholder="Ex: Advogado e Preposto">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Link da Audiência (Zoom/Meet/Teams)</label>
+            <div class="input-group">
+              <input class="form-control" name="link_audiencia" value="{{ data.link_audiencia or '' }}" placeholder="https://...">
+              {% if data.link_audiencia %}
+                <a href="{{ data.link_audiencia }}" target="_blank" class="btn btn-outline-primary" title="Abrir link em nova aba">
+                  <i class="fas fa-external-link-alt"></i>
+                </a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Tipo de Notificação</label>
+            <input class="form-control" name="tipo_notificacao" value="{{ data.tipo_notificacao or '' }}">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Resultado da Decisão</label>
+            <input class="form-control" name="resultado_decisao" value="{{ data.resultado_decisao or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Fundamentação Resumida</label>
+            <input class="form-control" name="fundamentacao_resumida" value="{{ data.fundamentacao_resumida or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EstratÃ©gia e Outras -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-chess-knight me-2"></i>Estratégia e Outras Informações</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Valor da Causa</label>
+            <input class="form-control" name="valor_causa" value="{{ data.valor_causa or '' }}" placeholder="Ex: 462.289,03">
+            <small class="text-muted">Formato: 1.000,00</small>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Estratégia</label>
+            <input class="form-control" name="estrategia" value="{{ data.estrategia or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Índice de Atualização</label>
+            <input class="form-control" name="indice_atualizacao" value="{{ data.indice_atualizacao or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">ID Interno Hilo</label>
+            <input class="form-control" name="id_interno_hilo" value="{{ data.id_interno_hilo or '' }}">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Observação</label>
+            <input class="form-control" name="observacao" value="{{ data.observacao or '' }}">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chkPrimeiraAud" name="cadastrar_primeira_audiencia"
+                     {% if data.cadastrar_primeira_audiencia %}checked{% endif %}>
+              <label class="form-check-label" for="chkPrimeiraAud">Cadastrar Primeira Audiência?</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dados Trabalhistas -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-briefcase me-2"></i>Dados Trabalhistas</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Data de Admissão</label>
+            <input class="form-control" name="data_admissao" value="{{ data.data_admissao or '' }}" placeholder="dd/mm/aaaa">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Data de Demissão</label>
+            <input class="form-control" name="data_demissao" value="{{ data.data_demissao or '' }}" placeholder="dd/mm/aaaa">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Salário</label>
+            <input class="form-control" name="salario" value="{{ data.salario or '' }}" placeholder="R$ 5.000,00">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Cargo/Função</label>
+            <input class="form-control" name="cargo_funcao" value="{{ data.cargo_funcao or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Empregador</label>
+            <input class="form-control" name="empregador" value="{{ data.empregador or '' }}" placeholder="Nome da empresa empregadora">
+          </div>
+          <div class="col-md-12">
+            <label class="form-label">Local de Trabalho</label>
+            <input class="form-control" name="local_trabalho" value="{{ data.local_trabalho or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">PIS</label>
+            <input class="form-control" name="pis" value="{{ data.pis or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">CTPS</label>
+            <input class="form-control" name="ctps" value="{{ data.ctps or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Motivo de Demissão</label>
+            <input class="form-control" name="motivo_demissao" value="{{ data.motivo_demissao or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Coluna lateral -->
+  <div class="col-lg-3">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="fas fa-circle-info me-2"></i>Status da Extração</h6>
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-items-start">
+          <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+          <div>
+            <strong>Extração Concluída</strong>
+            <p class="mb-0 small text-muted">IA processou o PDF com sucesso</p>
+          </div>
+        </div>
+        <div class="alert alert-warning mt-3 mb-0">
+          <i class="fas fa-triangle-exclamation me-2"></i>
+          <small>Importante: Sempre revise os dados extraídos antes de salvar.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="fas fa-bolt me-2"></i>Ações</h6>
+      </div>
+      <div class="card-body d-grid gap-2">
+        <button type="submit" class="btn btn-success">
+          <i class="fas fa-save me-2"></i>Salvar Processo
+        </button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('core.extract_from_pdf') }}">
+          <i class="fas fa-arrow-left me-2"></i>Voltar ao Upload
+        </a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('core.process_list') }}">
+          <i class="fas fa-list me-2"></i>Lista de Processos
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

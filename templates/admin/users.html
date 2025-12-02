@@ -1,0 +1,76 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Gerenciar UsuÃ¡rios - Sistema de Processos JurÃ­dicos{% endblock %}
+
+{% block extra_styles %}
+<style>
+    h2, h3, h4, h5, h6 {
+        color: white !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-users me-2"></i>Gerenciar UsuÃ¡rios</h2>
+            <a href="{{ url_for('admin_create_user') }}" class="btn btn-primary">
+                <i class="fas fa-user-plus me-1"></i>Novo UsuÃ¡rio
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>UsuÃ¡rio</th>
+                                <th>Email</th>
+                                <th>Tipo</th>
+                                <th>Processos</th>
+                                <th>Criado em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>
+                                    <i class="fas fa-user me-2"></i>{{ user.username }}
+                                </td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    {% if user.is_admin %}
+                                        <span class="badge bg-danger">Admin</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">UsuÃ¡rio</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ user.processes|length }}</span>
+                                </td>
+                                <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if not users %}
+                <div class="text-center py-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Nenhum usuÃ¡rio encontrado.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

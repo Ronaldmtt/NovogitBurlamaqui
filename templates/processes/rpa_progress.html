@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processando RPA - Processo #{{ process_id }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1e3c72;
+            --secondary-color: #2a5298;
+            --accent-color: #7e8ba3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
+            background-attachment: fixed;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            padding: 40px 20px;
+            max-width: 900px;
+        }
+
+        .progress-card {
+            background: rgba(255, 255, 255, 0.98);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .progress-card-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .progress-card-header h2 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 600;
+        }
+
+        .progress-card-header .process-number {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .progress-card-body {
+            padding: 40px;
+        }
+
+        /* Ampulheta animada */
+        .hourglass-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .hourglass {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            animation: flip 2s ease-in-out infinite;
+        }
+
+        @keyframes flip {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+        }
+
+        .hourglass i {
+            font-size: 60px;
+            color: var(--secondary-color);
+        }
+
+        /* Barra de progresso principal */
+        .main-progress {
+            margin-bottom: 30px;
+        }
+
+        .main-progress .progress {
+            height: 12px;
+            border-radius: 10px;
+            background: rgba(30, 60, 114, 0.1);
+            overflow: hidden;
+        }
+
+        .main-progress .progress-bar {
+            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s linear infinite;
+            transition: width 0.5s ease;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .progress-percentage {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-top: 10px;
+        }
+
+        /* Status atual */
+        .current-status {
+            background: linear-gradient(135deg, rgba(30, 60, 114, 0.08) 0%, rgba(126, 139, 163, 0.08) 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 2px solid rgba(30, 60, 114, 0.1);
+        }
+
+        .current-status-title {
+            font-size: 16px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .current-status-message {
+            font-size: 20px;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        /* Lista de etapas */
+        .steps-timeline {
+            position: relative;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            position: relative;
+            background: white;
+            border: 2px solid #e0e0e0;
+        }
+
+        .step-item.pending {
+            opacity: 0.5;
+            border-color: #e0e0e0;
+        }
+
+        .step-item.active {
+            background: linear-gradient(135deg, rgba(30, 60, 114, 0.05) 0%, rgba(126, 139, 163, 0.05) 100%);
+            border-color: var(--secondary-color);
+            box-shadow: 0 4px 15px rgba(30, 60, 114, 0.15);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .step-item.completed {
+            border-color: #28a745;
+            background: rgba(40, 167, 69, 0.03);
+        }
+
+        .step-item.error {
+            border-color: #dc3545;
+            background: rgba(220, 53, 69, 0.03);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 4px 15px rgba(30, 60, 114, 0.15);
+            }
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 6px 20px rgba(30, 60, 114, 0.25);
+            }
+        }
+
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+            font-size: 18px;
+        }
+
+        .step-item.pending .step-icon {
+            background: #e0e0e0;
+            color: #999;
+        }
+
+        .step-item.active .step-icon {
+            background: var(--secondary-color);
+            color: white;
+            animation: rotate 1s linear infinite;
+        }
+
+        .step-item.completed .step-icon {
+            background: #28a745;
+            color: white;
+        }
+
+        .step-item.error .step-icon {
+            background: #dc3545;
+            color: white;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .step-description {
+            font-size: 13px;
+            color: #666;
+            margin: 0;
+        }
+
+        .step-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        /* Powered by Inova */
+        .powered-by {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .powered-by-text {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .powered-by img {
+            max-height: 40px;
+            opacity: 0.9;
+            transition: opacity 0.3s ease;
+        }
+
+        .powered-by img:hover {
+            opacity: 1;
+        }
+
+        /* Animações de entrada */
+        .step-item {
+            animation: fadeInLeft 0.5s ease-out backwards;
+        }
+
+        .step-item:nth-child(1) { animation-delay: 0.1s; }
+        .step-item:nth-child(2) { animation-delay: 0.2s; }
+        .step-item:nth-child(3) { animation-delay: 0.3s; }
+        .step-item:nth-child(4) { animation-delay: 0.4s; }
+        .step-item:nth-child(5) { animation-delay: 0.5s; }
+        .step-item:nth-child(6) { animation-delay: 0.6s; }
+        .step-item:nth-child(7) { animation-delay: 0.7s; }
+        .step-item:nth-child(8) { animation-delay: 0.8s; }
+
+        @keyframes fadeInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .progress-card-body {
+                padding: 25px 20px;
+            }
+
+            .progress-card-header h2 {
+                font-size: 22px;
+            }
+
+            .current-status-message {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="progress-card">
+            <div class="progress-card-header">
+                <h2><i class="fas fa-robot me-2"></i>Preenchimento Automático eLaw</h2>
+                <div class="process-number">Processo #{{ process_id }}</div>
+            </div>
+            
+            <div class="progress-card-body">
+                <!-- Ampulheta animada -->
+                <div class="hourglass-container">
+                    <div class="hourglass">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                </div>
+
+                <!-- Barra de progresso -->
+                <div class="main-progress">
+                    <div class="progress">
+                        <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="progress-percentage" class="progress-percentage">0%</div>
+                </div>
+
+                <!-- Status atual -->
+                <div class="current-status">
+                    <div class="current-status-title">Status Atual</div>
+                    <div id="current-status-message" class="current-status-message">
+                        Iniciando RPA...
+                    </div>
+                </div>
+
+                <!-- Timeline de etapas -->
+                <div class="steps-timeline">
+                    <h5 class="mb-3" style="color: var(--primary-color); font-weight: 600;">
+                        <i class="fas fa-list-check me-2"></i>Progresso das Etapas
+                    </h5>
+                    
+                    <div id="step-login" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Login no eLaw</div>
+                            <div class="step-description">Autenticando no sistema eLaw</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-navegacao" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-compass"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Navegação</div>
+                            <div class="step-description">Acessando formulário de cadastro</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-preenchimento" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-pen-to-square"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Preenchimento de Dados</div>
+                            <div class="step-description">Inserindo informações do processo</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-audiencia" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-gavel"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Cadastro de Primeira Audiência</div>
+                            <div class="step-description">Registrando data e hora da audiência inicial</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-screenshot-before" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Captura de Tela (Antes)</div>
+                            <div class="step-description">Registrando formulário preenchido</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-salvamento" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-save"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Salvamento</div>
+                            <div class="step-description">Enviando dados ao eLaw</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-screenshot-after" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Captura de Tela (Depois)</div>
+                            <div class="step-description">Verificando confirmação de salvamento</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+
+                    <div id="step-finalizacao" class="step-item pending">
+                        <div class="step-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-title">Finalização</div>
+                            <div class="step-description">Processo concluído com sucesso</div>
+                            <div class="step-time"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Powered by Inova -->
+        <div class="powered-by">
+            <div class="powered-by-text">Powered by</div>
+            <img src="{{ url_for('static', filename='images/inovailab-logo.png') }}" alt="InovaLab">
+        </div>
+    </div>
+
+    <script>
+        const processId = {{ process_id }};
+        const pollInterval = 3000; // 3 segundos (otimizado para reduzir carga)
+        const maxDuration = 600000; // 10 minutos timeout
+        let startTime = Date.now();
+        let currentProgress = 0;
+
+        // Mapeamento de etapas do backend para IDs dos elementos
+        const stepMapping = {
+            // Login
+            'abrindo_navegador': 'step-login',
+            'login': 'step-login',
+            'fazendo_login': 'step-login',
+            'login_sucesso': 'step-login',
+            
+            // Navegação
+            'navegando': 'step-navegacao',
+            'navegacao': 'step-navegacao',
+            
+            // Preenchimento
+            'preenchendo_campos': 'step-preenchimento',
+            'preenchendo_dados': 'step-preenchimento',
+            'preenchendo_cnj': 'step-preenchimento',
+            'cnj_preenchido': 'step-preenchimento',
+            'localizacao_preenchida': 'step-preenchimento',
+            'cliente_preenchido': 'step-preenchimento',
+            'parte_adversa_preenchida': 'step-preenchimento',
+            
+            // Audiência
+            'cadastrando_audiencia': 'step-audiencia',
+            
+            // Screenshot before
+            'capturando_screenshot_before': 'step-screenshot-before',
+            'screenshot_before_captured': 'step-screenshot-before',
+            
+            // Salvamento
+            'salvando': 'step-salvamento',
+            'salvando_processo': 'step-salvamento',
+            'clicando_salvar': 'step-salvamento',
+            'processo_salvo': 'step-salvamento',
+            
+            // Screenshot after
+            'capturando_screenshot_after': 'step-screenshot-after',
+            'screenshot_after_captured': 'step-screenshot-after',
+            
+            // Finalização
+            'voltando_dashboard': 'step-finalizacao',
+            'dashboard_ok': 'step-finalizacao',
+            'concluido': 'step-finalizacao',
+            'completed': 'step-finalizacao',
+            'finalizacao': 'step-finalizacao'
+        };
+
+        // Total de etapas para cálculo de progresso
+        const totalSteps = 8;
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`/api/rpa-status/${processId}`);
+                const data = await response.json();
+
+                console.log('Status RPA:', data);
+
+                // Atualiza mensagem principal
+                updateCurrentStatus(data);
+
+                // Atualiza etapas baseado no histórico
+                if (data.history && data.history.length > 0) {
+                    updateSteps(data.history, data.current_step);
+                }
+
+                // Atualiza progresso
+                updateProgress(data);
+
+                // Verifica se terminou
+                if (data.status === 'completed' || data.status === 'success') {
+                    markStepCompleted('step-finalizacao');
+                    updateProgressBar(100);
+                    document.getElementById('current-status-message').innerHTML = 
+                        '<i class="fas fa-check-circle me-2"></i>Processo concluído com sucesso!<br><small>Redirecionando...</small>';
+                    setTimeout(() => {
+                        window.location.href = '/processos';
+                    }, 2500);
+                    return;
+                } else if (data.status === 'error') {
+                    const currentStep = data.current_step || 'unknown';
+                    const stepId = stepMapping[currentStep];
+                    if (stepId) {
+                        markStepError(stepId);
+                    }
+                    document.getElementById('current-status-message').innerHTML = 
+                        `<i class="fas fa-exclamation-triangle me-2"></i>Erro: ${data.message || 'Erro desconhecido'}<br><a href="/processos" class="btn btn-sm btn-secondary mt-3">Voltar para lista</a>`;
+                    return;
+                }
+
+                // Continua polling
+                if (Date.now() - startTime < maxDuration) {
+                    setTimeout(checkStatus, pollInterval);
+                } else {
+                    document.getElementById('current-status-message').innerHTML = 
+                        '<i class="fas fa-clock me-2"></i>Timeout: O RPA está demorando mais do que o esperado.<br><a href="/processos" class="btn btn-sm btn-secondary mt-3">Voltar</a>';
+                }
+            } catch (error) {
+                console.error('Erro ao verificar status:', error);
+                setTimeout(checkStatus, pollInterval * 2);
+            }
+        }
+
+        function updateCurrentStatus(data) {
+            const statusMsg = document.getElementById('current-status-message');
+            const message = data.message || data.current_step || 'Processando...';
+            statusMsg.textContent = message;
+        }
+
+        function updateSteps(history, currentStep) {
+            // Marca etapas completadas baseado no histórico
+            const completedSteps = new Set();
+            
+            history.forEach(item => {
+                const stepId = stepMapping[item.step];
+                if (stepId) {
+                    completedSteps.add(stepId);
+                    markStepCompleted(stepId, item.timestamp);
+                }
+            });
+
+            // Marca etapa atual como ativa
+            if (currentStep) {
+                const currentStepId = stepMapping[currentStep];
+                if (currentStepId && !completedSteps.has(currentStepId)) {
+                    markStepActive(currentStepId);
+                }
+            }
+        }
+
+        function updateProgress(data) {
+            // Calcula progresso baseado nas etapas completadas
+            let completedCount = 0;
+            const allSteps = document.querySelectorAll('.step-item.completed');
+            completedCount = allSteps.length;
+
+            const progressPercent = Math.round((completedCount / totalSteps) * 100);
+            updateProgressBar(progressPercent);
+        }
+
+        function updateProgressBar(percent) {
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-percentage');
+            
+            progressBar.style.width = percent + '%';
+            progressText.textContent = percent + '%';
+        }
+
+        function markStepActive(stepId) {
+            const step = document.getElementById(stepId);
+            if (step) {
+                // Remove active de todos
+                document.querySelectorAll('.step-item.active').forEach(s => {
+                    s.classList.remove('active');
+                });
+                
+                step.classList.remove('pending', 'completed', 'error');
+                step.classList.add('active');
+            }
+        }
+
+        function markStepCompleted(stepId, timestamp = null) {
+            const step = document.getElementById(stepId);
+            if (step) {
+                step.classList.remove('pending', 'active', 'error');
+                step.classList.add('completed');
+                
+                if (timestamp) {
+                    const timeEl = step.querySelector('.step-time');
+                    if (timeEl) {
+                        const time = new Date(timestamp).toLocaleTimeString('pt-BR');
+                        timeEl.textContent = time;
+                    }
+                }
+            }
+        }
+
+        function markStepError(stepId) {
+            const step = document.getElementById(stepId);
+            if (step) {
+                step.classList.remove('pending', 'active', 'completed');
+                step.classList.add('error');
+            }
+        }
+
+        // Inicia polling
+        checkStatus();
+    </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# artefatos locais
+*.patch
+*.mbox
+logs/
+processos.backup.db
+instance/*.db
+
+# docs não versionáveis
+data/*.docx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Cache e builds
+.cache/
+.pytest_cache/
+.pythonlibs/
+.local/
+
+# Playwright/Browsers (muito pesado - não fazer deploy)
+ms-playwright/
+.ms-playwright/
+
+# Assets temporários
+attached_assets/
+
+# Uploads e screenshots (não fazer deploy)
+uploads/
+static/rpa_screenshots/
+
+# Node (se houver)
+node_modules/
+npm-debug.log

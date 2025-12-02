@@ -1,0 +1,1165 @@
+{% extends "base.html" %}
+{% block title %}Processo {{ process.cnj }} - Sistema Jurídico Inteligente{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h1><i class="fas fa-file-alt"></i> Processo {{ process.cnj }}</h1>
+    <p class="text-muted mb-0 mt-2">Detalhes e informações do processo <small class="text-info">(clique em um campo para editar)</small></p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if batch_id %}
+    <a class="btn btn-secondary" href="{{ url_for('batch.batch_detail', id=batch_id) }}"><i class="fas fa-arrow-left me-1"></i>Voltar ao Batch</a>
+    {% else %}
+    <a class="btn btn-secondary" href="{{ url_for('core.process_list') }}"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+    {% endif %}
+    {% if process.pdf_filename %}
+    <a class="btn btn-outline-danger" href="{{ url_for('core.uploaded_file', filename=process.pdf_filename) }}" target="_blank">
+      <i class="fas fa-file-pdf me-1"></i>PDF
+    </a>
+    {% endif %}
+    {% if process.elaw_screenshot_before_path %}
+    <a class="btn btn-outline-success" href="{{ url_for('core.serve_rpa_screenshot', filename=process.elaw_screenshot_before_path) }}" target="_blank">
+      <i class="fas fa-camera me-1"></i>Screenshot ANTES
+    </a>
+    {% endif %}
+    {% if process.elaw_screenshot_after_path %}
+    <a class="btn btn-outline-primary" href="{{ url_for('core.serve_rpa_screenshot', filename=process.elaw_screenshot_after_path) }}" target="_blank">
+      <i class="fas fa-camera-retro me-1"></i>Screenshot DEPOIS
+    </a>
+    {% endif %}
+    {% if process.elaw_screenshot_reclamadas_path %}
+    <a class="btn btn-outline-warning" href="{{ url_for('core.serve_rpa_screenshot', filename=process.elaw_screenshot_reclamadas_path) }}" target="_blank">
+      <i class="fas fa-users me-1"></i>Screenshot RECLAMADAS
+    </a>
+    {% endif %}
+    {% if process.elaw_screenshot_path and not process.elaw_screenshot_before_path %}
+    <a class="btn btn-outline-primary" href="{{ url_for('core.process_screenshot', id=process.id) }}" target="_blank">
+      <i class="fas fa-camera me-1"></i>Screenshot eLaw
+    </a>
+    {% endif %}
+    {% if batch_id %}
+    <a class="btn btn-warning" href="{{ url_for('core.process_edit', id=process.id, batch_id=batch_id) }}">
+      <i class="fas fa-edit me-1"></i>Editar Tudo
+    </a>
+    {% else %}
+    <a class="btn btn-warning" href="{{ url_for('core.process_edit', id=process.id) }}">
+      <i class="fas fa-edit me-1"></i>Editar Tudo
+    </a>
+    {% endif %}
+    {% if process.elaw_status == 'pending' %}
+    {% if batch_id %}
+    <form method="POST" action="{{ url_for('core.process_fill_elaw', id=process.id, batch_id=batch_id) }}" style="display: inline;">
+      <button type="submit" class="btn btn-success">
+        <i class="fas fa-paper-plane me-1"></i>Preencher no eLaw
+      </button>
+    </form>
+    {% else %}
+    <form method="POST" action="{{ url_for('core.process_fill_elaw', id=process.id) }}" style="display: inline;">
+      <button type="submit" class="btn btn-success">
+        <i class="fas fa-paper-plane me-1"></i>Preencher no eLaw
+      </button>
+    </form>
+    {% endif %}
+    {% elif process.elaw_status == 'error' %}
+    {% if batch_id %}
+    <form method="POST" action="{{ url_for('core.process_fill_elaw', id=process.id, batch_id=batch_id) }}" style="display: inline;">
+      <button type="submit" class="btn btn-warning">
+        <i class="fas fa-redo me-1"></i>Tentar Novamente
+      </button>
+    </form>
+    {% else %}
+    <form method="POST" action="{{ url_for('core.process_fill_elaw', id=process.id) }}" style="display: inline;">
+      <button type="submit" class="btn btn-warning">
+        <i class="fas fa-redo me-1"></i>Tentar Novamente
+      </button>
+    </form>
+    {% endif %}
+    {% elif process.elaw_status == 'running' %}
+    <a class="btn btn-info disabled" href="#">
+      <i class="fas fa-spinner fa-spin me-1"></i>Preenchendo...
+    </a>
+    {% elif process.elaw_status == 'success' %}
+    <button class="btn btn-success disabled">
+      <i class="fas fa-check-circle me-1"></i>Preenchido
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{% set missing_fields = process.get_missing_critical_fields() %}
+{% set has_missing = missing_fields|length > 0 %}
+{% set total_critical = process.CRITICAL_FIELDS|length %}
+{% set filled_count = total_critical - missing_fields|length %}
+<div id="fields-status-alert" class="alert {% if has_missing %}alert-warning{% else %}alert-success{% endif %} mt-3 d-flex align-items-center justify-content-between">
+  <div>
+    {% if has_missing %}
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Campos RPA faltando ({{ missing_fields|length }}):</strong> <span id="missing-fields-list">{{ missing_fields[:5]|join(', ') }}{% if missing_fields|length > 5 %}...{% endif %}</span>
+    <small class="ms-2 text-muted">(clique nos campos para editar)</small>
+    {% else %}
+    <i class="fas fa-check-circle me-2"></i>
+    <strong>Todos os campos críticos preenchidos!</strong>
+    <small class="ms-2 text-muted">Pronto para RPA</small>
+    {% endif %}
+  </div>
+  <span id="fields-status-badge" class="badge {% if has_missing %}bg-warning text-dark{% else %}bg-success{% endif %}">
+    {{ filled_count }}/{{ total_critical }}
+  </span>
+</div>
+
+{% if process.elaw_status == 'error' and process.elaw_error_message %}
+<div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+  <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Erro no Preenchimento Automático</h5>
+  <p class="mb-0">{{ process.elaw_error_message }}</p>
+  <hr>
+  <p class="mb-0 small">Você pode tentar novamente clicando no botão "Tentar Novamente" acima.</p>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<style>
+.editable-field {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.editable-field:hover {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+}
+.editable-field:hover::after {
+  content: '\f303';
+  font-family: 'Font Awesome 6 Free', 'Font Awesome 5 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #0d6efd;
+  font-size: 0.8rem;
+}
+.editable-field.editing {
+  background-color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+.editable-field .field-value {
+  min-height: 24px;
+}
+.editable-field .edit-input {
+  display: none;
+  width: 100%;
+}
+.editable-field.editing .field-value {
+  display: none;
+}
+.editable-field.editing .edit-input {
+  display: block;
+}
+.editable-field .edit-actions {
+  display: none;
+  margin-top: 8px;
+}
+.editable-field.editing .edit-actions {
+  display: flex;
+  gap: 5px;
+}
+.save-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: none;
+}
+</style>
+
+<div class="save-indicator">
+  <div class="alert alert-success py-2 px-3 mb-0" id="save-success" style="display:none;">
+    <i class="fas fa-check-circle me-1"></i> Salvo com sucesso!
+  </div>
+  <div class="alert alert-danger py-2 px-3 mb-0" id="save-error" style="display:none;">
+    <i class="fas fa-times-circle me-1"></i> Erro ao salvar
+  </div>
+</div>
+
+<div class="row g-4 mt-2">
+  <!-- Dados Principais -->
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Dados Principais</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="cnj">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-gavel me-1"></i>CNJ</strong>
+              <span class="field-value fs-5">{{ process.cnj or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.cnj or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="tipo_processo">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-folder me-1"></i>Tipo</strong>
+              <span class="field-value fs-5">{{ process.tipo_processo or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.tipo_processo or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="numero_processo">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-hashtag me-1"></i>Nº Processo</strong>
+              <span class="field-value fs-5">{{ process.numero_processo or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.numero_processo or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="estado">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-map-marker-alt me-1"></i>Estado</strong>
+              <span class="field-value fs-5">{{ process.estado or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.estado or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="comarca">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-building me-1"></i>Comarca</strong>
+              <span class="field-value fs-5">{{ process.comarca or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.comarca or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="origem">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-sitemap me-1"></i>Origem</strong>
+              <span class="field-value fs-5">{{ process.origem or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.origem or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="orgao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-landmark me-1"></i>Órgão</strong>
+              <span class="field-value fs-5">{{ process.orgao or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.orgao or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="celula">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-layer-group me-1"></i>Célula</strong>
+              <span class="field-value fs-5">{{ process.celula or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.celula or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="foro">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-balance-scale me-1"></i>Foro</strong>
+              <span class="field-value fs-5">{{ process.foro or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.foro or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="instancia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-level-up-alt me-1"></i>Instância</strong>
+              <span class="field-value fs-5">{{ process.instancia or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.instancia or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="vara">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-university me-1"></i>Vara</strong>
+              <span class="field-value fs-5">{{ process.vara or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.vara or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="assunto">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-tag me-1"></i>Assunto</strong>
+              <span class="field-value fs-5">{{ process.assunto or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.assunto or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="objeto">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-bullseye me-1"></i>Objeto</strong>
+              <span class="field-value fs-5">{{ process.objeto or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.objeto or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Partes e Representação -->
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-user-tie me-2"></i>Partes e Representação</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="cliente">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-shield me-1"></i>Cliente</strong>
+              <span class="field-value fs-5">{{ process.cliente or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.cliente or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="parte">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-tag me-1"></i>Parte (posição)</strong>
+              <span class="field-value fs-5">{{ process.parte or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.parte or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="advogado_autor">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-graduate me-1"></i>Advogado do Autor/Cliente</strong>
+              <span class="field-value fs-5">{{ process.advogado_autor or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.advogado_autor or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="advogado_reu">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-tie me-1"></i>Advogado do Réu/Parte</strong>
+              <span class="field-value fs-5">{{ process.advogado_reu or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.advogado_reu or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="posicao_parte_interessada">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-users-cog me-1"></i>Posição Parte Interessada</strong>
+              <span class="field-value fs-5">{{ process.posicao_parte_interessada or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.posicao_parte_interessada or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="parte_interessada">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-friends me-1"></i>Parte Interessada</strong>
+              <span class="field-value fs-5">{{ process.parte_interessada or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.parte_interessada or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="parte_adversa_tipo">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-slash me-1"></i>Parte Adversa (tipo)</strong>
+              <span class="field-value fs-5">{{ process.parte_adversa_tipo or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.parte_adversa_tipo or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-9">
+            <div class="p-3 bg-light rounded editable-field" data-field="parte_adversa_nome">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-user-alt-slash me-1"></i>Nome Parte Adversa</strong>
+              <span class="field-value fs-5">{{ process.parte_adversa_nome or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.parte_adversa_nome or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="escritorio_parte_adversa">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-building me-1"></i>Escritório Parte Adversa</strong>
+              <span class="field-value fs-5">{{ process.escritorio_parte_adversa or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.escritorio_parte_adversa or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="p-3 bg-light rounded editable-field" data-field="uf_oab_advogado_adverso">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-id-badge me-1"></i>UF OAB</strong>
+              <span class="field-value fs-5">{{ process.uf_oab_advogado_adverso or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.uf_oab_advogado_adverso or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="cpf_cnpj_parte_adversa">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-id-card me-1"></i>CPF/CNPJ Parte Adversa</strong>
+              <span class="field-value fs-5">{{ process.cpf_cnpj_parte_adversa or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.cpf_cnpj_parte_adversa or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="telefone_parte_adversa">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-phone me-1"></i>Telefone Parte Adversa</strong>
+              <span class="field-value fs-5">{{ process.telefone_parte_adversa or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.telefone_parte_adversa or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="email_parte_adversa">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-envelope me-1"></i>Email Parte Adversa</strong>
+              <span class="field-value fs-5">{{ process.email_parte_adversa or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.email_parte_adversa or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="endereco_parte_adversa">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-map-marked-alt me-1"></i>Endereço Parte Adversa</strong>
+              <span class="field-value fs-5">{{ process.endereco_parte_adversa or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.endereco_parte_adversa or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dados Trabalhistas (RPA) -->
+  <div class="col-12">
+    <div class="card border-success">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="fas fa-briefcase me-2"></i>Dados Trabalhistas <small class="ms-2 opacity-75">(campos RPA - prioritários)</small></h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="data_admissao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-calendar-plus me-1"></i>Data de Admissão</strong>
+              <span class="field-value fs-5 {% if not process.data_admissao %}text-danger{% endif %}">{{ process.data_admissao or 'Não informado' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.data_admissao or '' }}" placeholder="DD/MM/AAAA">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="data_demissao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-calendar-minus me-1"></i>Data de Demissão</strong>
+              <span class="field-value fs-5 {% if not process.data_demissao %}text-danger{% endif %}">{{ process.data_demissao or 'Não informado' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.data_demissao or '' }}" placeholder="DD/MM/AAAA">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="salario">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-dollar-sign me-1"></i>Salário</strong>
+              <span class="field-value fs-5 {% if not process.salario %}text-danger{% endif %}">{{ process.salario or 'Não informado' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.salario or '' }}" placeholder="R$ 0.000,00">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="motivo_demissao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-sign-out-alt me-1"></i>Motivo da Demissão</strong>
+              <span class="field-value fs-5">{{ process.motivo_demissao or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.motivo_demissao or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="cargo_funcao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-id-badge me-1"></i>Cargo/Função</strong>
+              <span class="field-value fs-5 {% if not process.cargo_funcao %}text-danger{% endif %}">{{ process.cargo_funcao or 'Não informado' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.cargo_funcao or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="pis">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-id-card me-1"></i>PIS</strong>
+              <span class="field-value fs-5 {% if not process.pis %}text-danger{% endif %}">{{ process.pis or 'Não informado' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.pis or '' }}" placeholder="XXX.XXXXX.XX-X">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="ctps">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-address-card me-1"></i>CTPS</strong>
+              <span class="field-value fs-5 {% if not process.ctps %}text-danger{% endif %}">{{ process.ctps or 'Não informado' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.ctps or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="empregador">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-building me-1"></i>Empregador</strong>
+              <span class="field-value fs-5">{{ process.empregador or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.empregador or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="p-3 bg-light rounded editable-field" data-field="local_trabalho">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-map-marker-alt me-1"></i>Local de Trabalho</strong>
+              <span class="field-value fs-5">{{ process.local_trabalho or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.local_trabalho or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prazos / Audiência / Decisão -->
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-gavel me-2"></i>Prazos, Audiências e Decisões</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="prazo">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-clock me-1"></i>Prazo</strong>
+              <span class="field-value fs-5">{{ process.prazo or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.prazo or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="audiencia_inicial">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-calendar-check me-1"></i>Audiência Inicial</strong>
+              <span class="field-value fs-5">
+                {{ process.audiencia_inicial or '-' }}
+                {% if process.subtipo_audiencia %}
+                  <br><small class="text-muted"><i class="fas fa-tag"></i> {{ process.subtipo_audiencia }}</small>
+                {% endif %}
+                {% if process.envolvido_audiencia %}
+                  <br><small class="text-muted"><i class="fas fa-users"></i> {{ process.envolvido_audiencia }}</small>
+                {% endif %}
+              </span>
+              <input type="text" class="form-control edit-input" value="{{ process.audiencia_inicial or '' }}" placeholder="DD/MM/AAAA HH:MM">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="tipo_notificacao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-bell me-1"></i>Tipo de Notificação</strong>
+              <span class="field-value fs-5">{{ process.tipo_notificacao or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.tipo_notificacao or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          {% if process.link_audiencia %}
+          <div class="col-md-12">
+            <div class="p-3 bg-info bg-opacity-10 rounded">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-video me-1"></i>Link da Audiência (Telepresencial)</strong>
+              <a href="{{ process.link_audiencia }}" target="_blank" rel="noopener" class="text-primary fs-5">
+                <i class="fas fa-external-link-alt me-1"></i>{{ process.link_audiencia }}
+              </a>
+            </div>
+          </div>
+          {% endif %}
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="subtipo_audiencia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-tag me-1"></i>Subtipo de Audiência</strong>
+              <span class="field-value fs-5">{{ process.subtipo_audiencia or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.subtipo_audiencia or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="envolvido_audiencia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-users me-1"></i>Envolvido na Audiência</strong>
+              <span class="field-value fs-5">{{ process.envolvido_audiencia or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.envolvido_audiencia or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="p-3 bg-light rounded editable-field" data-field="link_audiencia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-link me-1"></i>Link Audiência Telepresencial</strong>
+              <span class="field-value fs-5">{{ process.link_audiencia or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.link_audiencia or '' }}" placeholder="https://...">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="p-3 bg-light rounded editable-field" data-field="resultado_audiencia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-clipboard-check me-1"></i>Resultado da Audiência</strong>
+              <span class="field-value fs-5">{{ process.resultado_audiencia or '-' }}</span>
+              <textarea class="form-control edit-input" rows="2">{{ process.resultado_audiencia or '' }}</textarea>
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="p-3 bg-light rounded editable-field" data-field="prazos_derivados_audiencia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-hourglass-half me-1"></i>Prazos Derivados da Audiência</strong>
+              <span class="field-value fs-5">{{ process.prazos_derivados_audiencia or '-' }}</span>
+              <textarea class="form-control edit-input" rows="2">{{ process.prazos_derivados_audiencia or '' }}</textarea>
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="decisao_tipo">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-balance-scale me-1"></i>Tipo de Decisão</strong>
+              <span class="field-value fs-5">{{ process.decisao_tipo or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.decisao_tipo or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded editable-field" data-field="decisao_resultado">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-check-double me-1"></i>Resultado da Decisão</strong>
+              <span class="field-value fs-5">{{ process.decisao_resultado or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.decisao_resultado or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="p-3 bg-light rounded editable-field" data-field="decisao_fundamentacao_resumida">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-file-alt me-1"></i>Fundamentação Resumida</strong>
+              <span class="field-value fs-5">{{ process.decisao_fundamentacao_resumida or '-' }}</span>
+              <textarea class="form-control edit-input" rows="3">{{ process.decisao_fundamentacao_resumida or '' }}</textarea>
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estratégia e Índices -->
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-flag me-2"></i>Estratégia e Índices</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="estrategia">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-chess me-1"></i>Estratégia</strong>
+              <span class="field-value fs-5">{{ process.estrategia or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.estrategia or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="indice_atualizacao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-chart-line me-1"></i>Índice de Atualização</strong>
+              <span class="field-value fs-5">{{ process.indice_atualizacao or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.indice_atualizacao or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="id_interno_hilo">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-fingerprint me-1"></i>ID Interno Hilo</strong>
+              <span class="field-value fs-5">{{ process.id_interno_hilo or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.id_interno_hilo or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outras Informações -->
+  <div class="col-12">
+    <div class="card border-primary">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Outras Informações</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="data_distribuicao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-calendar me-1"></i>Data de Distribuição</strong>
+              <span class="field-value fs-5">{{ process.data_distribuicao or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.data_distribuicao or '' }}" placeholder="DD/MM/AAAA">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="data_citacao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-calendar-day me-1"></i>Data de Citação</strong>
+              <span class="field-value fs-5">{{ process.data_citacao or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.data_citacao or '' }}" placeholder="DD/MM/AAAA">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="p-3 bg-light rounded editable-field" data-field="risco">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-exclamation-triangle me-1"></i>Risco</strong>
+              <span class="field-value fs-5">{{ process.risco or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.risco or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded editable-field" data-field="valor_causa">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-money-bill-wave me-1"></i>Valor da Causa</strong>
+              <span class="field-value fs-5">{{ process.valor_causa or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.valor_causa or '' }}" placeholder="R$ 0.000,00">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded editable-field" data-field="rito">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-route me-1"></i>Rito</strong>
+              <span class="field-value fs-5">{{ process.rito or '-' }}</span>
+              <input type="text" class="form-control edit-input" value="{{ process.rito or '' }}">
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div class="p-3 bg-light rounded editable-field" data-field="observacao">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-sticky-note me-1"></i>Observação</strong>
+              <span class="field-value fs-5">{{ process.observacao or '-' }}</span>
+              <textarea class="form-control edit-input" rows="2">{{ process.observacao or '' }}</textarea>
+              <div class="edit-actions">
+                <button class="btn btn-sm btn-success save-btn"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-secondary cancel-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-calendar-check me-1"></i>Cadastrar 1ª Audiência</strong>
+              <span class="fs-5">
+                {% if process.cadastrar_primeira_audiencia %}
+                  <span class="badge bg-success"><i class="fas fa-check me-1"></i>Sim</span>
+                {% else %}
+                  <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>Não</span>
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metadados -->
+  <div class="col-12">
+    <div class="card border-secondary">
+      <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0"><i class="fas fa-database me-2"></i>Metadados</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-hashtag me-1"></i>ID</strong>
+              <span class="fs-5">#{{ process.id }}</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-plus-circle me-1"></i>Criado em</strong>
+              <span class="fs-5">{% if process.created_at %}{{ process.created_at|brazil_datetime('%d/%m/%Y %H:%M') }}{% else %}-{% endif %}</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded">
+              <strong class="text-muted d-block mb-1"><i class="fas fa-sync-alt me-1"></i>Atualizado em</strong>
+              <span class="fs-5">{% if process.updated_at %}{{ process.updated_at|brazil_datetime('%d/%m/%Y %H:%M') }}{% else %}-{% endif %}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const processId = {{ process.id }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const editableFields = document.querySelectorAll('.editable-field');
+    
+    editableFields.forEach(field => {
+        const fieldValue = field.querySelector('.field-value');
+        const editInput = field.querySelector('.edit-input');
+        const saveBtn = field.querySelector('.save-btn');
+        const cancelBtn = field.querySelector('.cancel-btn');
+        
+        if (!fieldValue || !editInput) return;
+        
+        // Clicar no campo para editar
+        fieldValue.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Fechar outros campos em edição
+            document.querySelectorAll('.editable-field.editing').forEach(f => {
+                if (f !== field) {
+                    f.classList.remove('editing');
+                }
+            });
+            field.classList.add('editing');
+            editInput.focus();
+            if (editInput.tagName === 'INPUT') {
+                editInput.select();
+            }
+        });
+        
+        // Salvar ao clicar no botão
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                saveField(field);
+            });
+        }
+        
+        // Cancelar
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                field.classList.remove('editing');
+                // Restaurar valor original
+                const originalValue = fieldValue.textContent.trim();
+                editInput.value = originalValue === '-' || originalValue === 'Não informado' ? '' : originalValue;
+            });
+        }
+        
+        // Salvar com Enter, cancelar com Escape
+        editInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && editInput.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                saveField(field);
+            } else if (e.key === 'Escape') {
+                field.classList.remove('editing');
+                const originalValue = fieldValue.textContent.trim();
+                editInput.value = originalValue === '-' || originalValue === 'Não informado' ? '' : originalValue;
+            }
+        });
+    });
+    
+    // Fechar ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.editable-field')) {
+            document.querySelectorAll('.editable-field.editing').forEach(f => {
+                f.classList.remove('editing');
+            });
+        }
+    });
+});
+
+const criticalFields = [
+    'numero_processo', 'area_direito',
+    'estado', 'comarca', 'numero_orgao', 'orgao', 'celula', 'foro', 'instancia',
+    'assunto',
+    'cliente', 'posicao_parte_interessada', 'parte_interessada', 'parte_adversa_tipo', 'parte_adversa_nome',
+    'data_distribuicao', 'data_admissao', 'data_demissao',
+    'salario', 'cargo_funcao', 'empregador', 'local_trabalho', 'motivo_demissao', 'pis', 'ctps',
+    'valor_causa'
+];
+const criticalFieldLabels = {
+    'numero_processo': 'Número CNJ',
+    'area_direito': 'Área do Direito',
+    'estado': 'Estado',
+    'comarca': 'Comarca',
+    'numero_orgao': 'Nº Órgão',
+    'orgao': 'Órgão',
+    'celula': 'Célula',
+    'foro': 'Foro',
+    'instancia': 'Instância',
+    'assunto': 'Assunto',
+    'cliente': 'Cliente',
+    'posicao_parte_interessada': 'Posição',
+    'parte_interessada': 'Parte Interessada',
+    'parte_adversa_tipo': 'Tipo Parte Adversa',
+    'parte_adversa_nome': 'Nome Parte Adversa',
+    'data_distribuicao': 'Data Distribuição',
+    'data_admissao': 'Data Admissão',
+    'data_demissao': 'Data Demissão',
+    'salario': 'Salário',
+    'cargo_funcao': 'Cargo',
+    'empregador': 'Empregador',
+    'local_trabalho': 'Local Trabalho',
+    'motivo_demissao': 'Motivo Demissão',
+    'pis': 'PIS',
+    'ctps': 'CTPS',
+    'valor_causa': 'Valor da Causa'
+};
+const TOTAL_CRITICAL = criticalFields.length;
+
+function updateFieldsStatusIndicator() {
+    const statusAlert = document.getElementById('fields-status-alert');
+    const missingFieldsList = document.getElementById('missing-fields-list');
+    const statusBadge = document.getElementById('fields-status-badge');
+    
+    if (!statusAlert) return;
+    
+    const missingFields = [];
+    
+    criticalFields.forEach(fieldName => {
+        const field = document.querySelector(`.editable-field[data-field="${fieldName}"]`);
+        if (field) {
+            const fieldValue = field.querySelector('.field-value');
+            const text = fieldValue ? fieldValue.textContent.trim() : '';
+            if (!text || text === '-' || text === 'Não informado') {
+                missingFields.push(criticalFieldLabels[fieldName]);
+            }
+        }
+    });
+    
+    const filledCount = TOTAL_CRITICAL - missingFields.length;
+    
+    if (missingFields.length === 0) {
+        statusAlert.className = 'alert alert-success mt-3 d-flex align-items-center justify-content-between';
+        statusAlert.innerHTML = `
+            <div>
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Todos os campos críticos preenchidos!</strong>
+                <small class="ms-2 text-muted">Pronto para RPA</small>
+            </div>
+            <span id="fields-status-badge" class="badge bg-success">${TOTAL_CRITICAL}/${TOTAL_CRITICAL}</span>
+        `;
+    } else {
+        statusAlert.className = 'alert alert-warning mt-3 d-flex align-items-center justify-content-between';
+        statusAlert.innerHTML = `
+            <div>
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Campos RPA faltando (${missingFields.length}):</strong> <span id="missing-fields-list">${missingFields.slice(0, 5).join(', ')}${missingFields.length > 5 ? '...' : ''}</span>
+                <small class="ms-2 text-muted">(clique nos campos para editar)</small>
+            </div>
+            <span id="fields-status-badge" class="badge bg-warning text-dark">${filledCount}/${TOTAL_CRITICAL}</span>
+        `;
+    }
+}
+
+async function saveField(field) {
+    const fieldName = field.dataset.field;
+    const editInput = field.querySelector('.edit-input');
+    const fieldValue = field.querySelector('.field-value');
+    const newValue = editInput.value.trim();
+    
+    const saveIndicator = document.querySelector('.save-indicator');
+    const successAlert = document.getElementById('save-success');
+    const errorAlert = document.getElementById('save-error');
+    
+    try {
+        const response = await fetch(`/processos/${processId}/update-field`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                field: fieldName,
+                value: newValue
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const displayValue = newValue || '-';
+            
+            if (newValue) {
+                fieldValue.classList.remove('text-danger');
+                fieldValue.textContent = displayValue;
+            } else {
+                if (criticalFields.includes(fieldName)) {
+                    fieldValue.classList.add('text-danger');
+                    fieldValue.textContent = 'Não informado';
+                } else {
+                    fieldValue.textContent = '-';
+                }
+            }
+            
+            field.classList.remove('editing');
+            
+            // Atualizar indicador de status dos campos críticos
+            if (criticalFields.includes(fieldName)) {
+                updateFieldsStatusIndicator();
+            }
+            
+            saveIndicator.style.display = 'block';
+            successAlert.style.display = 'block';
+            errorAlert.style.display = 'none';
+            setTimeout(() => {
+                saveIndicator.style.display = 'none';
+                successAlert.style.display = 'none';
+            }, 2000);
+        } else {
+            throw new Error(result.error || 'Erro ao salvar');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        saveIndicator.style.display = 'block';
+        errorAlert.style.display = 'block';
+        successAlert.style.display = 'none';
+        setTimeout(() => {
+            saveIndicator.style.display = 'none';
+            errorAlert.style.display = 'none';
+        }, 3000);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,28 @@
+# Exclude user uploads and generated files from deployment
+uploads/
+static/rpa_screenshots/
+attached_assets/
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Playwright cache (will be installed during build)
+.cache/
+ms-playwright/
+
+# Development files
+.replit
+.git/
+.gitignore
+*.md
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,973 @@
+{
+  "clientes": {
+    "Smart RJ": {
+      "nome_cliente": "Smart RJ",
+      "partes": [
+        "Smart RJ Concessionária de Iluminação Pública SPE"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "Premio": {
+      "nome_cliente": "Premio",
+      "partes": [
+        "Premio Empreend.Imobiliarios Ltda.",
+        "SPE19 Global Premio Recanto Verde Empreendimentos Imobiliarios S.A",
+        "SPE 23 Global Premio Bora Itaboraí Suites Empreendimentos S/A",
+        "Premio Construtora Ltda",
+        "Casa Gabizo Empreendimentos Imobiliários Ltda",
+        "Consórcio De Construção Nurban",
+        "Clube Arete Búzios",
+        "CA92 Empreendimento Imobiliário Ltda"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "MP Incorporadora": {
+      "nome_cliente": "MP Incorporadora",
+      "partes": [
+        "Jardim Imperial II Construções e Incorporações SPE Ltda",
+        "Liberty Arraial Do Cabo Construcoes e Incorporacoes Spe Ltda",
+        "M&P Construtora e Incorporadora Ltda",
+        "Murta Construtora Eireli"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "HAZTEC": {
+      "nome_cliente": "HAZTEC",
+      "partes": [
+        "Central De Tratamento De Residuos Alcantara",
+        "Central De Tratamento De Resíduos Barra Mansa S/A",
+        "Central De Tratamento De Resíduos De Nova Iguaçú S/A - Ctr",
+        "Ecopesa Ambiental S.A.",
+        "ETR JARDIM GRAMACHO S/A",
+        "FOXX URE-JP AMBIENTAL S.A",
+        "HAZTEC INVESTIMENTOS E PARTICIPAÇÕES S/A",
+        "METROPOLITANA SERVIÇOS AMBIENTAIS LTDA",
+        "ORIZON MEIO AMBIENTE S.A.",
+        "Orizon Valorizacao de Residuos S.A",
+        "Rosario do Catete Ambiental Sociedade Anônima",
+        "SPE Maceió Ambiental S/A",
+        "UTM Jaboatao dos Guararapes Ltda"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "GRUPO VIAÇÃO AGULHAS NEGRAS": {
+      "nome_cliente": "GRUPO VIAÇÃO AGULHAS NEGRAS",
+      "partes": [
+        "VIAÇÃO PINHEIRAL LTDA",
+        "VIAÇÃO PARAISO LTDA",
+        "VIAÇÃO AGULHAS NEGRAS LTDA",
+        "AUTO COMERCIAL TUPI LTDA",
+        "MANEJO TRANSPORTE TURISMO LTDA - FALIDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "GRUPO PEIXOTO CASTRO": {
+      "nome_cliente": "GRUPO PEIXOTO CASTRO",
+      "partes": [
+        "APOLO TUBOS E EQUIPAMENTOS S/A",
+        "APOLO PRODUTOS DE ACO S.A (GPC)",
+        "GPC PARTICIPAÇÕES S/A",
+        "GPC QUÍMICA S/A"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "GRUPO KPFR": {
+      "nome_cliente": "GRUPO KPFR",
+      "partes": [
+        "CONSTRUGAR CONSTRUTORA LTDA",
+        "ENGENHARIA BRAVO LTDA - ME",
+        "FERREIRA NASCIMENTO CONSTRUÇÃO CIVIL LTDA",
+        "FRANÇA 2005 SERVIÇOS DE APOIO E MANUT. LTDA-ME",
+        "HF GRUPO HOTELEIRO LTDA",
+        "HOTEL DO FRADE S/A",
+        "KP PARTICIPACOES LTDA",
+        "KPFR PARTICIPAÇÕES E EMPREENDIMENTOS S/A",
+        "POLO CAPITAL REAL ESTATE GESTÃO DE RECURSOS LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "Grupo EBX": {
+      "nome_cliente": "Grupo EBX",
+      "partes": [
+        "AVX TÁXI AÉREO LTDA",
+        "EBX BRASIL S.A",
+        "EBX HOLDING LTDA",
+        "EIKE FUHRKEN BATISTA",
+        "IKOS CAPITAL MANAGEMENT S.A",
+        "MD.X BARRA MEDICAL CENTER LTDA",
+        "MMX SUDESTE MINERAÇÃO S.A.",
+        "SIX SOLUÇÕES INTELIGENTES S.A.",
+        "XHOW ALIMENTOS LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "EDITORA J.P.A.": {
+      "nome_cliente": "EDITORA J.P.A.",
+      "partes": [
+        "EDITORA ROCCO LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "CNS": {
+      "nome_cliente": "CNS",
+      "partes": [
+        "ATTIMO SERVICOS LTDA",
+        "Bergmar Servicos Eireli",
+        "CNS NACIONAL DE SERVICOS LTDA",
+        "MARBERG  SERVIÇOS  EIRELI",
+        "Topix Servicos Ltda",
+        "VIDYA SERVICOS LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "CIMENTO TUPI": {
+      "nome_cliente": "CIMENTO TUPI",
+      "partes": [
+        "CIMENTO TUPI S/A. EM RECUPERAÇÃO JUDICIAL",
+        "SANTO AMERICO EMPREENDIMENTOS E PARTICIPACOES LTDA",
+        "TCG TRANSPORTADORA DE CARGAS EM GERAL EIRELI",
+        "TUPIMEC INDUSTRIA MECANICA LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "CESTE": {
+      "nome_cliente": "CESTE",
+      "partes": [
+        "CESTE-CONS.EST.ENERG.USINA HID.EST."
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "CARVALHO HOSKEN": {
+      "nome_cliente": "CARVALHO HOSKEN",
+      "partes": [
+        "CARVALHO HOSKEN S/A ENG.CONSTRUCOES"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "Car Care": {
+      "nome_cliente": "Car Care",
+      "partes": [
+        "Car Care Servicos Automotivos Ltda - ME"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "CAMARGOS GIOSTRI (LILLA HUCK OTRANTO CAMARGO)": {
+      "nome_cliente": "CAMARGOS GIOSTRI (LILLA HUCK OTRANTO CAMARGO)",
+      "partes": [
+        "GE ENERGY DO BRASIL LTDA",
+        "BANCO GE CAPITAL S/A"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "BANCO MORADA": {
+      "nome_cliente": "BANCO MORADA",
+      "partes": [
+        "MORADA INVESTIMENTOS S/A"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "Alma Mater Educação LTDA": {
+      "nome_cliente": "Alma Mater Educação LTDA",
+      "partes": [
+        "Alma Mater Educação LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "ADALMA PARTICIPACAO": {
+      "nome_cliente": "ADALMA PARTICIPACAO",
+      "partes": [
+        "ADALMA PARTICIP.EMPREEND.IMOB.LTDA."
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "SEM GRUPO": {
+      "nome_cliente": "SEM GRUPO",
+      "partes": [
+        "ACADEMIA PURI (BFC ACADEMIAS DE GINÁTICA EIRELI)",
+        "BANCO INTER S/A",
+        "Bibas Clinica de Servicos Medicos Ltda",
+        "BRL TECNOLOGIA LTDA",
+        "CAFÉ DE PARIS BAR E RESTAURANTE EIRELI EPP",
+        "CAPITAL HUMANO TECNOL. E TREIN.LTDA",
+        "CIA ESTADUAL DE AGUAS E ESGOTOS ..",
+        "DBR ENERGIES (DORIS ENGENHARIA)",
+        "TERMO NORTE ENERGIA S/A",
+        "PERCAP IPIIBA ADM. E PARTICIPAÇÕES LTDA"
+      ],
+      "celula": "Trabalhista Outros Clientes"
+    },
+    "Profarma": {
+      "nome_cliente": "Profarma",
+      "partes": [
+        "DROGARIA CIPRIANO DE SANTA ROSA LTDA",
+        "CONECTFARMA MARKETING E CALL CENTER LTDA",
+        "CSB DROGARIAS S/A",
+        "D1000 VAREJO FARMA PARTICIPAÇÕES S.A.",
+        "D N PERFUMARIA LTDA",
+        "D’OCEANIC DE ITAIPU DROGARIA LTDA",
+        "DROGARIA CENTRAL DE ITAIPU LTDA",
+        "FLORESCER FARMACIA LTDA",
+        "DROGARIA F.V. DE ICARAI LTDA",
+        "DROGARIA ITAMARATY LTDA",
+        "DROGARIA MATER LTDA",
+        "DROGARIA MG DE ITABORAI LTDA",
+        "DROGARIA NAVARRO DE NITERÓI LTDA",
+        "DROGARIA PRAIANA DE CHARITAS LTDA",
+        "DROGARIA PREDILETA LTDA",
+        "DROGARIA REAL DE ICARAÍ LTDA",
+        "DROGARIA ROB GONÇALENSE LTDA",
+        "DROGARIA ROF LTDA",
+        "DROGARIA DO ROSÁRIO LTDA",
+        "DROGARIA ULTRAFARMA DE ICARAÍ LTDA",
+        "DROGARIA UNIÃO DO ALCÂNTARA LTDA",
+        "DROGARIA V.R. GONÇALENSE LTDA",
+        "FARMA GENÉRICO DROGARIA E PERFUMARIA LTDA",
+        "FARMÁCIA SÃO SEBASTIÃO LTDA",
+        "INSTITUTO PROFARMA DE RESPONSABILIDADE SOCIAL",
+        "LARGO DO PAÇO DROGARIA LTDA",
+        "NOVA DROGARIA TAMOIO LTDA",
+        "PROFARMA DISTRIBUIDORA DE PRODUTOS FARMACÊUTICOS S/A",
+        "SUFAR SUPER MERCADO FARMACÊUTICO LTDA"
+      ],
+      "celula": "Trabalhista Pro Pharma"
+    },
+    "PRUDENTIAL": {
+      "nome_cliente": "PRUDENTIAL",
+      "partes": [
+        "PRUDENTIAL DO BRASIL SEGUROS DE VIDA S.A."
+      ],
+      "celula": "Trabalhista Prudential"
+    },
+    "Grupo Pão de açúcar": {
+      "nome_cliente": "Grupo Pão de açúcar",
+      "partes": [
+        "COMPANHIA BRASILEIRA DE DISTRIBUIÇÃO",
+        "SENDAS DISTRIBUIDORA S/A"
+      ],
+      "celula": "Trabalhista GPA"
+    },
+    "CSN": {
+      "nome_cliente": "CSN",
+      "partes": [
+        "CBSI – COMPANHIA BRASILEIRA DE SERVIÇOS E INFRAESTRUTURA",
+        "COMPANHIA METALURGICA PRADA",
+        "CSN – COMPANHIA SIDERURGICA NACIONAL",
+        "CSN CIMENTOS BRASIL S/A",
+        "CSN MINERAÇÃO S.A.",
+        "SEPETIBA TECON S.A.",
+        "FUNDAÇÃO CSN"
+      ],
+      "celula": "Trabalhista CSN"
+    },
+    "Casas Bahia": {
+      "nome_cliente": "Casas Bahia",
+      "partes": [
+        "GRUPO CASAS BAHIA S.A",
+        "CNOVA COMÉRCIO ELETRONICO",
+        "GLOBEX ADMINISTRAÇÃO E SERVIÇOS LTDA",
+        "GLOBEX ADMINISTRADORA DE CONSORCIOS LTDA",
+        "ASAP LOG – LOGISTICA E SOLUÇÕES LTDA",
+        "INDUSTRIA DE MOVEIS BARTIRA LTDA",
+        "LAKE NIASSA EMPREENDIMENTOS E PARTICIPAÇÕES LTDA",
+        "CASAS BAHIA TECNOLOGIA LTDA",
+        "CNT SOLUÇÕES EM NEGOCIOS DIGITAIS E LOGISTICA LTDA",
+        "CNT LOG EXPRESS LOGISTICA E TRANSPORTE LTDA",
+        "INTEGRA SOLUÇÕES PARA VAREJO DIGITAL LTDA",
+        "ASAP LOG LTDA",
+        "BANQI CARTÕES INSTITUIÇÃO DE PAGAMENTO LTDA",
+        "BANQI SOCIEDADE DE CREDITO FINANCIAMENTO E INVESTIMENTO S.A.",
+        "BANQI INSTRIUIÇÃO DE PAGAMENTO LTDA",
+        "CELER PROCESSAMENTO COMERCIO E SERVIÇO LTDA"
+      ],
+      "celula": "Trabalhista Casas Bahia"
+    }
+  },
+  "partes_interessadas": [
+    {
+      "nome": "Smart RJ Concessionária de Iluminação Pública SPE",
+      "cliente": "Smart RJ",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Premio Empreend.Imobiliarios Ltda.",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "SPE19 Global Premio Recanto Verde Empreendimentos Imobiliarios S.A",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "SPE 23 Global Premio Bora Itaboraí Suites Empreendimentos S/A",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Premio Construtora Ltda",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Casa Gabizo Empreendimentos Imobiliários Ltda",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Consórcio De Construção Nurban",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Clube Arete Búzios",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CA92 Empreendimento Imobiliário Ltda",
+      "cliente": "Premio",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Jardim Imperial II Construções e Incorporações SPE Ltda",
+      "cliente": "MP Incorporadora",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Liberty Arraial Do Cabo Construcoes e Incorporacoes Spe Ltda",
+      "cliente": "MP Incorporadora",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "M&P Construtora e Incorporadora Ltda",
+      "cliente": "MP Incorporadora",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Murta Construtora Eireli",
+      "cliente": "MP Incorporadora",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Central De Tratamento De Residuos Alcantara",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Central De Tratamento De Resíduos Barra Mansa S/A",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Central De Tratamento De Resíduos De Nova Iguaçú S/A - Ctr",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Ecopesa Ambiental S.A.",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "ETR JARDIM GRAMACHO S/A",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "FOXX URE-JP AMBIENTAL S.A",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "HAZTEC INVESTIMENTOS E PARTICIPAÇÕES S/A",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "METROPOLITANA SERVIÇOS AMBIENTAIS LTDA",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "ORIZON MEIO AMBIENTE S.A.",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Orizon Valorizacao de Residuos S.A",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Rosario do Catete Ambiental Sociedade Anônima",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "SPE Maceió Ambiental S/A",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "UTM Jaboatao dos Guararapes Ltda",
+      "cliente": "HAZTEC",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "VIAÇÃO PINHEIRAL LTDA",
+      "cliente": "GRUPO VIAÇÃO AGULHAS NEGRAS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "VIAÇÃO PARAISO LTDA",
+      "cliente": "GRUPO VIAÇÃO AGULHAS NEGRAS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "VIAÇÃO AGULHAS NEGRAS LTDA",
+      "cliente": "GRUPO VIAÇÃO AGULHAS NEGRAS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "AUTO COMERCIAL TUPI LTDA",
+      "cliente": "GRUPO VIAÇÃO AGULHAS NEGRAS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "MANEJO TRANSPORTE TURISMO LTDA - FALIDA",
+      "cliente": "GRUPO VIAÇÃO AGULHAS NEGRAS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "APOLO TUBOS E EQUIPAMENTOS S/A",
+      "cliente": "GRUPO PEIXOTO CASTRO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "APOLO PRODUTOS DE ACO S.A (GPC)",
+      "cliente": "GRUPO PEIXOTO CASTRO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "GPC PARTICIPAÇÕES S/A",
+      "cliente": "GRUPO PEIXOTO CASTRO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "GPC QUÍMICA S/A",
+      "cliente": "GRUPO PEIXOTO CASTRO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CONSTRUGAR CONSTRUTORA LTDA",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "ENGENHARIA BRAVO LTDA - ME",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "FERREIRA NASCIMENTO CONSTRUÇÃO CIVIL LTDA",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "FRANÇA 2005 SERVIÇOS DE APOIO E MANUT. LTDA-ME",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "HF GRUPO HOTELEIRO LTDA",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "HOTEL DO FRADE S/A",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "KP PARTICIPACOES LTDA",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "KPFR PARTICIPAÇÕES E EMPREENDIMENTOS S/A",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "POLO CAPITAL REAL ESTATE GESTÃO DE RECURSOS LTDA",
+      "cliente": "GRUPO KPFR",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "AVX TÁXI AÉREO LTDA",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "EBX BRASIL S.A",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "EBX HOLDING LTDA",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "EIKE FUHRKEN BATISTA",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "IKOS CAPITAL MANAGEMENT S.A",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "MD.X BARRA MEDICAL CENTER LTDA",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "MMX SUDESTE MINERAÇÃO S.A.",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "SIX SOLUÇÕES INTELIGENTES S.A.",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "XHOW ALIMENTOS LTDA",
+      "cliente": "Grupo EBX",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "EDITORA ROCCO LTDA",
+      "cliente": "EDITORA J.P.A.",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "ATTIMO SERVICOS LTDA",
+      "cliente": "CNS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Bergmar Servicos Eireli",
+      "cliente": "CNS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CNS NACIONAL DE SERVICOS LTDA",
+      "cliente": "CNS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "MARBERG  SERVIÇOS  EIRELI",
+      "cliente": "CNS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Topix Servicos Ltda",
+      "cliente": "CNS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "VIDYA SERVICOS LTDA",
+      "cliente": "CNS",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CIMENTO TUPI S/A. EM RECUPERAÇÃO JUDICIAL",
+      "cliente": "CIMENTO TUPI",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "SANTO AMERICO EMPREENDIMENTOS E PARTICIPACOES LTDA",
+      "cliente": "CIMENTO TUPI",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "TCG TRANSPORTADORA DE CARGAS EM GERAL EIRELI",
+      "cliente": "CIMENTO TUPI",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "TUPIMEC INDUSTRIA MECANICA LTDA",
+      "cliente": "CIMENTO TUPI",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CESTE-CONS.EST.ENERG.USINA HID.EST.",
+      "cliente": "CESTE",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CARVALHO HOSKEN S/A ENG.CONSTRUCOES",
+      "cliente": "CARVALHO HOSKEN",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Car Care Servicos Automotivos Ltda - ME",
+      "cliente": "Car Care",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "GE ENERGY DO BRASIL LTDA",
+      "cliente": "CAMARGOS GIOSTRI (LILLA HUCK OTRANTO CAMARGO)",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "BANCO GE CAPITAL S/A",
+      "cliente": "CAMARGOS GIOSTRI (LILLA HUCK OTRANTO CAMARGO)",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "MORADA INVESTIMENTOS S/A",
+      "cliente": "BANCO MORADA",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Alma Mater Educação LTDA",
+      "cliente": "Alma Mater Educação LTDA",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "ADALMA PARTICIP.EMPREEND.IMOB.LTDA.",
+      "cliente": "ADALMA PARTICIPACAO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "ACADEMIA PURI (BFC ACADEMIAS DE GINÁTICA EIRELI)",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "BANCO INTER S/A",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "Bibas Clinica de Servicos Medicos Ltda",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "BRL TECNOLOGIA LTDA",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CAFÉ DE PARIS BAR E RESTAURANTE EIRELI EPP",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CAPITAL HUMANO TECNOL. E TREIN.LTDA",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "CIA ESTADUAL DE AGUAS E ESGOTOS ..",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "DBR ENERGIES (DORIS ENGENHARIA)",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "TERMO NORTE ENERGIA S/A",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "PERCAP IPIIBA ADM. E PARTICIPAÇÕES LTDA",
+      "cliente": "SEM GRUPO",
+      "celula": "Trabalhistas Outros clientes"
+    },
+    {
+      "nome": "DROGARIA CIPRIANO DE SANTA ROSA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "CONECTFARMA MARKETING E CALL CENTER LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "CSB DROGARIAS S/A",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "D1000 VAREJO FARMA PARTICIPAÇÕES S.A.",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "D N PERFUMARIA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "D’OCEANIC DE ITAIPU DROGARIA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA CENTRAL DE ITAIPU LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "FLORESCER FARMACIA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA F.V. DE ICARAI LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA ITAMARATY LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA MATER LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA MG DE ITABORAI LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA NAVARRO DE NITERÓI LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA PRAIANA DE CHARITAS LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA PREDILETA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA REAL DE ICARAÍ LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA ROB GONÇALENSE LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA ROF LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA DO ROSÁRIO LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA ULTRAFARMA DE ICARAÍ LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA UNIÃO DO ALCÂNTARA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "DROGARIA V.R. GONÇALENSE LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "FARMA GENÉRICO DROGARIA E PERFUMARIA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "FARMÁCIA SÃO SEBASTIÃO LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "INSTITUTO PROFARMA DE RESPONSABILIDADE SOCIAL",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "LARGO DO PAÇO DROGARIA LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "NOVA DROGARIA TAMOIO LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "PROFARMA DISTRIBUIDORA DE PRODUTOS FARMACÊUTICOS S/A",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "SUFAR SUPER MERCADO FARMACÊUTICO LTDA",
+      "cliente": "Profarma",
+      "celula": "Trabalhistas Pro Pharma"
+    },
+    {
+      "nome": "PRUDENTIAL DO BRASIL SEGUROS DE VIDA S.A.",
+      "cliente": "PRUDENTIAL",
+      "celula": "Trabalhistas Prudential"
+    },
+    {
+      "nome": "COMPANHIA BRASILEIRA DE DISTRIBUIÇÃO",
+      "cliente": "Grupo Pão de açúcar",
+      "celula": "Trabalhistas GPA"
+    },
+    {
+      "nome": "SENDAS DISTRIBUIDORA S/A",
+      "cliente": "Grupo Pão de açúcar",
+      "celula": "Trabalhistas GPA"
+    },
+    {
+      "nome": "CBSI – COMPANHIA BRASILEIRA DE SERVIÇOS E INFRAESTRUTURA",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "COMPANHIA METALURGICA PRADA",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "CSN – COMPANHIA SIDERURGICA NACIONAL",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "CSN CIMENTOS BRASIL S/A",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "CSN MINERAÇÃO S.A.",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "SEPETIBA TECON S.A.",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "FUNDAÇÃO CSN",
+      "cliente": "CSN",
+      "celula": "Trabalhistas CSN"
+    },
+    {
+      "nome": "GRUPO CASAS BAHIA S.A",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "CNOVA COMÉRCIO ELETRONICO",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "GLOBEX ADMINISTRAÇÃO E SERVIÇOS LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "GLOBEX ADMINISTRADORA DE CONSORCIOS LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "ASAP LOG – LOGISTICA E SOLUÇÕES LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "INDUSTRIA DE MOVEIS BARTIRA LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "LAKE NIASSA EMPREENDIMENTOS E PARTICIPAÇÕES LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "CASAS BAHIA TECNOLOGIA LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "CNT SOLUÇÕES EM NEGOCIOS DIGITAIS E LOGISTICA LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "CNT LOG EXPRESS LOGISTICA E TRANSPORTE LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "INTEGRA SOLUÇÕES PARA VAREJO DIGITAL LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "ASAP LOG LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "BANQI CARTÕES INSTITUIÇÃO DE PAGAMENTO LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "BANQI SOCIEDADE DE CREDITO FINANCIAMENTO E INVESTIMENTO S.A.",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "BANQI INSTRIUIÇÃO DE PAGAMENTO LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    },
+    {
+      "nome": "CELER PROCESSAMENTO COMERCIO E SERVIÇO LTDA",
+      "cliente": "Casas Bahia",
+      "celula": "Trabalhistas Casas Bahia"
+    }
+  ],
+  "celulas": {}
+}

@@ -1,0 +1,248 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Análise IA - Processo {{ process.cnj|default('-', true) }} - Sistema de Processos Jurídicos{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="fas fa-robot me-2"></i>AnÃ¡lise de IA</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('core.process_list') }}">Processos</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('core.process_view', id=process.id) }}">{{ process.cnj|default('-', true) }}</a></li>
+                        <li class="breadcrumb-item active">AnÃ¡lise IA</li>
+                    </ol>
+                </nav>
+            </div>
+            <a href="{{ url_for('core.process_view', id=process.id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if analysis %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Resumo do Documento -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-file-text me-2"></i>Resumo do Documento</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis.document_summary %}
+                    <p>{{ analysis.document_summary }}</p>
+                {% else %}
+                    <p class="text-muted">Resumo não disponível</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Pontos Principais -->
+        {% if analysis.key_points %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-star me-2"></i>Pontos Principais</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    {% for point in analysis.key_points|from_json %}
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>{{ point }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Questões Legais -->
+        {% if analysis.legal_issues %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-balance-scale me-2"></i>Questões Legais Identificadas</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    {% for issue in analysis.legal_issues|from_json %}
+                        <li class="mb-2">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>{{ issue }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recomendações -->
+        {% if analysis.recommendations %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-lightbulb me-2"></i>Recomendações</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    {{ analysis.recommendations }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Chunks do Documento -->
+        {% if chunks %}
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-puzzle-piece me-2"></i>Trechos Analisados ({{ chunks|length }})</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="chunksAccordion">
+                    {% for chunk in chunks %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#chunk{{ chunk.id }}" aria-expanded="false">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-primary me-2">{{ (chunk.chunk_index + 1)|default('-', true) }}</span>
+                                    <span class="text-truncate">{{ chunk.summary or "Trecho " ~ (chunk.chunk_index + 1)|string }}</span>
+                                    <small class="text-muted ms-auto">{{ chunk.token_count|default(0, true) }} tokens</small>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="chunk{{ chunk.id }}" class="accordion-collapse collapse" data-bs-parent="#chunksAccordion">
+                            <div class="accordion-body">
+                                {% if chunk.summary %}
+                                    <div class="mb-3">
+                                        <strong>Resumo:</strong>
+                                        <p class="mt-1">{{ chunk.summary }}</p>
+                                    </div>
+                                {% endif %}
+
+                                <div class="mb-3">
+                                    <strong>Conteúdo:</strong>
+                                    <div class="border rounded p-2 bg-light mt-1" style="max-height: 200px; overflow-y: auto;">
+                                        <small>{{ chunk.content|default('-', true) }}</small>
+                                    </div>
+                                </div>
+
+                                {% if chunk.key_entities %}
+                                <div class="mb-3">
+                                    <strong>Entidades:</strong>
+                                    <div class="mt-1">
+                                        {% for entity in chunk.key_entities|from_json %}
+                                            <span class="badge bg-secondary me-1">{{ entity }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if chunk.legal_concepts %}
+                                <div class="mb-3">
+                                    <strong>Conceitos Jurídicos:</strong>
+                                    <div class="mt-1">
+                                        {% for concept in chunk.legal_concepts|from_json %}
+                                            <span class="badge bg-info me-1">{{ concept }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Estatísticas -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar me-2"></i>Estatísticas</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-12 mb-2">
+                        <strong>Total de Chunks:</strong> {{ analysis.total_chunks|default(0, true) }}
+                    </div>
+                    <div class="col-12 mb-2">
+                        <strong>Total de Tokens:</strong> {{ analysis.total_tokens|default(0, true) }}
+                    </div>
+                    <div class="col-12 mb-2">
+                        <strong>Tempo de Processamento:</strong> {{ "%.1f"|format(analysis.processing_time or 0) }}s
+                    </div>
+                    {% if analysis.confidence_score is not none %}
+                    <div class="col-12 mb-2">
+                        <strong>Confiança:</strong>
+                        <div class="progress mt-1">
+                            <div class="progress-bar" role="progressbar"
+                                 style="width: {{ (analysis.confidence_score * 100)|round }}%"
+                                 aria-valuenow="{{ (analysis.confidence_score * 100)|round }}"
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ "%.1f"|format(analysis.confidence_score * 100) }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>Processado em:
+                        {% if analysis.created_at %}
+                            {{ analysis.created_at.strftime('%d/%m/%Y Ã s %H:%M') }}
+                        {% else %}-{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-tools me-2"></i>Ações</h6>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('rag_search') }}?q={{ process.cnj|default('', true) }}" class="btn btn-primary w-100 mb-2">
+                    <i class="fas fa-search me-1"></i>Buscar Conteúdo Similar
+                </a>
+                {% if process.pdf_filename %}
+                <a href="{{ url_for('uploaded_file', filename=process.pdf_filename) }}"
+                   class="btn btn-outline-danger w-100" target="_blank">
+                    <i class="fas fa-download me-1"></i>Baixar PDF Original
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                <h4>Análise não encontrada</h4>
+                <p class="text-muted">Este processo ainda não foi analisado pela IA ou o processamento ainda estÃ¡ em andamento.</p>
+                <a href="{{ url_for('core.process_view', id=process.id) }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar ao Processo
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// JS específico da página de análise (se necessário)
+</script>
+{% endblock %}

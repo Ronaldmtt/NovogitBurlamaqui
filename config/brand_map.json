@@ -1,0 +1,7 @@
+{
+  "grupo pão de açúcar": { "grupo": "Grupo Pão de Açúcar", "aliases": ["GPA","Grupo Pao de Acucar","Pão de Açúcar","Pao de Acucar"] },
+  "companhia brasileira de distribuicao": { "grupo": "Grupo Pão de Açúcar", "aliases": ["COMPANHIA BRASILEIRA DE DISTRIBUICAO","CBD"] },
+  "sendas distribuidora": { "grupo": "Grupo Pão de Açúcar", "aliases": ["SENDAS DISTRIBUIDORA S/A","Sendas Distribuidora S/A","SENDAS"] },
+  "viavarejo": { "grupo": "Casas Bahia / Via", "aliases": ["Casas Bahia","VIA VAREJO","Via Varejo","GLOBEX","CNOVA","BANQI"] },
+  "csn": { "grupo": "CSN", "aliases": ["Companhia Siderúrgica Nacional","CBSI","PRADA","CSN Mineração","CSN Cimentos"] }
+}

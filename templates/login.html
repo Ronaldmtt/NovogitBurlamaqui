@@ -1,0 +1,342 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema Jurídico Inteligente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .login-header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .login-header p {
+            font-size: 14px;
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        .login-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 28px;
+        }
+
+        .login-body {
+            padding: 40px 30px;
+        }
+
+        .form-floating {
+            margin-bottom: 20px;
+        }
+
+        .form-floating input {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            height: 60px;
+            transition: all 0.3s ease;
+        }
+
+        .form-floating input:focus {
+            border-color: #2a5298;
+            box-shadow: 0 0 0 0.25rem rgba(42, 82, 152, 0.15);
+        }
+
+        .form-floating label {
+            padding: 18px 15px;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(30, 60, 114, 0.3);
+        }
+
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .powered-by {
+            position: fixed;
+            bottom: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 20px;
+            border-radius: 50px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            animation: fadeIn 0.8s ease-out 0.3s backwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .powered-by span {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .powered-by img {
+            height: 35px;
+            width: auto;
+        }
+
+        .default-credentials {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .default-credentials .title {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .default-credentials .creds {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #1e3c72;
+            font-weight: 600;
+        }
+
+        @media (max-width: 576px) {
+            .login-container {
+                padding: 10px;
+            }
+
+            .login-header h1 {
+                font-size: 24px;
+            }
+
+            .powered-by {
+                bottom: 10px;
+                right: 10px;
+                padding: 8px 15px;
+            }
+
+            .powered-by span {
+                font-size: 10px;
+            }
+
+            .powered-by img {
+                height: 28px;
+            }
+        }
+
+        .feature-icons {
+            display: flex;
+            justify-content: space-around;
+            margin: 25px 0 15px;
+            padding: 20px 0;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .feature-icon {
+            text-align: center;
+            flex: 1;
+        }
+
+        .feature-icon i {
+            font-size: 24px;
+            color: #2a5298;
+            margin-bottom: 8px;
+        }
+
+        .feature-icon span {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-icon">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <h1>
+                    Sistema Jurídico Inteligente
+                </h1>
+                <p>Gestão de Processos com IA</p>
+            </div>
+
+            <div class="login-body">
+                {# Mensagens flash com mapeamento completo de categorias #}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            {% set map = {'success':'success','info':'info','warning':'warning','danger':'danger','error':'danger'} %}
+                            <div class="alert alert-{{ map.get(category, 'info') }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Preserva o 'next' na action e em um hidden input -->
+                <form method="POST" action="{{ url_for('core.login', next=request.args.get('next')) }}">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" name="next" value="{{ next_url or request.args.get('next','') }}">
+
+                    <div class="form-floating">
+                        {{ form.username(class="form-control", placeholder="UsuÃ¡rio", id="floatingUsername", autocomplete="username") }}
+                        {{ form.username.label(for="floatingUsername") }}
+                        {% for error in form.username.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="form-floating">
+                        {{ form.password(class="form-control", placeholder="Senha", id="floatingPassword", autocomplete="current-password") }}
+                        {{ form.password.label(for="floatingPassword") }}
+                        {% for error in form.password.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" class="btn btn-login">
+                        <i class="fas fa-sign-in-alt me-2"></i>Entrar no Sistema
+                    </button>
+                </form>
+
+                <div class="default-credentials">
+                    <div class="title">ACESSO PADRÃO</div>
+                    <div class="creds">admin / admin123</div>
+                </div>
+
+                <div class="feature-icons">
+                    <div class="feature-icon">
+                        <i class="fas fa-file-pdf"></i>
+                        <span>Upload PDF</span>
+                    </div>
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
+                        <span>IA Integrada</span>
+                    </div>
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Analytics</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="powered-by">
+        <span>Powered by</span>
+        <img src="{{ url_for('static', filename='images/inovailab-logo.png') }}" alt="InovAi.Lab">
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

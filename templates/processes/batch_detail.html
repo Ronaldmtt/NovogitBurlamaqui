@@ -1,0 +1,758 @@
+{% extends "base.html" %}
+
+{% block title %}Batch #{{ batch.id }} - Sistema Jurídico{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Card de Status do Batch -->
+        <div class="card shadow-lg mb-4">
+            <div class="card-header bg-gradient text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-layer-group me-2"></i>
+                    Batch #{{ batch.id }}
+                </h4>
+                <span class="badge bg-light text-dark">
+                    <span id="batch-status">{{ batch.status }}</span>
+                </span>
+            </div>
+            <div class="card-body">
+                <!-- Progresso Geral -->
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <h6 class="text-muted mb-2">Progresso Geral</h6>
+                        <div class="progress" style="height: 30px;">
+                            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%">
+                                <span id="progress-text">0%</span>
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            <span id="progress-count">0</span>/<span id="total-count">{{ batch.total_count }}</span> processos
+                        </small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div id="batch-action-buttons">
+                            {% if batch.status in ['ready', 'partial_ready'] %}
+                            <button id="btn-start" class="btn btn-success btn-lg" onclick="startBatch()">
+                                <i class="fas fa-play me-2"></i>
+                                Iniciar Processamento RPA
+                            </button>
+                            {% elif batch.status == 'running' %}
+                            <button id="btn-start" class="btn btn-primary btn-lg" disabled>
+                                <i class="fas fa-spinner fa-spin me-2"></i>
+                                Processando...
+                            </button>
+                            {% elif batch.status in ['completed', 'partial_completed'] %}
+                            <button id="btn-start" class="btn btn-success btn-lg" disabled>
+                                <i class="fas fa-check-circle me-2"></i>
+                                Completo
+                            </button>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Botão Reprocessar (mostra quando há itens pendentes, erro ou sem process_id) -->
+                        {% set has_pending = items|selectattr('status', 'equalto', 'pending')|list|length > 0 %}
+                        {% set has_errors = items|selectattr('status', 'equalto', 'error')|list|length > 0 %}
+                        {% set has_ready_no_process = items|selectattr('status', 'equalto', 'ready')|selectattr('process_id', 'none')|list|length > 0 %}
+                        {% if has_pending or has_errors or has_ready_no_process or batch.status in ['error', 'running', 'pending'] %}
+                        <form action="{{ url_for('batch.batch_reprocess', id=batch.id) }}" method="POST" class="d-inline ms-2">
+                            <button type="submit" class="btn btn-warning btn-lg" onclick="return confirm('Deseja reprocessar os itens pendentes/erro?');">
+                                <i class="fas fa-redo me-2"></i>
+                                Reprocessar
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Informações do Batch -->
+                <div class="row text-center border-top pt-3">
+                    <div class="col-md-3">
+                        <div class="metric">
+                            <i class="fas fa-calendar-alt text-primary fa-2x mb-2"></i>
+                            <h6 class="text-muted">Criado em</h6>
+                            <p class="mb-0">{{ batch.created_at.strftime('%d/%m/%Y %H:%M') if batch.created_at else '-' }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric">
+                            <i class="fas fa-play-circle text-info fa-2x mb-2"></i>
+                            <h6 class="text-muted">Iniciado em</h6>
+                            <p class="mb-0" id="started-at">{{ batch.started_at.strftime('%d/%m/%Y %H:%M') if batch.started_at else '-' }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric">
+                            <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+                            <h6 class="text-muted">Finalizado em</h6>
+                            <p class="mb-0" id="finished-at">{{ batch.finished_at.strftime('%d/%m/%Y %H:%M') if batch.finished_at else '-' }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric">
+                            <i class="fas fa-file-pdf text-danger fa-2x mb-2"></i>
+                            <h6 class="text-muted">Total de PDFs</h6>
+                            <p class="mb-0">{{ batch.total_count }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de Items -->
+        <div class="card shadow-lg">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>
+                    Arquivos do Batch
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="items-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Arquivo</th>
+                                <th>Status</th>
+                                <th>Status RPA</th>
+                                <th>Processo</th>
+                                <th>Tentativas</th>
+                                <th>Erro</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr data-item-id="{{ item.id }}">
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                    {{ item.source_filename }}
+                                </td>
+                                <td class="status-cell">
+                                    {% if item.status == 'success' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle me-1"></i>Sucesso
+                                        </span>
+                                    {% elif item.status == 'running' %}
+                                        <span class="badge bg-primary">
+                                            <i class="fas fa-spinner fa-spin me-1"></i>Executando
+                                        </span>
+                                    {% elif item.status == 'ready' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-clock me-1"></i>Pronto
+                                        </span>
+                                    {% elif item.status == 'extracting' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-cog fa-spin me-1"></i>Extraindo
+                                        </span>
+                                    {% elif item.status == 'error' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>Erro
+                                        </span>
+                                    {% elif item.status == 'pending' %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-hourglass-start me-1"></i>Pendente
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ item.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="rpa-status-cell" data-process-id="{{ item.process_id if item.process_id else '' }}">
+                                    {% if item.process and item.process.elaw_status == 'running' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-spinner fa-pulse me-1"></i><span class="rpa-status-text">Iniciando...</span>
+                                        </span>
+                                    {% elif item.process and item.process.elaw_status == 'success' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Concluído
+                                        </span>
+                                    {% elif item.process and item.process.elaw_status == 'error' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times me-1"></i>Erro
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="process-cell">
+                                    {% if item.process_id %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle me-1"></i>Processo #{{ item.process_id }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="attempts-cell">{{ item.attempt_count }}</td>
+                                <td class="error-cell">
+                                    {% if item.last_error %}
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                data-bs-toggle="tooltip" 
+                                                title="{{ item.last_error }}">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions-cell" data-item-id="{{ item.id }}" data-process-id="{{ item.process_id if item.process_id else '' }}">
+                                    <div class="btn-group" role="group">
+                                        {% if item.process_id %}
+                                        {% if item.process and item.process.elaw_status == 'running' %}
+                                        <a href="{{ url_for('core.rpa_progress', process_id=item.process_id, batch_id=batch.id) }}" 
+                                           class="btn btn-sm btn-info" 
+                                           data-bs-toggle="tooltip" title="Ver Progresso RPA">
+                                            <i class="fas fa-spinner fa-pulse"></i>
+                                        </a>
+                                        {% else %}
+                                        {% set missing_fields = item.process.get_missing_critical_fields() if item.process else [] %}
+                                        {% set has_missing = missing_fields|length > 0 %}
+                                        <a href="{{ url_for('core.process_view', id=item.process_id, batch_id=batch.id) }}" 
+                                           class="btn btn-sm {% if has_missing %}btn-danger{% else %}btn-outline-primary{% endif %}" 
+                                           data-bs-toggle="tooltip" title="{% if has_missing %}Campos faltando: {{ missing_fields|join(', ') }}{% else %}Visualizar processo{% endif %}"
+                                           id="view-btn-{{ item.process_id }}">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% endif %}
+                                        <a href="{{ url_for('core.process_edit', id=item.process_id, batch_id=batch.id) }}" 
+                                           class="btn btn-sm btn-outline-secondary" 
+                                           data-bs-toggle="tooltip" title="Editar processo">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% endif %}
+                                        <a href="{{ url_for('batch.batch_item_pdf', id=item.id) }}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           data-bs-toggle="tooltip" title="Ver PDF original" target="_blank">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                        {% if item.process and item.process.elaw_screenshot_before_path %}
+                                        <a href="{{ url_for('core.serve_rpa_screenshot', filename=item.process.elaw_screenshot_before_path) }}" 
+                                           class="btn btn-sm btn-outline-success" 
+                                           data-bs-toggle="tooltip" title="Screenshot ANTES de salvar" target="_blank">
+                                            <i class="fas fa-camera"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if item.process and item.process.elaw_screenshot_after_path %}
+                                        <a href="{{ url_for('core.serve_rpa_screenshot', filename=item.process.elaw_screenshot_after_path) }}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           data-bs-toggle="tooltip" title="Screenshot DEPOIS de salvar" target="_blank">
+                                            <i class="fas fa-camera-retro"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if item.process and item.process.elaw_screenshot_reclamadas_path %}
+                                        <a href="{{ url_for('core.serve_rpa_screenshot', filename=item.process.elaw_screenshot_reclamadas_path) }}" 
+                                           class="btn btn-sm btn-outline-warning" 
+                                           data-bs-toggle="tooltip" title="Screenshot RECLAMADAS" target="_blank">
+                                            <i class="fas fa-users"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if item.process and item.process.elaw_screenshot_pedidos_path %}
+                                        <a href="{{ url_for('core.serve_rpa_screenshot', filename=item.process.elaw_screenshot_pedidos_path) }}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           data-bs-toggle="tooltip" title="Screenshot PEDIDOS" target="_blank">
+                                            <i class="fas fa-list-alt"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if item.status in ['error', 'ready'] and item.process_id %}
+                                        <form action="{{ url_for('batch.batch_item_retry', id=item.id) }}" 
+                                              method="POST" style="display:inline;">
+                                            <button type="submit" class="btn btn-sm btn-warning" 
+                                                    data-bs-toggle="tooltip" title="Reprocessar RPA">
+                                                <i class="fas fa-redo"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        <form action="{{ url_for('batch.batch_item_delete', id=item.id) }}" 
+                                              method="POST" style="display:inline;" 
+                                              onsubmit="return confirm('Tem certeza que deseja deletar este item?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                    data-bs-toggle="tooltip" title="Deletar">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="{{ url_for('batch.batch_list') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>
+                Voltar para Lista
+            </a>
+            <span id="final-buttons-container">
+                {% if batch.status in ['completed', 'partial_completed'] %}
+                <a href="{{ url_for('core.dashboard') }}" class="btn btn-success ms-2">
+                    <i class="fas fa-home me-2"></i>Voltar para Dashboard
+                </a>
+                <a href="{{ url_for('batch.batch_new') }}" class="btn btn-primary ms-2">
+                    <i class="fas fa-plus me-2"></i>Iniciar Outro Batch
+                </a>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+let pollingInterval = null;
+const POLL_INTERVAL = 5000; // 5 segundos (otimizado para reduzir carga)
+const batchId = {{ batch.id }};
+let completionToastShown = false; // Flag para evitar toasts repetidos
+const initialBatchStatus = '{{ batch.status }}'; // Status inicial ao carregar a página
+
+async function startBatch() {
+    const btn = document.getElementById('btn-start');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Iniciando...';
+    
+    try {
+        const response = await fetch(`/processos/batch/${batchId}/start`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            startPolling();
+        } else {
+            showToast('Erro: ' + (data.error || 'Falha ao iniciar processamento'), 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play me-2"></i>Iniciar Processamento RPA';
+        }
+    } catch (error) {
+        console.error('Erro ao iniciar batch:', error);
+        showToast('Erro de conexão. Tente novamente.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-play me-2"></i>Iniciar Processamento RPA';
+    }
+}
+
+async function updateBatchStatus() {
+    try {
+        const response = await fetch(`/processos/batch/${batchId}/status`);
+        const data = await response.json();
+        
+        // Atualizar progresso
+        const percent = data.progress_percent || 0;
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        document.getElementById('progress-count').textContent = data.processed_count;
+        document.getElementById('total-count').textContent = data.total_count;
+        document.getElementById('batch-status').textContent = data.status;
+        
+        // Atualizar timestamps
+        if (data.started_at) {
+            document.getElementById('started-at').textContent = new Date(data.started_at).toLocaleString('pt-BR');
+        }
+        if (data.finished_at) {
+            document.getElementById('finished-at').textContent = new Date(data.finished_at).toLocaleString('pt-BR');
+        }
+        
+        // Atualizar items
+        data.items.forEach(item => {
+            const row = document.querySelector(`tr[data-item-id="${item.id}"]`);
+            if (row) {
+                updateItemRow(row, item);
+            }
+        });
+        
+        // Atualizar status RPA para processos em execução
+        await updateRPAStatuses();
+        
+        // Parar polling se concluído
+        if (['completed', 'partial_completed'].includes(data.status)) {
+            stopPolling();
+            document.getElementById('progress-bar').classList.remove('progress-bar-animated');
+            document.getElementById('progress-bar').classList.add('bg-success');
+            
+            // Atualizar botão para "Completo"
+            const btnStart = document.getElementById('btn-start');
+            if (btnStart) {
+                btnStart.innerHTML = '<i class="fas fa-check-circle me-2"></i>Completo';
+                btnStart.className = 'btn btn-success btn-lg';
+                btnStart.disabled = true;
+            }
+            
+            // MOSTRAR BOTÕES FINAIS AUTOMATICAMENTE
+            const finalButtonsContainer = document.getElementById('final-buttons-container');
+            if (finalButtonsContainer) {
+                finalButtonsContainer.innerHTML = `
+                    <a href="/dashboard" class="btn btn-success ms-2">
+                        <i class="fas fa-home me-2"></i>Voltar para Dashboard
+                    </a>
+                    <a href="/processos/batch/new" class="btn btn-primary ms-2">
+                        <i class="fas fa-plus me-2"></i>Iniciar Outro Batch
+                    </a>
+                `;
+            }
+            
+            // Calcular estatísticas e mostrar toast APENAS UMA VEZ
+            // Evitar spam de toasts: só mostrar se não foi mostrado antes E se o status mudou
+            // (não mostrar se o batch já estava concluído quando a página carregou)
+            if (!completionToastShown && !['completed', 'partial_completed'].includes(initialBatchStatus)) {
+                completionToastShown = true; // Marcar como mostrado
+                
+                const successCount = data.items.filter(item => item.status === 'success').length;
+                const totalCount = data.items.length;
+                
+                if (data.status === 'completed') {
+                    showToast(`Batch RPA concluído! ${successCount}/${totalCount} processos preenchidos com sucesso no eLaw.`, 'success');
+                } else {
+                    const errorCount = totalCount - successCount;
+                    showToast(`Batch RPA concluído parcialmente. ${successCount} sucesso(s), ${errorCount} erro(s). Verifique os detalhes abaixo.`, 'warning');
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+    }
+}
+
+async function updateRPAStatuses() {
+    // Buscar todas as células com process_id
+    const rpaCells = document.querySelectorAll('.rpa-status-cell[data-process-id]');
+    
+    for (const cell of rpaCells) {
+        const processId = cell.getAttribute('data-process-id');
+        if (!processId) continue;
+        
+        try {
+            const response = await fetch(`/api/rpa-status/${processId}`);
+            const rpaStatus = await response.json();
+            
+            // PRIORIZAR status 'completed'/'success' PRIMEIRO
+            if (rpaStatus.status === 'completed' || rpaStatus.status === 'success') {
+                // Check verde para processos concluídos
+                cell.innerHTML = `
+                    <span class="badge bg-success">
+                        <i class="fas fa-check me-1"></i>Concluído
+                    </span>
+                `;
+            } else if (rpaStatus.status === 'error') {
+                cell.innerHTML = `
+                    <span class="badge bg-danger">
+                        <i class="fas fa-times me-1"></i>Erro
+                    </span>
+                `;
+            } else if (rpaStatus.status === 'running' || rpaStatus.current_step) {
+                const message = rpaStatus.message || rpaStatus.current_step || 'Processando...';
+                cell.innerHTML = `
+                    <span class="badge bg-info">
+                        <i class="fas fa-spinner fa-pulse me-1"></i>${message}
+                    </span>
+                `;
+            }
+        } catch (error) {
+            // Silenciar erros (processo pode não ter RPA ativo)
+        }
+    }
+}
+
+async function updateItemRow(row, item) {
+    const statusCell = row.querySelector('.status-cell');
+    const processCell = row.querySelector('.process-cell');
+    const attemptsCell = row.querySelector('.attempts-cell');
+    const errorCell = row.querySelector('.error-cell');
+    const actionsCell = row.querySelector('.actions-cell');
+    
+    // Status badge
+    const statusIcons = {
+        'success': '<i class="fas fa-check-circle me-1"></i>Sucesso',
+        'running': '<i class="fas fa-spinner fa-spin me-1"></i>Executando',
+        'ready': '<i class="fas fa-clock me-1"></i>Pronto',
+        'extracting': '<i class="fas fa-cog fa-spin me-1"></i>Extraindo',
+        'error': '<i class="fas fa-exclamation-triangle me-1"></i>Erro',
+        'pending': '<i class="fas fa-hourglass-start me-1"></i>Pendente'
+    };
+    
+    const statusClasses = {
+        'success': 'bg-success',
+        'running': 'bg-primary',
+        'ready': 'bg-info',
+        'extracting': 'bg-warning',
+        'error': 'bg-danger',
+        'pending': 'bg-secondary'
+    };
+    
+    statusCell.innerHTML = `<span class="badge ${statusClasses[item.status] || 'bg-secondary'}">${statusIcons[item.status] || item.status}</span>`;
+    
+    // Process link
+    if (item.process_id) {
+        processCell.innerHTML = `<a href="/processos/${item.process_id}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye me-1"></i>Ver #${item.process_id}</a>`;
+    }
+    
+    // Attempts
+    attemptsCell.textContent = item.attempt_count;
+    
+    // Error
+    if (item.last_error) {
+        errorCell.innerHTML = `<button class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="${item.last_error}"><i class="fas fa-info-circle"></i></button>`;
+        // Inicializar tooltip do botão de erro com função centralizada
+        initTooltips(errorCell);
+    }
+    
+    // NOVA FUNÇÃO: Atualizar coluna Ações com screenshots em tempo real
+    if (actionsCell && item.process_id) {
+        await updateActionsCell(actionsCell, item);
+    }
+}
+
+async function updateActionsCell(actionsCell, item) {
+    const processId = item.process_id;
+    const itemId = item.id;
+    
+    // Não atualizar se não houver process_id
+    if (!processId) {
+        return;
+    }
+    
+    try {
+        // 🔧 FIX: Usar dados do processo que já vêm na API batch/status
+        // ao invés de fazer outro fetch desnecessário
+        const processData = item.process || {};
+        
+        // Construir HTML dos botões
+        let buttonsHTML = '<div class="btn-group" role="group">';
+        
+        // Botão Ver/Progresso RPA
+        if (processData.elaw_status === 'running') {
+            buttonsHTML += `
+                <a href="/processos/rpa/progress/${processId}?batch_id=${batchId}" 
+                   class="btn btn-sm btn-info" 
+                   data-bs-toggle="tooltip" title="Ver Progresso RPA">
+                    <i class="fas fa-spinner fa-pulse"></i>
+                </a>
+            `;
+        } else {
+            buttonsHTML += `
+                <a href="/processos/${processId}?batch_id=${batchId}" 
+                   class="btn btn-sm btn-outline-primary" 
+                   data-bs-toggle="tooltip" title="Visualizar processo">
+                    <i class="fas fa-eye"></i>
+                </a>
+            `;
+        }
+        
+        // Botão Editar
+        buttonsHTML += `
+            <a href="/processos/${processId}/edit?batch_id=${batchId}" 
+               class="btn btn-sm btn-outline-secondary" 
+               data-bs-toggle="tooltip" title="Editar processo">
+                <i class="fas fa-edit"></i>
+            </a>
+        `;
+        
+        // Botão PDF
+        buttonsHTML += `
+            <a href="/processos/batch/item/${itemId}/pdf" 
+               class="btn btn-sm btn-outline-info" 
+               data-bs-toggle="tooltip" title="Ver PDF original" target="_blank">
+                <i class="fas fa-file-pdf"></i>
+            </a>
+        `;
+        
+        // Botão Screenshot ANTES (aparece se existir)
+        if (processData.elaw_screenshot_before_path) {
+            // 🔧 FIX: Usar rota /rpa_screenshots/ em vez de /static/
+            buttonsHTML += `
+                <a href="/rpa_screenshots/${processData.elaw_screenshot_before_path}" 
+                   class="btn btn-sm btn-outline-success" 
+                   data-bs-toggle="tooltip" title="Screenshot ANTES de salvar" target="_blank">
+                    <i class="fas fa-camera"></i>
+                </a>
+            `;
+        }
+        
+        // Botão Screenshot DEPOIS (aparece se existir)
+        if (processData.elaw_screenshot_after_path) {
+            // 🔧 FIX: Usar rota /rpa_screenshots/ em vez de /static/
+            buttonsHTML += `
+                <a href="/rpa_screenshots/${processData.elaw_screenshot_after_path}" 
+                   class="btn btn-sm btn-outline-primary" 
+                   data-bs-toggle="tooltip" title="Screenshot DEPOIS de salvar" target="_blank">
+                    <i class="fas fa-camera-retro"></i>
+                </a>
+            `;
+        }
+        
+        // Botão Screenshot RECLAMADAS (aparece se existir)
+        if (processData.elaw_screenshot_reclamadas_path) {
+            buttonsHTML += `
+                <a href="/rpa_screenshots/${processData.elaw_screenshot_reclamadas_path}" 
+                   class="btn btn-sm btn-outline-warning" 
+                   data-bs-toggle="tooltip" title="Screenshot RECLAMADAS" target="_blank">
+                    <i class="fas fa-users"></i>
+                </a>
+            `;
+        }
+        
+        // Botão Screenshot PEDIDOS (aparece se existir)
+        if (processData.elaw_screenshot_pedidos_path) {
+            buttonsHTML += `
+                <a href="/rpa_screenshots/${processData.elaw_screenshot_pedidos_path}" 
+                   class="btn btn-sm btn-outline-info" 
+                   data-bs-toggle="tooltip" title="Screenshot PEDIDOS" target="_blank">
+                    <i class="fas fa-list-alt"></i>
+                </a>
+            `;
+        }
+        
+        // Botão Reprocessar (só se erro)
+        if (item.status === 'error') {
+            buttonsHTML += `
+                <form action="/processos/batch/item/${itemId}/retry" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-warning" 
+                            data-bs-toggle="tooltip" title="Reprocessar">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </form>
+            `;
+        }
+        
+        // Botão Deletar
+        buttonsHTML += `
+            <form action="/processos/batch/item/${itemId}/delete" method="POST" style="display:inline;" 
+                  onsubmit="return confirm('Tem certeza que deseja deletar este item?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                        data-bs-toggle="tooltip" title="Deletar">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </form>
+        `;
+        
+        buttonsHTML += '</div>';
+        
+        // Atualizar HTML da célula
+        actionsCell.innerHTML = buttonsHTML;
+        
+        // Reinicializar tooltips com função centralizada
+        initTooltips(actionsCell);
+        
+    } catch (error) {
+        console.error('Erro ao atualizar ações:', error);
+    }
+}
+
+function startPolling() {
+    if (!pollingInterval) {
+        pollingInterval = setInterval(updateBatchStatus, POLL_INTERVAL);
+    }
+}
+
+function stopPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
+// Função para inicializar tooltips com configuração correta
+function initTooltips(container = document) {
+    const tooltipTriggerList = container.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach(el => {
+        // Destruir tooltip existente se houver
+        const existingTooltip = bootstrap.Tooltip.getInstance(el);
+        if (existingTooltip) {
+            existingTooltip.dispose();
+        }
+        // Criar novo tooltip com trigger explícito
+        new bootstrap.Tooltip(el, {
+            trigger: 'hover',
+            delay: { show: 200, hide: 0 }
+        });
+    });
+}
+
+// Inicializar tooltips existentes ao carregar a página
+document.addEventListener('DOMContentLoaded', async function() {
+    initTooltips();
+    
+    // 🔧 FIX: Forçar atualização de TODOS os botões de ação ao carregar a página
+    // Isso garante que screenshots apareçam mesmo se o polling já tiver parado
+    const allRows = document.querySelectorAll('tr[data-item-id]');
+    for (const row of allRows) {
+        const actionsCell = row.querySelector('.actions-cell');
+        const processId = row.querySelector('.process-cell a')?.href?.match(/\/processos\/(\d+)/)?.[1];
+        
+        if (actionsCell && processId) {
+            await updateActionsCell(actionsCell, { 
+                id: row.getAttribute('data-item-id'),
+                process_id: parseInt(processId),
+                status: row.querySelector('.status-cell .badge')?.textContent?.toLowerCase().includes('sucesso') ? 'success' : 'unknown'
+            });
+        }
+    }
+});
+
+// Iniciar polling se batch está em execução
+{% if batch.status in ['running', 'extracting', 'queued'] %}
+startPolling();
+{% endif %}
+
+// 🔧 FIX: Também iniciar polling se batch está "completed" mas há processos success sem screenshots
+// Isso garante que os botões apareçam mesmo se a página for recarregada após o batch terminar
+{% if batch.status in ['completed', 'partial_completed'] %}
+(async function() {
+    // Aguardar 2 segundos e verificar se há processos success sem screenshots
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const successRows = document.querySelectorAll('tr[data-item-id]');
+    let needsUpdate = false;
+    
+    for (const row of successRows) {
+        const statusBadge = row.querySelector('.status-cell .badge');
+        const actionsCell = row.querySelector('.actions-cell');
+        
+        if (statusBadge?.textContent?.toLowerCase().includes('sucesso')) {
+            // Verificar se tem botões de screenshot
+            const hasScreenshotButtons = actionsCell?.querySelector('a[title*="Screenshot"]');
+            if (!hasScreenshotButtons) {
+                needsUpdate = true;
+                break;
+            }
+        }
+    }
+    
+    // Se encontrou processos success sem screenshots, iniciar polling por mais 30 segundos
+    if (needsUpdate) {
+        console.log('[BATCH] Detectados processos success sem screenshots - iniciando polling adicional');
+        startPolling();
+        setTimeout(stopPolling, 30000); // Parar após 30 segundos
+    }
+})();
+{% endif %}
+
+// Cleanup ao sair da página
+window.addEventListener('beforeunload', stopPolling);
+</script>
+
+<style>
+.bg-gradient {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+
+.metric {
+    padding: 15px;
+}
+
+.progress {
+    border-radius: 10px;
+}
+
+.progress-bar {
+    transition: width 0.5s ease;
+}
+</style>
+{% endblock %}

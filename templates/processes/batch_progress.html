@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processando Lote - Batch #{{ batch_id }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1e3c72;
+            --secondary-color: #2a5298;
+            --accent-color: #7e8ba3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e8ba3 100%);
+            background-attachment: fixed;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            padding: 40px 20px;
+            max-width: 900px;
+        }
+
+        .progress-card {
+            background: rgba(255, 255, 255, 0.98);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .progress-card-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .progress-card-header h2 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 600;
+        }
+
+        .progress-card-header .batch-info {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .progress-card-body {
+            padding: 40px;
+        }
+
+        .hourglass-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .hourglass {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            animation: flip 2s ease-in-out infinite;
+        }
+
+        @keyframes flip {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+        }
+
+        .hourglass i {
+            font-size: 60px;
+            color: var(--secondary-color);
+        }
+
+        .main-progress {
+            margin-bottom: 30px;
+        }
+
+        .main-progress .progress {
+            height: 12px;
+            border-radius: 10px;
+            background: rgba(30, 60, 114, 0.1);
+            overflow: visible;
+        }
+
+        .main-progress .progress-bar {
+            background: linear-gradient(90deg, #1e3c72, #2a5298);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(30, 60, 114, 0.3);
+            transition: width 0.4s ease;
+        }
+
+        .status-message {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: rgba(30, 60, 114, 0.05);
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .status-message h4 {
+            color: var(--primary-color);
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .status-message p {
+            color: #666;
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .files-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 10px;
+        }
+
+        .file-item {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .file-item.processing {
+            border-left: 4px solid #0d6efd;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .file-item.success {
+            border-left: 4px solid #28a745;
+        }
+
+        .file-item.error {
+            border-left: 4px solid #dc3545;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 24px;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .file-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-top-color: #0d6efd;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .completion-message {
+            text-align: center;
+            padding: 30px;
+            display: none;
+        }
+
+        .completion-message.success {
+            color: #28a745;
+        }
+
+        .completion-message.error {
+            color: #dc3545;
+        }
+
+        .completion-message i {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .btn-custom {
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="progress-card">
+            <div class="progress-card-header">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <a href="/processos/batch/{{ batch_id }}" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
+                    <a href="/processos/batch" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-list me-1"></i>Ver Todos
+                    </a>
+                </div>
+                <h2><i class="fas fa-layer-group me-2"></i>Processando Lote</h2>
+                <div class="batch-info">Batch #{{ batch_id }} - <span id="total-files">0</span> arquivo(s)</div>
+            </div>
+
+            <div class="progress-card-body">
+                <div class="hourglass-container">
+                    <div class="hourglass">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                </div>
+
+                <div class="main-progress">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span style="font-size: 14px; font-weight: 500; color: #666;">Progresso Geral</span>
+                        <span id="progress-percent" style="font-size: 18px; font-weight: 600; color: var(--primary-color);">0%</span>
+                    </div>
+                    <div class="progress">
+                        <div id="main-progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div class="text-center mt-2">
+                        <small class="text-muted"><span id="processed-count">0</span> de <span id="total-count">0</span> processados</small>
+                    </div>
+                </div>
+
+                <div id="status-message" class="status-message">
+                    <h4 id="current-step">Iniciando...</h4>
+                    <p id="current-message">Preparando para processar arquivos...</p>
+                </div>
+
+                <div class="files-list" id="files-list">
+                    <!-- Arquivos serão inseridos dinamicamente -->
+                </div>
+
+                <div id="completion-message" class="completion-message">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Processamento Concluído!</h3>
+                    <p id="completion-text"></p>
+                    <div class="mt-4">
+                        <a href="/processos/batch/{{ batch_id }}" class="btn btn-primary btn-custom">
+                            <i class="fas fa-eye me-2"></i>Ver Detalhes do Batch
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const batchId = {{ batch_id }};
+        const pollInterval = 3000; // 3 segundos (otimizado para reduzir carga)
+        let filesData = {};
+
+        async function checkProgress() {
+            try {
+                const response = await fetch(`/processos/batch/${batchId}/progress-status`);
+                const data = await response.json();
+
+                // Atualizar progresso geral
+                const progressPercent = Math.round((data.processed_count / data.total_count) * 100) || 0;
+                document.getElementById('progress-percent').textContent = progressPercent + '%';
+                document.getElementById('main-progress-bar').style.width = progressPercent + '%';
+                document.getElementById('processed-count').textContent = data.processed_count;
+                document.getElementById('total-count').textContent = data.total_count;
+                document.getElementById('total-files').textContent = data.total_count;
+
+                // Atualizar mensagem de status
+                document.getElementById('current-step').textContent = `Processando arquivos (${data.processed_count}/${data.total_count})`;
+                
+                if (data.current_file) {
+                    document.getElementById('current-message').textContent = `Extraindo dados de: ${data.current_file}`;
+                }
+
+                // Atualizar lista de arquivos
+                updateFilesList(data.items);
+
+                // Verificar se extração concluída
+                if (data.status === 'ready' || data.status === 'partial_ready' || data.status === 'error') {
+                    const successCount = data.items.filter(item => item.status === 'ready' || item.status === 'success').length;
+                    const errorCount = data.items.filter(item => item.status === 'error').length;
+
+                    // Redirecionar IMEDIATAMENTE para tela de detalhes do batch
+                    window.location.replace(`/processos/batch/${batchId}`);
+                } else {
+                    // Continuar polling
+                    setTimeout(checkProgress, pollInterval);
+                }
+
+            } catch (error) {
+                console.error('Erro ao verificar progresso:', error);
+                setTimeout(checkProgress, pollInterval * 2);
+            }
+        }
+
+        function updateFilesList(items) {
+            const filesList = document.getElementById('files-list');
+            let html = '';
+
+            items.forEach((item, index) => {
+                let statusClass = '';
+                let statusIcon = '';
+                let statusText = '';
+
+                switch (item.status) {
+                    case 'extracting':
+                        statusClass = 'processing';
+                        statusIcon = '<div class="spinner"></div>';
+                        statusText = 'Extraindo dados...';
+                        break;
+                    case 'ready':
+                    case 'success':
+                        statusClass = 'success';
+                        statusIcon = '<i class="fas fa-check-circle text-success"></i>';
+                        statusText = 'Concluído';
+                        break;
+                    case 'error':
+                        statusClass = 'error';
+                        statusIcon = '<i class="fas fa-times-circle text-danger"></i>';
+                        statusText = 'Erro';
+                        break;
+                    default:
+                        statusClass = '';
+                        statusIcon = '<i class="fas fa-clock text-muted"></i>';
+                        statusText = 'Aguardando';
+                }
+
+                html += `
+                    <div class="file-item ${statusClass}">
+                        <div class="file-info">
+                            <i class="fas fa-file-pdf file-icon text-danger"></i>
+                            <span class="file-name">${item.filename}</span>
+                        </div>
+                        <div class="file-status">
+                            ${statusIcon}
+                            <span>${statusText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            filesList.innerHTML = html;
+        }
+
+        // Iniciar polling
+        checkProgress();
+    </script>
+</body>
+</html>

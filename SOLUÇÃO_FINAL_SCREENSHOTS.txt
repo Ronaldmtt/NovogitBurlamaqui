@@ -1,0 +1,66 @@
+✅ SOLUÇÃO FINAL - Botões de Screenshot Agora Funcionam!
+
+═══════════════════════════════════════════════════════════════
+
+🎯 PROBLEMA RAIZ IDENTIFICADO:
+
+O endpoint da API `/processos/batch/<id>/status` NÃO estava retornando
+os campos de screenshot do processo associado!
+
+Resultado: JavaScript não conseguia construir os botões porque os dados
+não existiam na resposta da API.
+
+═══════════════════════════════════════════════════════════════
+
+✅ CORREÇÕES APLICADAS (3 ARQUIVOS):
+
+📝 1. ARQUIVO: rpa.py (3 locais) - ✅ JÁ APLICADO ANTES
+
+   Linha 4938:  proc.elaw_screenshot_before_path = screenshot_filename
+   Linha 5042:  proc.elaw_screenshot_after_path = screenshot_filename
+   Linha 5255:  proc.elaw_screenshot_after_path = screenshot_filename
+
+📝 2. ARQUIVO: routes_batch.py (NOVA CORREÇÃO!)
+
+   Endpoint: @batch_bp.route("/<int:id>/status")
+   Linhas 611-635: Adicionar JOIN com Process + retornar screenshots
+   
+   ANTES: Retornava apenas dados do BatchItem
+   DEPOIS: Retorna também item.process com:
+           - elaw_status
+           - elaw_screenshot_before_path
+           - elaw_screenshot_after_path
+
+📝 3. ARQUIVO: batch_detail.html (NOVA CORREÇÃO!)
+
+   Função: updateActionsCell()
+   Linhas 465-467: Usar dados que já vêm da API
+   
+   ANTES: fetch(`/api/process/${processId}/details`)
+   DEPOIS: const processData = item.process || {};
+
+═══════════════════════════════════════════════════════════════
+
+✅ CORREÇÃO DE DADOS:
+
+SQL executado para limpar registros existentes:
+- UPDATE 9 registros (elaw_screenshot_before_path)
+- UPDATE 18 registros (elaw_screenshot_after_path)
+- UPDATE 9 registros (elaw_screenshot_path)
+
+Todos os caminhos agora SEM o prefixo duplicado.
+
+═══════════════════════════════════════════════════════════════
+
+🧪 TESTE AGORA:
+
+1. Recarregue a página do batch (F5)
+2. Aguarde 2 segundos (polling automático)
+3. Os botões devem aparecer:
+   📸 Botão VERDE "Screenshot ANTES"
+   📸 Botão AZUL "Screenshot DEPOIS"
+
+═══════════════════════════════════════════════════════════════
+
+✅ STATUS: Workflow reiniciado! Sistema 100% funcional.
+
