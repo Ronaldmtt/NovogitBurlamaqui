@@ -908,6 +908,9 @@ def confirm_extracted():
             "local_trabalho": (data.get("local_trabalho") or None),
             "pis": (data.get("pis") or None),
             "ctps": (data.get("ctps") or None),
+            
+            # 🔧 Pedidos extraídos do PDF (JSON)
+            "pedidos_json": json.dumps(data.get("pedidos", [])) if data.get("pedidos") else None,
         }
 
         # Remove chaves que não existem no modelo (evita TypeError)
