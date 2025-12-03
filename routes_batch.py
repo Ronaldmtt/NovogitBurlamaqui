@@ -210,7 +210,10 @@ def _create_process_from_data(data, user_id):
 # Configuração de Processamento Paralelo
 # =============================================================================
 MAX_EXTRACTION_WORKERS = 5  # 🔧 Balanceado: 5 workers para estabilidade
-MAX_RPA_WORKERS = 5  # 🔧 Balanceado: 5 workers RPA paralelas
+# 2025-12-03: Reduzido para 3 workers em produção para evitar falta de recursos
+# Em desenvolvimento pode usar 5, mas produção Replit tem recursos limitados
+_DEFAULT_RPA_WORKERS = 3 if os.getenv("REPL_DEPLOYMENT") else 5
+MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", str(_DEFAULT_RPA_WORKERS)))
 
 
 def _extract_single_item(item_id: int, upload_path: str, source_filename: str, user_id: int) -> dict:

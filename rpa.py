@@ -154,7 +154,10 @@ def reset_rpa_context(token: contextvars.Token) -> None:
 # =============================================================================
 
 # Configuração de paralelismo
-MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", "5"))  # Máximo de RPAs paralelos (consistente com routes_batch.py)
+# 2025-12-03: Reduzido para 3 workers em produção para evitar falta de recursos
+# Em desenvolvimento pode usar 5, mas produção Replit tem recursos limitados
+_DEFAULT_WORKERS = "3" if os.getenv("REPL_DEPLOYMENT") else "5"
+MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", _DEFAULT_WORKERS))  # Máximo de RPAs paralelos
 
 # Semáforo para controlar número máximo de execuções RPA simultâneas
 # Substitui o antigo _execute_rpa_lock (mutex) por semáforo (permite N simultâneos)
@@ -190,8 +193,8 @@ UPLOADS_DIR = Path(os.getenv("RPA_UPLOADS_DIR", "./uploads")).resolve()
 HEADLESS = os.getenv("RPA_HEADLESS", "true").strip().lower() in {"1", "true", "yes"}  # Default TRUE para VM sem X server
 SLOWMO_MS = int(os.getenv("RPA_SLOWMO_MS", "0"))
 DEFAULT_TIMEOUT_MS = int(os.getenv("RPA_DEFAULT_TIMEOUT_MS", "30000"))  # 30s (seguro para operações gerais)
-NAV_TIMEOUT_MS = int(os.getenv("RPA_NAV_TIMEOUT_MS", "120000"))  # 120s (aumentado para produção com latência alta)
-BROWSER_LAUNCH_TIMEOUT_MS = int(os.getenv("RPA_BROWSER_LAUNCH_TIMEOUT_MS", "120000"))  # 120s (aumentado para batch processing em VM)
+NAV_TIMEOUT_MS = int(os.getenv("RPA_NAV_TIMEOUT_MS", "180000"))  # 180s (3 min - aumentado para produção Replit)
+BROWSER_LAUNCH_TIMEOUT_MS = int(os.getenv("RPA_BROWSER_LAUNCH_TIMEOUT_MS", "180000"))  # 180s (3 min - aumentado para produção Replit)
 SHORT_TIMEOUT_MS = int(os.getenv("RPA_SHORT_TIMEOUT_MS", "1500"))
 VERY_SHORT_TIMEOUT_MS = int(os.getenv("RPA_VERY_SHORT_TIMEOUT_MS", "700"))
 
@@ -806,26 +809,43 @@ async def launch_browser():
         log("[BROWSER] 🔒 Aguardando lock de thread para lançamento serializado...")
         with _browser_launch_lock:
             log("[BROWSER] ✅ Lock adquirido - thread tem permissão para lançar browser")
-            launch_start_time = time.time()
             
-            try:
-                browser = await p.chromium.launch(
-                    executable_path=executable_path,
-                    headless=HEADLESS,  # CRITICAL: Deve ser True na VM (sem X server)
-                    slow_mo=SLOWMO_MS, 
-                    args=args, 
-                    timeout=BROWSER_LAUNCH_TIMEOUT_MS
-                )
-                launch_duration = time.time() - launch_start_time
-                log(f"[BROWSER] ✅ Chromium iniciado com sucesso em {launch_duration:.2f}s!")
-                log(f"[BROWSER] 🔓 Liberando lock - próxima thread pode iniciar browser")
-                update_status("abrindo_navegador", "Configurando navegador...")
-            except Exception as e:
-                launch_duration = time.time() - launch_start_time
-                log(f"[BROWSER] ❌ ERRO ao lançar Chromium após {launch_duration:.2f}s: {e}")
-                log(f"[BROWSER] 🔓 Liberando lock após falha")
-                update_status("erro_navegador", f"Falha ao iniciar navegador: {str(e)[:100]}", status="error")
-                raise RuntimeError(f"Não foi possível iniciar o navegador Chromium em {BROWSER_LAUNCH_TIMEOUT_MS}ms após {launch_duration:.2f}s. Possível falta de recursos no ambiente de produção.") from e
+            # 2025-12-03: Retry com backoff exponencial para produção
+            max_browser_retries = 3
+            browser = None
+            last_error = None
+            
+            for attempt in range(max_browser_retries):
+                launch_start_time = time.time()
+                try:
+                    if attempt > 0:
+                        backoff_seconds = 5 * (2 ** (attempt - 1))  # 5s, 10s
+                        log(f"[BROWSER] ⏳ Tentativa {attempt + 1}/{max_browser_retries} após aguardar {backoff_seconds}s...")
+                        await asyncio.sleep(backoff_seconds)
+                    
+                    browser = await p.chromium.launch(
+                        executable_path=executable_path,
+                        headless=HEADLESS,  # CRITICAL: Deve ser True na VM (sem X server)
+                        slow_mo=SLOWMO_MS, 
+                        args=args, 
+                        timeout=BROWSER_LAUNCH_TIMEOUT_MS
+                    )
+                    launch_duration = time.time() - launch_start_time
+                    log(f"[BROWSER] ✅ Chromium iniciado com sucesso em {launch_duration:.2f}s (tentativa {attempt + 1})!")
+                    log(f"[BROWSER] 🔓 Liberando lock - próxima thread pode iniciar browser")
+                    update_status("abrindo_navegador", "Configurando navegador...")
+                    break  # Sucesso - sair do loop
+                    
+                except Exception as e:
+                    launch_duration = time.time() - launch_start_time
+                    last_error = e
+                    log(f"[BROWSER] ⚠️ Tentativa {attempt + 1}/{max_browser_retries} falhou após {launch_duration:.2f}s: {e}")
+                    
+                    if attempt == max_browser_retries - 1:
+                        log(f"[BROWSER] ❌ ERRO CRÍTICO: Todas as {max_browser_retries} tentativas falharam")
+                        log(f"[BROWSER] 🔓 Liberando lock após falha total")
+                        update_status("erro_navegador", f"Falha ao iniciar navegador após {max_browser_retries} tentativas: {str(e)[:80]}", status="error")
+                        raise RuntimeError(f"Não foi possível iniciar o navegador Chromium após {max_browser_retries} tentativas ({BROWSER_LAUNCH_TIMEOUT_MS}ms cada). Última tentativa: {launch_duration:.2f}s. Possível falta de recursos no ambiente de produção.") from e
         
         ctx_kwargs: Dict[str, Any] = {"ignore_https_errors": True}
         if VIEWPORT_MODE == "MAX":
