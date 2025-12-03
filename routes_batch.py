@@ -449,13 +449,26 @@ def process_batch_async(batch_id, user_id):
 def batch_new():
     """Upload de múltiplos PDFs"""
     if request.method == "POST":
+        # 🔧 DEBUG 2025-12-03: Log detalhado para identificar problemas de upload em produção
+        import traceback
+        logger.info(f"[UPLOAD][DEBUG] ========== INÍCIO DO UPLOAD ==========")
+        logger.info(f"[UPLOAD][DEBUG] User: {current_user.id} ({current_user.username})")
+        logger.info(f"[UPLOAD][DEBUG] Content-Type: {request.content_type}")
+        logger.info(f"[UPLOAD][DEBUG] Content-Length: {request.content_length}")
+        logger.info(f"[UPLOAD][DEBUG] Request files keys: {list(request.files.keys())}")
+        
         files = request.files.getlist('pdfs')
+        logger.info(f"[UPLOAD][DEBUG] Arquivos recebidos: {len(files)}")
+        for i, f in enumerate(files):
+            logger.info(f"[UPLOAD][DEBUG]   [{i}] filename='{f.filename}', content_type='{f.content_type}'")
         
         if not files or len(files) == 0:
+            logger.warning(f"[UPLOAD][DEBUG] ERRO: Nenhum arquivo selecionado")
             flash("Nenhum arquivo selecionado.", "danger")
             return redirect(request.url)
         
         if len(files) > MAX_FILES_PER_BATCH:
+            logger.warning(f"[UPLOAD][DEBUG] ERRO: Limite excedido ({len(files)} > {MAX_FILES_PER_BATCH})")
             flash(f"Máximo de {MAX_FILES_PER_BATCH} arquivos por vez.", "danger")
             return redirect(request.url)
         
@@ -464,11 +477,14 @@ def batch_new():
         total_size = 0
         MAX_TOTAL_SIZE = 350 * 1024 * 1024  # 350MB total
         
-        for file in files:
+        logger.info(f"[UPLOAD][DEBUG] Iniciando validação de {len(files)} arquivos...")
+        for idx, file in enumerate(files):
             if file.filename == '':
+                logger.info(f"[UPLOAD][DEBUG]   [{idx}] Pulando arquivo vazio")
                 continue
             
             if not allowed_file(file.filename):
+                logger.warning(f"[UPLOAD][DEBUG]   [{idx}] ERRO: '{file.filename}' não é PDF válido")
                 flash(f"Arquivo '{file.filename}' não é um PDF válido.", "danger")
                 return redirect(request.url)
             
@@ -477,33 +493,50 @@ def batch_new():
             size = file.tell()
             file.seek(0)
             
+            logger.info(f"[UPLOAD][DEBUG]   [{idx}] '{file.filename}' = {size:,} bytes ({size/1024/1024:.2f} MB)")
+            
             if size > MAX_FILE_SIZE:
+                logger.warning(f"[UPLOAD][DEBUG]   [{idx}] ERRO: Arquivo muito grande ({size} > {MAX_FILE_SIZE})")
                 flash(f"Arquivo '{file.filename}' excede {MAX_FILE_SIZE // (1024*1024)}MB.", "danger")
                 return redirect(request.url)
             
             total_size += size
             valid_files.append(file)
         
+        logger.info(f"[UPLOAD][DEBUG] Validação concluída: {len(valid_files)} válidos, total={total_size:,} bytes")
+        
         # Verificar limite total
         if total_size > MAX_TOTAL_SIZE:
             total_mb = total_size / (1024 * 1024)
+            logger.warning(f"[UPLOAD][DEBUG] ERRO: Tamanho total excede limite ({total_mb:.1f}MB > 350MB)")
             flash(f"Tamanho total dos arquivos ({total_mb:.1f}MB) excede o limite de 350MB.", "danger")
             return redirect(request.url)
         
         if not valid_files:
+            logger.warning(f"[UPLOAD][DEBUG] ERRO: Nenhum arquivo válido após filtro")
             flash("Nenhum arquivo válido para processar.", "danger")
             return redirect(request.url)
         
         try:
             # 🚀 PLANO BATMAN: Ler arquivos para memória PRIMEIRO (inevitável com Flask)
             # Depois redirecionar IMEDIATAMENTE e processar em background
+            logger.info(f"[UPLOAD][DEBUG] Lendo {len(valid_files)} arquivos para memória...")
             file_data = []
-            for file in valid_files:
+            for idx, file in enumerate(valid_files):
                 filename = secure_filename(file.filename)
-                content = file.read()  # Lê para memória (necessário antes do redirect)
-                file_data.append((filename, content))
+                try:
+                    content = file.read()  # Lê para memória (necessário antes do redirect)
+                    logger.info(f"[UPLOAD][DEBUG]   [{idx}] Lido '{filename}' = {len(content):,} bytes")
+                    file_data.append((filename, content))
+                except Exception as read_err:
+                    logger.error(f"[UPLOAD][DEBUG]   [{idx}] ERRO ao ler '{filename}': {read_err}")
+                    logger.error(f"[UPLOAD][DEBUG] Stack: {traceback.format_exc()}")
+                    raise
+            
+            logger.info(f"[UPLOAD][DEBUG] Total lido: {len(file_data)} arquivos em memória")
             
             # Criar batch
+            logger.info(f"[UPLOAD][DEBUG] Criando batch no banco de dados...")
             batch = BatchUpload(
                 owner_id=current_user.id,
                 status='uploading',
@@ -511,13 +544,22 @@ def batch_new():
             )
             db.session.add(batch)
             db.session.flush()  # Obter batch.id
+            logger.info(f"[UPLOAD][DEBUG] Batch criado: id={batch.id}")
             
             # Criar diretório para este batch
             batch_dir = Path('uploads') / 'batch' / str(batch.id)
-            batch_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[UPLOAD][DEBUG] Criando diretório: {batch_dir}")
+            try:
+                batch_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"[UPLOAD][DEBUG] Diretório criado com sucesso")
+            except Exception as dir_err:
+                logger.error(f"[UPLOAD][DEBUG] ERRO ao criar diretório: {dir_err}")
+                logger.error(f"[UPLOAD][DEBUG] Stack: {traceback.format_exc()}")
+                raise
             
             # Criar BatchItems ANTES de salvar (para mostrar na tela)
-            for filename, _ in file_data:
+            logger.info(f"[UPLOAD][DEBUG] Criando {len(file_data)} BatchItems...")
+            for idx, (filename, _) in enumerate(file_data):
                 item = BatchItem(
                     batch_id=batch.id,
                     source_filename=filename,
@@ -525,9 +567,12 @@ def batch_new():
                     status='uploading'
                 )
                 db.session.add(item)
+                logger.info(f"[UPLOAD][DEBUG]   [{idx}] BatchItem criado: {filename}")
             
             batch.status = 'pending'
+            logger.info(f"[UPLOAD][DEBUG] Fazendo commit no banco...")
             db.session.commit()
+            logger.info(f"[UPLOAD][DEBUG] Commit OK! Batch {batch.id} salvo com {len(file_data)} items")
             
             # 🚀 TUDO EM BACKGROUND: Salvar arquivos + extrair
             import threading
@@ -536,35 +581,75 @@ def batch_new():
                 """Salva arquivos e processa tudo em background"""
                 from main import app
                 from concurrent.futures import ThreadPoolExecutor
+                import traceback as tb
+                
+                logger.info(f"[BACKGROUND][DEBUG] ========== THREAD INICIADA ==========")
+                logger.info(f"[BACKGROUND][DEBUG] batch_id={batch_id}, user_id={user_id}")
+                logger.info(f"[BACKGROUND][DEBUG] batch_dir={batch_dir_str}")
+                logger.info(f"[BACKGROUND][DEBUG] Arquivos a salvar: {len(file_data_list)}")
                 
                 with app.app_context():
                     try:
                         batch_dir_path = Path(batch_dir_str)
+                        logger.info(f"[BACKGROUND][DEBUG] Verificando diretório: {batch_dir_path}")
+                        logger.info(f"[BACKGROUND][DEBUG] Diretório existe: {batch_dir_path.exists()}")
                         
                         # Salvar arquivos em paralelo
                         def save_file(args):
                             fname, content = args
                             fpath = batch_dir_path / fname
-                            with open(str(fpath), 'wb') as f:
-                                f.write(content)
-                            return fname, str(fpath)
+                            try:
+                                with open(str(fpath), 'wb') as f:
+                                    f.write(content)
+                                logger.info(f"[BACKGROUND][DEBUG] Salvo: {fname} ({len(content):,} bytes)")
+                                return fname, str(fpath), None
+                            except Exception as save_err:
+                                logger.error(f"[BACKGROUND][DEBUG] ERRO ao salvar {fname}: {save_err}")
+                                return fname, None, str(save_err)
                         
+                        logger.info(f"[BACKGROUND][DEBUG] Iniciando salvamento paralelo (5 workers)...")
                         with ThreadPoolExecutor(max_workers=5) as executor:
-                            list(executor.map(save_file, file_data_list))
+                            results = list(executor.map(save_file, file_data_list))
+                        
+                        # Verificar resultados
+                        saved_count = sum(1 for r in results if r[1] is not None)
+                        error_count = sum(1 for r in results if r[2] is not None)
+                        logger.info(f"[BACKGROUND][DEBUG] Salvamento concluído: {saved_count} OK, {error_count} erros")
+                        
+                        if error_count > 0:
+                            for fname, fpath, err in results:
+                                if err:
+                                    logger.error(f"[BACKGROUND][DEBUG]   ERRO em '{fname}': {err}")
                         
                         logger.info(f"[BATCH] {len(file_data_list)} arquivos salvos em disco")
                         
                         # Atualizar status dos items para 'pending'
+                        logger.info(f"[BACKGROUND][DEBUG] Atualizando status dos items para 'pending'...")
                         items = BatchItem.query.filter_by(batch_id=batch_id).all()
                         for item in items:
                             item.status = 'pending'
                         db.session.commit()
+                        logger.info(f"[BACKGROUND][DEBUG] Status atualizado para {len(items)} items")
                         
                         # Agora processar extração
+                        logger.info(f"[BACKGROUND][DEBUG] Iniciando extração (process_batch_async)...")
                         process_batch_async(batch_id, user_id)
+                        logger.info(f"[BACKGROUND][DEBUG] ========== THREAD CONCLUÍDA ==========")
                         
                     except Exception as e:
-                        logger.error(f"[BATCH] Erro no background: {e}")
+                        logger.error(f"[BACKGROUND][DEBUG] ========== ERRO NA THREAD ==========")
+                        logger.error(f"[BACKGROUND][DEBUG] Erro: {e}")
+                        logger.error(f"[BACKGROUND][DEBUG] Stack trace:\n{tb.format_exc()}")
+                        
+                        # Tentar marcar batch como erro
+                        try:
+                            batch_obj = BatchUpload.query.get(batch_id)
+                            if batch_obj:
+                                batch_obj.status = 'error'
+                                db.session.commit()
+                                logger.info(f"[BACKGROUND][DEBUG] Batch {batch_id} marcado como 'error'")
+                        except Exception as db_err:
+                            logger.error(f"[BACKGROUND][DEBUG] Erro ao marcar batch como error: {db_err}")
             
             thread = threading.Thread(
                 target=save_and_process, 
@@ -572,7 +657,8 @@ def batch_new():
             )
             thread.daemon = True
             thread.start()
-            logger.info(f"[BATCH] Thread de upload+processamento iniciada para batch {batch.id}")
+            logger.info(f"[UPLOAD][DEBUG] Thread de background iniciada para batch {batch.id}")
+            logger.info(f"[UPLOAD][DEBUG] ========== REDIRECIONANDO PARA PROGRESSO ==========")
             
             # Toast de sucesso
             flash(f"Batch criado! {len(file_data)} arquivo(s) sendo enviados e processados.", "success")
@@ -582,7 +668,9 @@ def batch_new():
         
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Erro ao criar batch: {e}")
+            logger.error(f"[UPLOAD][DEBUG] ========== ERRO GERAL NO UPLOAD ==========")
+            logger.error(f"[UPLOAD][DEBUG] Erro: {e}")
+            logger.error(f"[UPLOAD][DEBUG] Stack trace:\n{traceback.format_exc()}")
             flash(f"Erro ao processar arquivos: {str(e)}", "danger")
             return redirect(request.url)
     
