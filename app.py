@@ -188,6 +188,31 @@ def create_app():
             ensure_admin_user()
         except Exception:
             pass
+        
+        # ==============================
+        # Limpeza automática de screenshots antigos
+        # Executa ao iniciar o servidor para liberar espaço
+        # ==============================
+        try:
+            from rpa_status import run_all_cleanup
+            import threading
+            
+            def delayed_cleanup():
+                """Executa limpeza após 30 segundos para não atrasar startup"""
+                import time
+                time.sleep(30)
+                try:
+                    from main import app as main_app
+                    with main_app.app_context():
+                        run_all_cleanup(screenshot_days=2, status_days=7)
+                except Exception as cleanup_err:
+                    logging.warning(f"Limpeza automática falhou: {cleanup_err}")
+            
+            cleanup_thread = threading.Thread(target=delayed_cleanup, daemon=True)
+            cleanup_thread.start()
+            logging.info("🧹 Limpeza automática agendada (executa em 30s)")
+        except Exception as e:
+            logging.warning(f"Não foi possível agendar limpeza automática: {e}")
 
     # ==============================
     # Handlers de erro (DB)

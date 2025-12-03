@@ -236,3 +236,117 @@ def cleanup_old_statuses(days_old: int = 7):
             db.session.rollback()
         except Exception:
             pass
+
+
+def cleanup_old_screenshots(days_old: int = 2):
+    """
+    Remove screenshots de RPA antigos (mais de X dias após processamento).
+    
+    Esta função:
+    1. Busca processos com RPA concluído há mais de X dias
+    2. Remove os arquivos de screenshot do disco
+    3. Limpa os paths no banco de dados
+    
+    Args:
+        days_old: Número de dias após o qual os screenshots são deletados (padrão: 2)
+    
+    Returns:
+        Tuple[int, int]: (arquivos_deletados, processos_atualizados)
+    """
+    from extensions import db
+    from models import Process
+    from pathlib import Path
+    import os
+    
+    files_deleted = 0
+    processes_updated = 0
+    
+    try:
+        cutoff = datetime.now() - timedelta(days=days_old)
+        
+        processes_with_old_screenshots = Process.query.filter(
+            Process.elaw_status.in_(["success", "error", "completed"]),
+            Process.elaw_filled_at < cutoff,
+            db.or_(
+                Process.elaw_screenshot_path.isnot(None),
+                Process.elaw_screenshot_before_path.isnot(None),
+                Process.elaw_screenshot_after_path.isnot(None)
+            )
+        ).all()
+        
+        if not processes_with_old_screenshots:
+            print(f"🧹 [CLEANUP] Nenhum screenshot antigo para limpar")
+            return (0, 0)
+        
+        print(f"🧹 [CLEANUP] Encontrados {len(processes_with_old_screenshots)} processos com screenshots > {days_old} dias")
+        
+        screenshot_dirs = [
+            Path('rpa_screenshots'),
+            Path('static/rpa_screenshots'),
+            Path('/home/runner/workspace/rpa_screenshots')
+        ]
+        
+        for process in processes_with_old_screenshots:
+            screenshot_paths = [
+                process.elaw_screenshot_path,
+                process.elaw_screenshot_before_path,
+                process.elaw_screenshot_after_path
+            ]
+            
+            any_deleted = False
+            for screenshot_path in screenshot_paths:
+                if not screenshot_path:
+                    continue
+                
+                filename = Path(screenshot_path).name
+                
+                for screenshot_dir in screenshot_dirs:
+                    full_path = screenshot_dir / filename
+                    if full_path.exists():
+                        try:
+                            os.remove(str(full_path))
+                            files_deleted += 1
+                            any_deleted = True
+                            print(f"   🗑️ Deletado: {full_path}")
+                        except Exception as e:
+                            print(f"   ⚠️ Erro ao deletar {full_path}: {e}")
+            
+            if any_deleted:
+                process.elaw_screenshot_path = None
+                process.elaw_screenshot_before_path = None
+                process.elaw_screenshot_after_path = None
+                processes_updated += 1
+        
+        db.session.commit()
+        print(f"🧹 [CLEANUP] ✅ Limpeza concluída: {files_deleted} arquivos deletados, {processes_updated} processos atualizados")
+        
+        return (files_deleted, processes_updated)
+        
+    except Exception as e:
+        print(f"❌ [CLEANUP] Erro na limpeza de screenshots: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return (0, 0)
+
+
+def run_all_cleanup(screenshot_days: int = 2, status_days: int = 7):
+    """
+    Executa todas as rotinas de limpeza automática.
+    
+    Args:
+        screenshot_days: Dias após os quais screenshots são deletados (padrão: 2)
+        status_days: Dias após os quais status RPA são deletados (padrão: 7)
+    """
+    print("=" * 60)
+    print("🧹 INICIANDO LIMPEZA AUTOMÁTICA")
+    print("=" * 60)
+    
+    cleanup_old_screenshots(days_old=screenshot_days)
+    
+    cleanup_old_statuses(days_old=status_days)
+    
+    print("=" * 60)
+    print("🧹 LIMPEZA AUTOMÁTICA CONCLUÍDA")
+    print("=" * 60)

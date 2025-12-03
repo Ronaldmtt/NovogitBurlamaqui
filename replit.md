@@ -32,6 +32,7 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - Google Cloud nginx: Requer client_max_body_size 500M em /etc/nginx/nginx.conf
 *   **Sistema Inteligente de Priorização de Pedidos:** 5 categorias de prioridade (P5-P1) garantem que verbas rescisórias essenciais (aviso prévio, férias, FGTS, 13º) sejam sempre inseridas primeiro, seguidas de salariais básicas, adicionais, indenizatórios e acessórios. Limite configurável de 30 pedidos com log detalhado de omissões.
 *   **Parallel PDF Extraction:** Processes multiple PDFs concurrently using a ThreadPoolExecutor, ensuring isolated database sessions and robust error handling for each extraction task.
+*   **Limpeza Automática de Screenshots (2025-12-03):** Sistema automático que remove screenshots de RPA antigos após 2 dias do processamento, liberando espaço em disco. Executa automaticamente 30 segundos após o servidor iniciar. Também remove status RPA concluídos há mais de 7 dias. Funções disponíveis: `cleanup_old_screenshots(days_old=2)`, `cleanup_old_statuses(days_old=7)`, `run_all_cleanup()`.
 *   **LLM Fallback Otimizado (2025-12-02):** Novas funções LLM para extração avançada:
     - `extract_pedidos_with_llm()`: Extrai pedidos com categorização (verbas_rescisorias, salariais, indenizatorios, acessorios) quando regex falha.
     - `extract_reclamadas_with_llm()`: Identifica todas as empresas reclamadas quando regex não encontra.
