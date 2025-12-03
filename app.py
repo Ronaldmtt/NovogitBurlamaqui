@@ -208,6 +208,29 @@ def create_app():
         flash("Falha de conexão/operacional com o banco. Tente novamente.", "danger")
         return redirect(request.referrer or url_for("core.dashboard")), 302
 
+    # Handler para erro 413 - Request Entity Too Large
+    @app.errorhandler(413)
+    def handle_request_too_large(error):
+        current_app.logger.error(f"[UPLOAD][ERROR] 413 - Request Too Large: {error}")
+        current_app.logger.error(f"[UPLOAD][ERROR] Content-Length: {request.content_length}")
+        current_app.logger.error(f"[UPLOAD][ERROR] MAX_CONTENT_LENGTH: {app.config.get('MAX_CONTENT_LENGTH')}")
+        flash("O arquivo é muito grande. O limite máximo é 350MB por upload.", "danger")
+        return redirect(url_for("batch.batch_new")), 302
+
+    # Handler para erro 400 - Bad Request (pode acontecer com uploads malformados)
+    @app.errorhandler(400)
+    def handle_bad_request(error):
+        current_app.logger.error(f"[UPLOAD][ERROR] 400 - Bad Request: {error}")
+        flash("Requisição inválida. Verifique os arquivos e tente novamente.", "danger")
+        return redirect(request.referrer or url_for("core.dashboard")), 302
+
+    # Handler para erro 500 - Internal Server Error
+    @app.errorhandler(500)
+    def handle_internal_error(error):
+        current_app.logger.exception(f"[UPLOAD][ERROR] 500 - Internal Server Error: {error}")
+        flash("Erro interno do servidor. Por favor, tente novamente.", "danger")
+        return redirect(request.referrer or url_for("core.dashboard")), 302
+
     return app
 
 

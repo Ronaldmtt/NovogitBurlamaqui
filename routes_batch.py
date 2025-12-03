@@ -448,9 +448,15 @@ def process_batch_async(batch_id, user_id):
 @login_required
 def batch_new():
     """Upload de múltiplos PDFs"""
+    # 🔧 DEBUG 2025-12-03: Log IMEDIATO para verificar se a requisição chega
+    import traceback
+    logger.info(f"[UPLOAD][TRACE] ========== REQUISIÇÃO RECEBIDA ==========")
+    logger.info(f"[UPLOAD][TRACE] Method: {request.method}")
+    logger.info(f"[UPLOAD][TRACE] URL: {request.url}")
+    logger.info(f"[UPLOAD][TRACE] User-Agent: {request.headers.get('User-Agent', 'N/A')[:50]}")
+    
     if request.method == "POST":
         # 🔧 DEBUG 2025-12-03: Log detalhado para identificar problemas de upload em produção
-        import traceback
         logger.info(f"[UPLOAD][DEBUG] ========== INÍCIO DO UPLOAD ==========")
         logger.info(f"[UPLOAD][DEBUG] User: {current_user.id} ({current_user.username})")
         logger.info(f"[UPLOAD][DEBUG] Content-Type: {request.content_type}")
