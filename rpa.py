@@ -154,10 +154,9 @@ def reset_rpa_context(token: contextvars.Token) -> None:
 # =============================================================================
 
 # Configuração de paralelismo
-# 2025-12-03: Reduzido para 3 workers em produção para evitar falta de recursos
-# Em desenvolvimento pode usar 5, mas produção Replit tem recursos limitados
-_DEFAULT_WORKERS = "3" if os.getenv("REPL_DEPLOYMENT") else "5"
-MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", _DEFAULT_WORKERS))  # Máximo de RPAs paralelos
+# 2025-12-03: 5 workers fixos para RPA paralelo (Google Cloud tem recursos suficientes)
+# Pode ser sobrescrito via variável de ambiente MAX_RPA_WORKERS
+MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", "5"))  # Máximo de RPAs paralelos
 
 # Semáforo para controlar número máximo de execuções RPA simultâneas
 # Substitui o antigo _execute_rpa_lock (mutex) por semáforo (permite N simultâneos)

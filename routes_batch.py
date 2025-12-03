@@ -207,13 +207,13 @@ def _create_process_from_data(data, user_id):
 
 
 # =============================================================================
-# Configuração de Processamento Paralelo
+# CONFIGURAÇÃO DE PARALELISMO - UNIFICADA
+# 2025-12-03: 5 workers fixos para Google Cloud (recursos suficientes)
+# Pode ser sobrescrito via variáveis de ambiente
 # =============================================================================
-MAX_EXTRACTION_WORKERS = 5  # 🔧 Balanceado: 5 workers para estabilidade
-# 2025-12-03: Reduzido para 3 workers em produção para evitar falta de recursos
-# Em desenvolvimento pode usar 5, mas produção Replit tem recursos limitados
-_DEFAULT_RPA_WORKERS = 3 if os.getenv("REPL_DEPLOYMENT") else 5
-MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", str(_DEFAULT_RPA_WORKERS)))
+MAX_EXTRACTION_WORKERS = int(os.getenv("MAX_EXTRACTION_WORKERS", "5"))  # Extração paralela de PDFs
+MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", "5"))  # RPA paralelo no eLaw
+MAX_UPLOAD_WORKERS = int(os.getenv("MAX_UPLOAD_WORKERS", "5"))  # Salvamento paralelo de uploads
 
 
 def _extract_single_item(item_id: int, upload_path: str, source_filename: str, user_id: int) -> dict:
@@ -613,8 +613,8 @@ def batch_new():
                                 logger.error(f"[BACKGROUND][DEBUG] ERRO ao salvar {fname}: {save_err}")
                                 return fname, None, str(save_err)
                         
-                        logger.info(f"[BACKGROUND][DEBUG] Iniciando salvamento paralelo (5 workers)...")
-                        with ThreadPoolExecutor(max_workers=5) as executor:
+                        logger.info(f"[BACKGROUND][DEBUG] Iniciando salvamento paralelo ({MAX_UPLOAD_WORKERS} workers)...")
+                        with ThreadPoolExecutor(max_workers=MAX_UPLOAD_WORKERS) as executor:
                             results = list(executor.map(save_file, file_data_list))
                         
                         # Verificar resultados

@@ -23,11 +23,13 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
 *   **Extração por Zonas Ampliada (2025-12-01):** Pipeline agora extrai 35 páginas iniciais (antes 15) para capturar seção DOS PEDIDOS que normalmente fica entre páginas 15-35 após fundamentação jurídica. Últimas 15 páginas mantidas para TRCT/dados trabalhistas.
 *   **RPA Automation (eLaw Integration):** Headless RPA execution using Playwright for external system interaction, providing real-time, step-by-step progress tracking with field-by-field updates. It captures screenshots for verification, features robust status management, history logging, and graceful error handling. The system prioritizes database values over PDF extraction for critical fields and automatically registers first hearings. Supports parallel execution of RPA processes with isolated browser instances. Handles multiple defendants from PDF extraction to eLaw population.
 *   **Data Isolation Fix (2025-12-02):** Corrigido bug de "data bleeding" onde dados de um processo vazavam para outro durante execução paralela do RPA. Solução: contextvars setados DENTRO da função async (run_elaw_login_once) para garantir propagação correta quando asyncio.run() cria novo event loop. Debug logging expandido para campos trabalhistas críticos (cargo, pis, ctps, salário, datas). Timeouts de produção aumentados para estabilidade.
-*   **Otimizações Produção (2025-12-03):** Correções para estabilidade em ambiente Replit de produção:
-    - MAX_RPA_WORKERS: 5 (dev) → 3 (produção) via detecção automática de REPL_DEPLOYMENT
+*   **Otimizações Produção (2025-12-03):** Correções para estabilidade e desempenho:
+    - Workers paralelos fixos em 5: MAX_RPA_WORKERS=5, MAX_EXTRACTION_WORKERS=5, MAX_UPLOAD_WORKERS=5
+    - Configuração via variáveis de ambiente para flexibilidade (sobrescrever valores padrão)
     - Timeouts aumentados: NAV_TIMEOUT e BROWSER_LAUNCH de 120s → 180s (3 minutos)
     - Browser launch com retry: 3 tentativas com backoff exponencial (5s, 10s) antes de falhar
     - Parsing de pedidos corrigido: Trata pedidos_json como string JSON e parseia corretamente
+    - Google Cloud nginx: Requer client_max_body_size 500M em /etc/nginx/nginx.conf
 *   **Sistema Inteligente de Priorização de Pedidos:** 5 categorias de prioridade (P5-P1) garantem que verbas rescisórias essenciais (aviso prévio, férias, FGTS, 13º) sejam sempre inseridas primeiro, seguidas de salariais básicas, adicionais, indenizatórios e acessórios. Limite configurável de 30 pedidos com log detalhado de omissões.
 *   **Parallel PDF Extraction:** Processes multiple PDFs concurrently using a ThreadPoolExecutor, ensuring isolated database sessions and robust error handling for each extraction task.
 *   **LLM Fallback Otimizado (2025-12-02):** Novas funções LLM para extração avançada:
