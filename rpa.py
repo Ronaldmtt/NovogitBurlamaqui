@@ -6096,12 +6096,34 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 log("[RECLAMADAS] Apenas 1 reclamada - nenhuma extra para adicionar")
             
             # ✅ NOVO: Verificar e processar pedidos para TODOS os processos (com ou sem reclamadas extras)
-            pedidos = data.get("pedidos_json", []) or data.get("pedidos", [])
-            # 🔧 DEBUG 2025-12-02: Log detalhado para identificar por que pedidos não estão sendo inseridos
+            # 2025-12-03: Corrigido para tratar pedidos_json como string JSON e parsear corretamente
+            raw_pedidos_json = data.get("pedidos_json")
+            raw_pedidos = data.get("pedidos", [])
+            
+            # Se pedidos_json é uma string, parsear
+            if isinstance(raw_pedidos_json, str) and raw_pedidos_json.strip():
+                try:
+                    import json
+                    parsed_pedidos = json.loads(raw_pedidos_json)
+                    if isinstance(parsed_pedidos, list):
+                        pedidos = parsed_pedidos
+                    else:
+                        log(f"[PEDIDOS][WARN] pedidos_json parseado não é lista: {type(parsed_pedidos)}")
+                        pedidos = raw_pedidos if isinstance(raw_pedidos, list) else []
+                except Exception as e:
+                    log(f"[PEDIDOS][WARN] Erro ao parsear pedidos_json: {e}")
+                    pedidos = raw_pedidos if isinstance(raw_pedidos, list) else []
+            elif isinstance(raw_pedidos_json, list):
+                pedidos = raw_pedidos_json
+            elif isinstance(raw_pedidos, list):
+                pedidos = raw_pedidos
+            else:
+                pedidos = []
+            
+            # 🔧 DEBUG 2025-12-03: Log detalhado para identificar por que pedidos não estão sendo inseridos
             log(f"[PEDIDOS][DEBUG] process_id={process_id}")
-            log(f"[PEDIDOS][DEBUG] data.get('pedidos_json')={type(data.get('pedidos_json')).__name__}: {data.get('pedidos_json', 'N/A')[:200] if isinstance(data.get('pedidos_json'), str) else data.get('pedidos_json')}")
-            log(f"[PEDIDOS][DEBUG] data.get('pedidos')={type(data.get('pedidos')).__name__}: {len(data.get('pedidos', [])) if isinstance(data.get('pedidos'), list) else data.get('pedidos')}")
-            log(f"[PEDIDOS][DEBUG] pedidos final={type(pedidos).__name__}: {len(pedidos) if isinstance(pedidos, list) else pedidos}")
+            log(f"[PEDIDOS][DEBUG] raw_pedidos_json type={type(raw_pedidos_json).__name__}, raw_pedidos type={type(raw_pedidos).__name__}")
+            log(f"[PEDIDOS][DEBUG] pedidos final: {len(pedidos)} itens")
             if pedidos:
                 log(f"[PEDIDOS] Detectados {len(pedidos)} pedidos para inserir")
                 
