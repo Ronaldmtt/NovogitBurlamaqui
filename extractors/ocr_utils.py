@@ -434,6 +434,11 @@ ANNEX_KEYWORDS = {
     "documentos": ["documentos", "anexos", "docs", "comprovantes"],
     "ctps": ["ctps", "carteira de trabalho", "carteira profissional"],
     "pis": ["pis", "pasep", "nit"],
+    # 🆕 2025-12-05: Novos documentos com dados trabalhistas
+    "termo_devolucao": ["termo de devolução", "termo devolução", "devolução de uniforme", "devolução uniforme", "epi"],
+    "termo_quitacao": ["termo de quitação", "termo quitação", "quitação anual", "quitação de obrigações"],
+    "ficha_registro": ["ficha de registro", "registro de empregado", "ficha cadastral"],
+    "aso": ["aso", "atestado de saúde ocupacional", "exame admissional", "exame demissional"],
 }
 
 
@@ -505,6 +510,24 @@ def extract_pdf_bookmarks(pdf_path: str) -> Dict[str, int]:
                     if "ficha_registro" not in result:
                         result["ficha_registro"] = page_num
                         logger.info(f"[BOOKMARK] ✅ Ficha Registro → página {page_num}")
+                
+                # 🆕 2025-12-05: TERMO DE DEVOLUÇÃO (uniforme/EPI)
+                elif "devolução" in title_lower or "devolucao" in title_lower or "uniforme" in title_lower or "epi" in title_lower:
+                    if "termo_devolucao" not in result:
+                        result["termo_devolucao"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ Termo Devolução → página {page_num}")
+                
+                # 🆕 2025-12-05: TERMO DE QUITAÇÃO
+                elif "quitação" in title_lower or "quitacao" in title_lower:
+                    if "termo_quitacao" not in result:
+                        result["termo_quitacao"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ Termo Quitação → página {page_num}")
+                
+                # 🆕 2025-12-05: ASO (Atestado de Saúde Ocupacional)
+                elif "aso" in title_lower or "atestado de saúde" in title_lower or "exame admissional" in title_lower:
+                    if "aso" not in result:
+                        result["aso"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ ASO → página {page_num}")
                 
                 elif "ppp" in title_lower or "perfil profissiográfico" in title_lower:
                     if "ppp" not in result:
@@ -665,14 +688,24 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     # ===== PASSO 1: Identificar quais DOCUMENTOS precisamos processar =====
     docs_needed = set()
     
-    # Mapeamento: qual documento contém qual campo
+    # 🆕 2025-12-05: Mapeamento EXPANDIDO - qual documento contém qual campo
+    # Incluindo TERMO DE DEVOLUÇÃO e TERMO DE QUITAÇÃO como fontes de dados
+    
     if any(f in missing_fields for f in ["data_admissao", "pis", "ctps", "serie_ctps"]):
         docs_needed.add("ctps")
+        docs_needed.add("termo_devolucao")   # 🆕 RG/CTPS, Função
+        docs_needed.add("termo_quitacao")    # 🆕 PIS, CTPS, datas
+        docs_needed.add("ficha_registro")    # 🆕 Dados cadastrais
     if any(f in missing_fields for f in ["data_demissao"]):
         docs_needed.add("trct")
+        docs_needed.add("termo_quitacao")    # 🆕 Data de Afastamento
     if "salario" in missing_fields:
         docs_needed.add("contracheque")
         docs_needed.add("trct")  # fallback para salário
+    if "cargo_funcao" in missing_fields:
+        docs_needed.add("termo_devolucao")   # 🆕 Campo Função
+        docs_needed.add("ficha_registro")    # 🆕 Campo Cargo
+        docs_needed.add("ctps")              # Cargo na CTPS
     
     if not docs_needed:
         return result, None
@@ -759,14 +792,21 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     # ===== PASSO 4: OCR SEQUENCIAL COM EARLY EXIT =====
     # Abre uma página, lê, achou os dados? PARA. Não achou? Próxima página.
     
-    # Ordenar páginas por prioridade: Contracheque > TRCT > CTPS
+    # 🆕 2025-12-05: Ordenar páginas por prioridade EXPANDIDA
+    # Prioridade: Termo Quitação > Termo Devolução > Contracheque > TRCT > CTPS > Ficha Registro
     ordered_pages = []
+    if doc_pages.get("termo_quitacao"):
+        ordered_pages.append(("termo_quitacao", doc_pages["termo_quitacao"]))
+    if doc_pages.get("termo_devolucao"):
+        ordered_pages.append(("termo_devolucao", doc_pages["termo_devolucao"]))
     if doc_pages.get("contracheque"):
         ordered_pages.append(("contracheque", doc_pages["contracheque"]))
     if doc_pages.get("trct"):
         ordered_pages.append(("trct", doc_pages["trct"]))
     if doc_pages.get("ctps"):
         ordered_pages.append(("ctps", doc_pages["ctps"]))
+    if doc_pages.get("ficha_registro"):
+        ordered_pages.append(("ficha_registro", doc_pages["ficha_registro"]))
     
     campos_faltantes = set(missing_fields)
     
@@ -882,11 +922,23 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                         logger.info(f"[OCR] ✅ PIS: {result['pis']}")
             
             if "ctps" in campos_faltantes:
-                m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_pagina, re.IGNORECASE)
-                if m:
-                    result["ctps"] = m.group(1)
-                    campos_faltantes.discard("ctps")
-                    logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
+                # 🆕 2025-12-05: Padrões ordenados por prioridade (específicos primeiro)
+                ctps_patterns = [
+                    # TERMO DE DEVOLUÇÃO: "RG/CTPS: 085227296" ou OCR "RGICTPS: |085227296"
+                    r'RG\s*/\s*CTPS\s*[:\s]*(\d{6,12})',
+                    r'RGICTPS\s*[:\s]*[\|\[\]]?(\d{6,12})',  # OCR lê "/" como "I"
+                    # TERMO DE QUITAÇÃO Campo 17
+                    r'17\s*CTPS[^\d]{0,20}(\d{6,12})',
+                    # Genérico com contexto
+                    r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,12})',
+                ]
+                for pattern in ctps_patterns:
+                    m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                    if m:
+                        result["ctps"] = m.group(1)
+                        campos_faltantes.discard("ctps")
+                        logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
+                        break
             
             if "serie_ctps" in campos_faltantes:
                 m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_pagina)
@@ -894,6 +946,34 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                     result["serie_ctps"] = m.group(1)
                     campos_faltantes.discard("serie_ctps")
                     logger.info(f"[OCR] ✅ Série CTPS: {result['serie_ctps']}")
+            
+            # 🆕 2025-12-05: Cargo/Função - TERMO DE DEVOLUÇÃO e outros documentos
+            if "cargo_funcao" in campos_faltantes:
+                cargo_patterns = [
+                    # TERMO DE DEVOLUÇÃO: "Função |MAQUINISTA DE TEATRO" ou "[Função |..."
+                    r'Fun[çc][ãa]o\s*[\|\[\]:]?\s*([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})(?:\n|Setor|Matr|$)',
+                    # TRCT Campo 22: "22 Cargo OPERADOR"
+                    r'22\s*(?:Cargo|Fun[çc][ãa]o)\s*([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})',
+                    # Ficha de registro: "Cargo/Função: OPERADOR"
+                    r'Cargo\s*/?\s*Fun[çc][ãa]o\s*[:\s]+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+                    # "Ocupação: OPERADOR"
+                    r'Ocupa[çc][ãa]o\s*[:\s]+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+                    # Genérico com pipe do OCR: "Função |OPERADOR"
+                    r'Fun[çc][ãa]o\s*[\|\[\]:]\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+                    r'Cargo\s*[\|\[\]:]\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+                ]
+                for pattern in cargo_patterns:
+                    m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                    if m:
+                        cargo = m.group(1).strip()
+                        # Limpar trailing de palavras desnecessárias e pipes
+                        cargo = re.sub(r'^[\|\[\]]+', '', cargo).strip()  # Remove pipes no início
+                        cargo = re.sub(r'\s+(Setor|Matr|de|da|do|e)$', '', cargo, flags=re.I).strip()
+                        if len(cargo) >= 3:
+                            result["cargo_funcao"] = cargo
+                            campos_faltantes.discard("cargo_funcao")
+                            logger.info(f"[OCR] ✅ Cargo/Função: {result['cargo_funcao']}")
+                            break
         
         if result:
             logger.info(f"[OCR] 🎯 Recuperados: {list(result.keys())}")

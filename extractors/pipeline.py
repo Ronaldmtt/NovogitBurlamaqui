@@ -589,6 +589,7 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
     if not data.get("ctps"): campos_ocr.append("ctps")
     if not data.get("data_admissao"): campos_ocr.append("data_admissao")
     if not data.get("data_demissao"): campos_ocr.append("data_demissao")
+    if not data.get("cargo_funcao"): campos_ocr.append("cargo_funcao")
     
     # Variável para armazenar tarefa OCR diferida (quando slots ocupados)
     deferred_ocr_task = None
