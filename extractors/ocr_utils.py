@@ -38,13 +38,13 @@ def _preprocess_image_for_ocr(img: Image.Image, doc_type: str = "generic") -> Im
     """
     Pré-processa imagem para melhorar velocidade e qualidade do OCR.
     
-    2025-12-05: Otimizações baseadas em boas práticas:
-    - Binarização (threshold) para remover ruídos
-    - Redimensionamento se muito grande
-    - Ajuste de contraste
+    2025-12-05: Otimizações balanceadas - performance vs qualidade:
+    - Upscale APENAS para imagens muito pequenas (<900px)
+    - Binarização simples e rápida (sem numpy para economizar tempo)
+    - Evita processamento desnecessário para documentos já legíveis
     
     Args:
-        img: Imagem PIL em modo L (grayscale)
+        img: Imagem PIL
         doc_type: Tipo de documento (trct, ctps, contracheque)
     
     Returns:
@@ -54,16 +54,24 @@ def _preprocess_image_for_ocr(img: Image.Image, doc_type: str = "generic") -> Im
     if img.mode != 'L':
         img = img.convert('L')
     
-    # 2. Redimensionar se muito grande (economiza tempo de OCR)
-    max_width = 1200  # Reduzido de ~1700 (150 DPI em A4)
+    # 2. Upscale SOMENTE para imagens muito pequenas (< 900px)
+    # Imagens de 100 DPI em A4 = ~827px, apenas essas precisam de upscale
+    min_width = 900
+    if img.width < min_width:
+        ratio = min_width / img.width
+        new_size = (int(img.width * ratio), int(img.height * ratio))
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
+    
+    # 3. Redimensionar se muito grande (economiza tempo de OCR)
+    max_width = 1400
     if img.width > max_width:
         ratio = max_width / img.width
         new_size = (int(img.width * ratio), int(img.height * ratio))
         img = img.resize(new_size, Image.Resampling.LANCZOS)
     
-    # 3. Binarização adaptativa usando threshold
-    # Converte para preto/branco puro, remove ruídos de fundo
-    threshold = 180  # Valor para documentos escaneados típicos
+    # 4. Binarização simples e rápida (threshold fixo para documentos típicos)
+    # Evita processamento numpy pesado para economizar tempo
+    threshold = 170  # Valor otimizado para documentos escaneados típicos
     img = img.point(lambda x: 255 if x > threshold else 0, mode='1')
     
     # Converter de volta para L para Tesseract
@@ -862,14 +870,14 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
             logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
             
             # 🆕 2025-12-05: EXTRAÇÃO COMBINADA TRCT
-            # Quando TRCT tem layout: "23 Remuneração...\n1.610,00 15/04/2024 05/06/2025 SJ2"
-            # Extrair TODOS os dados de uma vez quando estão na mesma linha
+            # Quando TRCT tem layout: "Z3 Remuneração...\n1.610,00 15/04/2024 [ 05/06/2025 SJ2"
+            # OCR pode ler "23" como "Z3" e adicionar pipes/colchetes
             if any(f in campos_faltantes for f in ["salario", "data_admissao", "data_demissao"]):
-                # Procurar linha após "23 Remuneração" com formato: SALARIO DATA DATA SJ2
+                # Procurar linha após "23/Z3 Remuneração" com formato: SALARIO DATA DATA SJ2
                 m = re.search(
-                    r'23\s*(?:Remunera|Rem)[^\n]*\n\s*'
-                    r'([\d]{1,3}[.,]\d{3}[,\.]\d{2}|[\d]{1,3}[,\.]\d{2})\s+'
-                    r'(\d{1,2}/\d{1,2}/\d{4})\s+'
+                    r'(?:23|Z3)\s*(?:Remunera|Rem)[^\n]*\n\s*'
+                    r'([\d]{1,3}[.,]\d{3}[,\.]\d{2}|[\d]{1,3}[,\.]\d{2})[\s\[\|]*'
+                    r'(\d{1,2}/\d{1,2}/\d{4})[\s\[\|]*'
                     r'(\d{1,2}/\d{1,2}/\d{4})',
                     texto_pagina, re.IGNORECASE
                 )
@@ -1003,16 +1011,16 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                             break
             
             if "ctps" in campos_faltantes:
-                # 🆕 2025-12-05: Padrões expandidos + flexíveis para OCR de baixa qualidade
+                # 🆕 2025-12-05: Padrões expandidos para CTPS 8-11 dígitos + tolerância OCR
                 ctps_patterns = [
                     # TRCT Campo 17: "17 CTPS... [0007236033, 000060, RJ"
-                    r'17\s*(?:CTPS|6168)[^\d]{0,30}(\d{7,12})',
-                    # TRCT OCR sujo: sequência de 10 dígitos após colchete ou pipe
-                    r'[\[\|]\s*(\d{10}),?\s*\d{5,6}',
-                    # Demonstrativo CBSI: "CTPS nº: 31822-5"
-                    r'CTPS\s*[nN][º°o]?\.?\s*[:\s]*(\d{5,12})',
-                    # CTPS Digital: "Carteira de trabalho 20761141RJ"
-                    r'[Cc]arteira\s*(?:de\s*)?[Tt]rabalho\s*[:\s]*(\d{6,12})',
+                    r'17\s*(?:CTPS|6168)[^\d]{0,30}(\d{8,11})',
+                    # TRCT OCR sujo: sequência de 8-11 dígitos após colchete ou pipe
+                    r'[\[\|]\s*(\d{8,11})[,\s]+\d{4,6}',
+                    # Demonstrativo CBSI: "CTPS nº: 31822-5" ou "CTPS nº: 20761141"
+                    r'CTPS\s*[nN][º°o]?\.?\s*[:\s]*(\d{5,11})',
+                    # CTPS Digital: "Carteira de trabalho 20761141RJ" (pode ter UF)
+                    r'[Cc]arteira\s*(?:de\s*)?[Tt]rabalho\s*[:\s]*(\d{6,11})',
                     # TERMO DE DEVOLUÇÃO: "RG/CTPS: 085227296"
                     r'RG\s*/\s*CTPS\s*[:\s]*(\d{6,12})',
                     r'RGICTPS\s*[:\s]*[\|\[\]]?(\d{6,12})',
