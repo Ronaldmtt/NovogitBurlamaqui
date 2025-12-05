@@ -985,11 +985,41 @@ def batch_start(id):
                                 item.updated_at = datetime.utcnow()
                                 logger.warning(f"[BATCH RPA] Item {item.id} sem process_id - marcado como erro")
                             else:
+                                # Calcular peso do processo baseado em campos preenchidos
+                                process = Process.query.get(item.process_id)
+                                data_weight = 0
+                                if process:
+                                    # Conta campos preenchidos que serão enviados ao eLaw
+                                    rpa_fields = [
+                                        'numero_processo', 'area_direito', 'estado', 'comarca',
+                                        'numero_orgao', 'orgao', 'celula', 'foro', 'instancia',
+                                        'assunto', 'cliente', 'posicao_parte_interessada',
+                                        'parte_interessada', 'parte_adversa_tipo', 'parte_adversa_nome',
+                                        'data_distribuicao', 'data_admissao', 'data_demissao',
+                                        'salario', 'cargo_funcao', 'pis', 'ctps', 'valor_causa',
+                                        'audiencia_inicial', 'link_audiencia', 'pedidos_json',
+                                        'outras_reclamadas_json'
+                                    ]
+                                    for field in rpa_fields:
+                                        val = getattr(process, field, None)
+                                        if val:
+                                            data_weight += 1
+                                            # Campos com muitos dados pesam mais
+                                            if field == 'pedidos_json' and len(str(val)) > 100:
+                                                data_weight += 2
+                                            if field == 'outras_reclamadas_json' and len(str(val)) > 50:
+                                                data_weight += 1
+                                
                                 items_data.append({
                                     'item_id': item.id,
-                                    'process_id': item.process_id
+                                    'process_id': item.process_id,
+                                    'data_weight': data_weight
                                 })
                         db.session.commit()
+                        
+                        # Ordenar por quantidade de dados (menor primeiro = mais rápido)
+                        items_data.sort(key=lambda x: x['data_weight'])
+                        logger.info(f"[BATCH RPA] Itens ordenados por peso de dados (menor→maior para RPA mais rápido)")
                         
                         success_count = 0
                         error_count = len(items) - len(items_data)  # Contar erros de itens sem process_id
@@ -1719,7 +1749,35 @@ def batch_rerpa(id):
         batch.status = 'ready'
         db.session.commit()
         
-        process_ids = [item.process_id for item in items_to_rerpa]
+        # Calcular peso de dados para ordenação (menor primeiro = mais rápido)
+        process_data = []
+        for item in items_to_rerpa:
+            process = Process.query.get(item.process_id)
+            data_weight = 0
+            if process:
+                rpa_fields = [
+                    'numero_processo', 'area_direito', 'estado', 'comarca',
+                    'numero_orgao', 'orgao', 'celula', 'foro', 'instancia',
+                    'assunto', 'cliente', 'posicao_parte_interessada',
+                    'parte_interessada', 'parte_adversa_tipo', 'parte_adversa_nome',
+                    'data_distribuicao', 'data_admissao', 'data_demissao',
+                    'salario', 'cargo_funcao', 'pis', 'ctps', 'valor_causa',
+                    'audiencia_inicial', 'link_audiencia', 'pedidos_json',
+                    'outras_reclamadas_json'
+                ]
+                for field in rpa_fields:
+                    val = getattr(process, field, None)
+                    if val:
+                        data_weight += 1
+                        if field == 'pedidos_json' and len(str(val)) > 100:
+                            data_weight += 2
+                        if field == 'outras_reclamadas_json' and len(str(val)) > 50:
+                            data_weight += 1
+            process_data.append({'process_id': item.process_id, 'weight': data_weight})
+        
+        process_data.sort(key=lambda x: x['weight'])
+        process_ids = [p['process_id'] for p in process_data]
+        logger.info(f"[RERPA] Processos ordenados por peso de dados (menor→maior)")
         
         def execute_rerpa_background():
             with flask_app_main.app_context():
@@ -1734,7 +1792,7 @@ def batch_rerpa(id):
                     batch_reload.started_at = datetime.utcnow()
                     db.session.commit()
                     
-                    logger.info(f"[RERPA] Iniciando RPA paralelo para {len(process_ids)} processos")
+                    logger.info(f"[RERPA] Iniciando RPA para {len(process_ids)} processos (ordenados por peso)")
                     
                     success_count = 0
                     error_count = 0

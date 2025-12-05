@@ -60,6 +60,11 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - Query ordena por `file_size ASC` (menor primeiro, NULL por último)
     - Benefício visual: mais itens concluídos rapidamente no início, sensação de progresso mais rápido
     - Log mostra ordenação: "itens pendentes ordenados por tamanho (menor→maior)"
+*   **Ordenação RPA por Peso de Dados (2025-12-05):** RPA processa primeiro os processos com menos dados a preencher:
+    - Calcula "peso" baseado em quantidade de campos preenchidos (menos campos = mais rápido)
+    - Campos com muitos dados (pedidos, reclamadas) têm peso extra
+    - Processos simples completam primeiro, dando sensação de progresso mais rápido
+    - Aplicado tanto ao batch_start quanto ao reprocessamento seletivo (rerpa)
 *   **Reprocessamento Seletivo (2025-12-05):** Interface para selecionar e reprocessar PDFs específicos de um batch:
     - Checkbox em cada item da tabela para seleção individual
     - "Selecionar Todos" no header para toggle de seleção em massa
