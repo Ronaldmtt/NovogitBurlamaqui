@@ -24,9 +24,16 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - `extract_pdf_bookmarks()`: Extrai mapeamento dos bookmarks (CTPS→pág.19, TRCT→pág.21, Contracheque→pág.29)
     - Identifica quais DOCUMENTOS são necessários (não campos): CTPS, TRCT ou Contracheque
     - OCR 1x por documento → extrai TODOS os campos daquele documento em uma passada
-    - Fallback hierárquico: Bookmarks → Sumário textual → Heurística de páginas escaneadas
+    - Fallback hierárquico: Bookmarks → Sumário textual → Inferência Histórica → Heurística limitada
     - Economia de ~90 segundos por PDF (2 páginas ao invés de 5)
     - Tesseract instalado com português para extração
+*   **Inteligência de Localização de Anexos (2025-12-05):** Sistema de aprendizado que mapeia onde documentos (CTPS, TRCT, Contracheque) aparecem em PDFs processados:
+    - Tabela `AnnexLocation`: Armazena page_number, page_ratio, doc_type, confidence para cada documento encontrado
+    - `infer_annex_pages_from_history()`: Consulta estatísticas históricas por faixa de tamanho do PDF
+    - Padrões default quando sem histórico: CTPS ~82%, TRCT ~87%, Contracheque ~77% do total de páginas
+    - Prioridade 2.5 no pipeline OCR (entre TOC e heurística)
+    - Script de backfill: `python scripts/backfill_annex_locations.py`
+*   **Suporte a PDFs Grandes (2025-12-05):** Limite de upload aumentado de 16MB para 100MB por arquivo. Limite total de request 2GB para suportar batches grandes.
 *   **Política ZERO ERRORS (2025-12-01):** Funções de extração NUNCA fabricam dados. parse_date_extenso() rejeita datas só com mês/ano (não assume dia=01). extract_data_hora_audiencia() só retorna hora com minutos explícitos (não fabrica :00). extract_data_distribuicao() removido fallback perigoso de "primeira data no cabeçalho".
 *   **Extração por Zonas Ampliada (2025-12-01):** Pipeline agora extrai 35 páginas iniciais (antes 15) para capturar seção DOS PEDIDOS que normalmente fica entre páginas 15-35 após fundamentação jurídica. Últimas 15 páginas mantidas para TRCT/dados trabalhistas.
 *   **RPA Automation (eLaw Integration):** Headless RPA execution using Playwright for external system interaction, providing real-time, step-by-step progress tracking with field-by-field updates. It captures screenshots for verification, features robust status management, history logging, and graceful error handling. The system prioritizes database values over PDF extraction for critical fields and automatically registers first hearings. Supports parallel execution of RPA processes with isolated browser instances. Handles multiple defendants from PDF extraction to eLaw population.
