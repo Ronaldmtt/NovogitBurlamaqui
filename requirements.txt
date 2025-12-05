@@ -40,3 +40,4 @@ urllib3
 werkzeug
 wtforms
 numpy
+opencv-python-headless

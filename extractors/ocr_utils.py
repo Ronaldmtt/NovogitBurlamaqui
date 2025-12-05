@@ -3,11 +3,11 @@
 Módulo OCR para extração de PDFs escaneados usando Tesseract.
 Aplica OCR seletivo apenas quando texto nativo é insuficiente.
 
-2025-12-05: Sistema de Fila OCR Assíncrona
+2025-12-05: Sistema de Fila OCR Assíncrona + Pré-processamento Avançado OpenCV
 - Se não conseguir slot OCR imediato, adiciona à fila e retorna
 - Worker de background processa a fila quando slots liberarem
 - Atualiza os processos no banco quando OCR completar
-- Isso acelera a extração geral pois outros processos não ficam esperando
+- Pré-processamento agressivo com OpenCV para imagens de baixa qualidade
 """
 import logging
 import os
@@ -18,6 +18,8 @@ from typing import Optional, Dict, List, Tuple, Callable, Any
 from pdf2image import convert_from_path
 import pytesseract
 from PIL import Image
+import numpy as np
+import cv2
 
 # Semáforo global para limitar OCRs simultâneos (evita sobrecarga do sistema)
 # 2025-12-05: Reduzido de ilimitado para 2 simultâneos após travamentos com 5 workers
@@ -34,50 +36,77 @@ OCR_WORKER_RUNNING = False
 OCR_WORKER_THREAD: Optional[threading.Thread] = None
 OCR_WORKER_LOCK = threading.Lock()
 
-def _preprocess_image_for_ocr(img: Image.Image, doc_type: str = "generic") -> Image.Image:
+def _preprocess_image_for_ocr(img: Image.Image, doc_type: str = "generic", aggressive: bool = False) -> Image.Image:
     """
-    Pré-processa imagem para melhorar velocidade e qualidade do OCR.
+    Pré-processa imagem com OpenCV para melhorar OCR em documentos de baixa qualidade.
     
-    2025-12-05: Otimizações balanceadas - performance vs qualidade:
-    - Upscale APENAS para imagens muito pequenas (<900px)
-    - Binarização simples e rápida (sem numpy para economizar tempo)
-    - Evita processamento desnecessário para documentos já legíveis
+    2025-12-05: Pipeline OTIMIZADO para velocidade + qualidade:
+    - Modo padrão: Rápido (CLAHE + Otsu) ~1-2s
+    - Modo agressivo: Completo (Denoising + Sombras) ~5-8s
     
     Args:
         img: Imagem PIL
         doc_type: Tipo de documento (trct, ctps, contracheque)
+        aggressive: Se True, aplica denoising pesado (usar só quando básico falhar)
     
     Returns:
         Imagem pré-processada
     """
-    # 1. Garantir grayscale
-    if img.mode != 'L':
-        img = img.convert('L')
+    logger = logging.getLogger(__name__)
     
-    # 2. Upscale SOMENTE para imagens muito pequenas (< 900px)
-    # Imagens de 100 DPI em A4 = ~827px, apenas essas precisam de upscale
-    min_width = 900
-    if img.width < min_width:
-        ratio = min_width / img.width
-        new_size = (int(img.width * ratio), int(img.height * ratio))
-        img = img.resize(new_size, Image.Resampling.LANCZOS)
-    
-    # 3. Redimensionar se muito grande (economiza tempo de OCR)
-    max_width = 1400
-    if img.width > max_width:
-        ratio = max_width / img.width
-        new_size = (int(img.width * ratio), int(img.height * ratio))
-        img = img.resize(new_size, Image.Resampling.LANCZOS)
-    
-    # 4. Binarização simples e rápida (threshold fixo para documentos típicos)
-    # Evita processamento numpy pesado para economizar tempo
-    threshold = 170  # Valor otimizado para documentos escaneados típicos
-    img = img.point(lambda x: 255 if x > threshold else 0, mode='1')
-    
-    # Converter de volta para L para Tesseract
-    img = img.convert('L')
-    
-    return img
+    try:
+        # Converter PIL para OpenCV (numpy array)
+        if img.mode == 'RGB':
+            cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
+        elif img.mode == 'RGBA':
+            cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2GRAY)
+        elif img.mode == 'L':
+            cv_img = np.array(img)
+        else:
+            cv_img = np.array(img.convert('L'))
+        
+        height, width = cv_img.shape[:2]
+        
+        # 1. RESCALE - Mínimo 1000px para OCR legível
+        min_width = 1000
+        if width < min_width:
+            scale = min_width / width
+            cv_img = cv2.resize(cv_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        
+        # 2. Limitar tamanho máximo (economizar tempo)
+        max_width = 1600
+        if cv_img.shape[1] > max_width:
+            scale = max_width / cv_img.shape[1]
+            cv_img = cv2.resize(cv_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        
+        # 3. CLAHE - Sempre aplicar (rápido e eficaz)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        cv_img = clahe.apply(cv_img)
+        
+        if aggressive:
+            # 4. DENOISING - Só quando necessário (lento)
+            cv_img = cv2.fastNlMeansDenoising(cv_img, None, h=10, templateWindowSize=7, searchWindowSize=15)
+            
+            # 5. REMOÇÃO DE SOMBRAS - Kernel menor para velocidade
+            blurred = cv2.GaussianBlur(cv_img, (51, 51), 0)
+            cv_img = cv2.divide(cv_img, blurred, scale=255)
+        
+        # 6. BINARIZAÇÃO OTSU - Threshold automático
+        _, cv_img = cv2.threshold(cv_img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # 7. MORFOLOGIA LEVE - Fecha pequenas lacunas
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+        cv_img = cv2.morphologyEx(cv_img, cv2.MORPH_CLOSE, kernel)
+        
+        # Converter de volta para PIL
+        return Image.fromarray(cv_img)
+        
+    except Exception as e:
+        logger.warning(f"[OCR] Fallback para pré-processamento básico: {e}")
+        # Fallback para método simples se OpenCV falhar
+        if img.mode != 'L':
+            img = img.convert('L')
+        return img.point(lambda x: 255 if x > 170 else 0, mode='1').convert('L')
 
 
 def _get_psm_for_doc_type(doc_type: str) -> str:
