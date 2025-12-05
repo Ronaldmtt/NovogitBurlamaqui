@@ -39,6 +39,15 @@ sqlalchemy
 urllib3
 werkzeug
 wtforms
+
+# === OCR & Image Processing ===
 numpy
 opencv-python-headless
 easyocr
+pdf2image
+pytesseract
+Pillow
+
+# === Deep Learning (EasyOCR dependency) ===
+torch
+torchvision
