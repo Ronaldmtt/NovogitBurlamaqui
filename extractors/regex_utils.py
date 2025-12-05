@@ -2102,6 +2102,9 @@ def extract_data_demissao(text: str) -> str | None:
     
     # ===== PRIORIDADE 1: TRCT/CTPS (alta confiança) =====
     trct_patterns = [
+        # 🆕 2025-12-05: TERMO DE QUITAÇÃO - Campo "26 Data de Afastamento"
+        r'26\s*Data\s*de\s*Afastamento\s*(\d{2}[/.\-]\d{2}[/.\-]\d{4})',
+        r'Data\s*de\s*Afastamento\s*(\d{2}[/.\-]\d{2}[/.\-]\d{4})',
         r'data\s+de\s+(?:demiss[aã]o|dispensa|desligamento)\s*[:\s]+(\d{2}[/.\-]\d{2}[/.\-]\d{4})',
         r'(?:demiss[aã]o|dispensa|desligamento|sa[íi]da)\s*[:\s]+(\d{2}[/.\-]\d{2}[/.\-]\d{4})',
         r'data\s+de\s+sa[íi]da\s*[:\s]+(\d{2}[/.\-]\d{2}[/.\-]\d{4})',
@@ -2561,6 +2564,9 @@ def extract_pis(text: str) -> str | None:
     UNIVERSAL_PIS = r'(\d{2,3}[\.\s\-]*\d{3,5}[\.\s\-]*\d{2,5}[\.\s\-]*\d{1,2})'
     
     patterns = [
+        # 🆕 2025-12-05: TERMO DE QUITAÇÃO - Campo "10 PIS/PASEP" seguido de 11 dígitos
+        # Formato: "10 PIS/PASEP\n13222525543" (número pode estar colado com "11 Nome")
+        r'10\s*PIS[/\s]*PASEP\s*(\d{11})',
         # 🆕 PIS-PASEP com hífen
         r'(?:pis[-\s]*pasep|pis/pasep)\s*[:\-]?\s*' + UNIVERSAL_PIS,
         # 🆕 NIT (Número de Identificação do Trabalhador)
@@ -2639,6 +2645,9 @@ def extract_ctps(text: str) -> str | None:
     
     # PADRÕES COM NÚMERO (prioritários - tentar todos primeiro)
     patterns_with_number = [
+        # 🆕 2025-12-05: TERMO DE QUITAÇÃO - Campo "17 CTPS (nº, série, UF)"
+        # Formato: "0000525234,003730,RJ" ou "0007899570.001234,PA"
+        r'17\s*CTPS[^\d]{0,30}(\d{7,})[.,](\d+)[.,]?([A-Z]{2})',
         # Formato COMPACTO: "CTPS sob nº 0048610 -00080/RJ" (PyPDF2 adiciona espaços)
         r'(?:portador\s+da\s+)?CTPS\s+(?:sob\s+)?(\d+[\s\-]+\d+[/][A-Z]{2})',
         # 🆕 Formato com série: "CTPS nº 1210996, série 2780/RJ" ou "CTPS 1210996, série 2780/MA"
