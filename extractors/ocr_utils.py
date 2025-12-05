@@ -191,18 +191,36 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
                         pass
         
         if "data_admissao" in campos_faltantes:
-            m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
-            if m:
-                result["data_admissao"] = m.group(1)
-                campos_faltantes.discard("data_admissao")
-                logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Data Admissão: {result['data_admissao']}")
+            # Padrões tradicionais
+            admissao_patterns = [
+                r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                # CTPS Digital: "Contratos de trabalho 15/04/2024 - 05/06/2025" (primeira data)
+                r'[Cc]ontratos?\s*(?:de\s*)?trabalho\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\s*[-–]\s*\d',
+            ]
+            for pattern in admissao_patterns:
+                m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                if m:
+                    result["data_admissao"] = m.group(1)
+                    campos_faltantes.discard("data_admissao")
+                    logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Data Admissão: {result['data_admissao']}")
+                    break
         
         if "data_demissao" in campos_faltantes:
-            m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
-            if m:
-                result["data_demissao"] = m.group(1)
-                campos_faltantes.discard("data_demissao")
-                logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Data Demissão: {result['data_demissao']}")
+            # Padrões tradicionais + CTPS Digital
+            demissao_patterns = [
+                r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                # CTPS Digital: "Contratos de trabalho 15/04/2024 - 05/06/2025" (segunda data)
+                r'[Cc]ontratos?\s*(?:de\s*)?trabalho\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\s*[-–]\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                # "projeção do aviso prévio indenizado 08/07/2025"
+                r'(?:proje[çc][ãa]o\s*(?:do\s*)?aviso\s*pr[ée]vio)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+            ]
+            for pattern in demissao_patterns:
+                m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                if m:
+                    result["data_demissao"] = m.group(1)
+                    campos_faltantes.discard("data_demissao")
+                    logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Data Demissão: {result['data_demissao']}")
+                    break
         
         if "pis" in campos_faltantes:
             m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
@@ -823,18 +841,36 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                             pass
             
             if "data_admissao" in campos_faltantes:
-                m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
-                if m:
-                    result["data_admissao"] = m.group(1)
-                    campos_faltantes.discard("data_admissao")
-                    logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
+                # Padrões tradicionais + CTPS Digital
+                admissao_patterns = [
+                    r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # CTPS Digital: "Contratos de trabalho 15/04/2024 - 05/06/2025"
+                    r'[Cc]ontratos?\s*(?:de\s*)?trabalho\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\s*[-–]\s*\d',
+                ]
+                for pattern in admissao_patterns:
+                    m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                    if m:
+                        result["data_admissao"] = m.group(1)
+                        campos_faltantes.discard("data_admissao")
+                        logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
+                        break
             
             if "data_demissao" in campos_faltantes:
-                m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
-                if m:
-                    result["data_demissao"] = m.group(1)
-                    campos_faltantes.discard("data_demissao")
-                    logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
+                # Padrões tradicionais + CTPS Digital
+                demissao_patterns = [
+                    r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # CTPS Digital: "Contratos de trabalho 15/04/2024 - 05/06/2025"
+                    r'[Cc]ontratos?\s*(?:de\s*)?trabalho\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\s*[-–]\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # "projeção do aviso prévio indenizado 08/07/2025"
+                    r'(?:proje[çc][ãa]o\s*(?:do\s*)?aviso\s*pr[ée]vio)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                ]
+                for pattern in demissao_patterns:
+                    m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                    if m:
+                        result["data_demissao"] = m.group(1)
+                        campos_faltantes.discard("data_demissao")
+                        logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
+                        break
             
             if "pis" in campos_faltantes:
                 m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
