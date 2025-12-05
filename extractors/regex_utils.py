@@ -2373,26 +2373,79 @@ def extract_cargo_funcao(text: str) -> str | None:
     # Abordagem GREEDY: capturar o máximo possível e depois limpar no pós-processamento
     # Isso evita problemas com cargos longos como "Técnico em Segurança do Trabalho"
     
+    # 🆕 2025-12-05: PADRÕES EXPANDIDOS para cobrir TODOS os formatos de documentos
     patterns = [
-        # 🆕 2025-12-05: TERMO DE DEVOLUÇÃO - Campo "Função" seguido de valor
-        # Formato: "Função    MAQUINISTA DE TEATRO" (com espaços/tabs)
-        r'Fun[çc][ãa]o\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,40})(?:\n|Setor|$)',
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 TRCT / TERMO DE QUITAÇÃO - Campo 22: Cargo/Função
+        # ═══════════════════════════════════════════════════════════════
+        # "22 Cargo" seguido de texto em maiúsculo
+        r'22\s*(?:Cargo|Fun[çc][ãa]o)\s*([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})',
         
-        # PRIORIDADE 1: Padrões específicos de contratação (case sensitive para cargos em maiúsculo)
-        # Captura até 60 caracteres greedy, depois limpa
-        r'para\s+exercer\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,60})',
-        r'o\s+cargo\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,60})',
-        r'exercendo\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,60})',
-        r'exercia\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,60})',
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 TERMO DE DEVOLUÇÃO (Uniforme/EPI)
+        # ═══════════════════════════════════════════════════════════════
+        # "Função    MAQUINISTA DE TEATRO" (com espaços/tabs)
+        r'Fun[çc][ãa]o\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})(?:\n|Setor|Matr|$)',
         
-        # PRIORIDADE 2: Padrões de narrativa (case insensitive) - GREEDY
-        r'fun[cç][aã]o\s+de\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s]{3,60})',
-        r'cargo\s+de\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s]{3,60})',
-        r'contratad[oa]\s+como\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s]{3,60})',
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FICHA DE REGISTRO / CONTRACHEQUE / ASO
+        # ═══════════════════════════════════════════════════════════════
+        # "Cargo/Função: OPERADOR" (formato tabela)
+        r'Cargo\s*/\s*Fun[çc][ãa]o\s*[:\s]+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+        # "Função/Cargo: OPERADOR"
+        r'Fun[çc][ãa]o\s*/\s*Cargo\s*[:\s]+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+        # "Ocupação: OPERADOR"
+        r'Ocupa[çc][ãa]o\s*[:\s]+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+        # "CBO/Ocupação: 411005 - AUXILIAR DE ESCRITÓRIO"
+        r'CBO\s*/?\s*Ocupa[çc][ãa]o[^\d]*\d+\s*[-–]\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,40})',
+        # "Atividade: OPERADOR"
+        r'Atividade\s*[:\s]+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})',
         
-        # PRIORIDADE 3: Tabelas TRCT/CTPS
-        r'fun[cç][aã]o\s*:\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s]{3,60})',
-        r'cargo\s*:\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s]{3,60})',
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 CTPS FÍSICA (páginas de contrato)
+        # ═══════════════════════════════════════════════════════════════
+        # "Função.....OPERADOR" (com pontos)
+        r'Fun[çc][ãa]o\.+\s*([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})',
+        # "Cargo.....OPERADOR"
+        r'Cargo\.+\s*([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,40})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 PETIÇÕES / NARRATIVAS
+        # ═══════════════════════════════════════════════════════════════
+        # "para exercer a função de OPERADOR"
+        r'para\s+exercer\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "admitido para o cargo de OPERADOR"
+        r'(?:admitid[oa]|contratad[oa])\s+para\s+o\s+cargo\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "o cargo de OPERADOR"
+        r'o\s+cargo\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "exercendo a função de OPERADOR"
+        r'exercendo\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "exercia a função de OPERADOR"
+        r'exercia\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "ocupava o cargo de OPERADOR"
+        r'ocupava\s+o\s+cargo\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "trabalhava como OPERADOR"
+        r'trabalhava\s+como\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        # "atuava como OPERADOR"
+        r'atuava\s+como\s+([A-ZÀ-Ú][A-ZÀ-Ú\s/\-]{3,60})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FORMATOS GENÉRICOS (case insensitive)
+        # ═══════════════════════════════════════════════════════════════
+        # "função de operador"
+        r'fun[cç][aã]o\s+de\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,60})',
+        # "cargo de operador"
+        r'cargo\s+de\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,60})',
+        # "contratado como operador"
+        r'contratad[oa]\s+como\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,60})',
+        # "admitido como operador"
+        r'admitid[oa]\s+como\s+([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,60})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 TABELAS (com dois pontos)
+        # ═══════════════════════════════════════════════════════════════
+        r'fun[cç][aã]o\s*:\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,60})',
+        r'cargo\s*:\s*([A-Za-zÀ-ú][A-Za-zÀ-ú\s/\-]{3,60})',
     ]
     
     def limpar_cargo(funcao: str) -> str | None:
@@ -2567,28 +2620,74 @@ def extract_pis(text: str) -> str | None:
     # Ex: 204.05911.17.8, 204.05911.17-8, 124.13653.63-7, 161.94839.72-5
     UNIVERSAL_PIS = r'(\d{2,3}[\.\s\-]*\d{3,5}[\.\s\-]*\d{2,5}[\.\s\-]*\d{1,2})'
     
+    # 🆕 2025-12-05: PADRÕES EXPANDIDOS para cobrir TODOS os formatos de documentos
     patterns = [
-        # 🆕 2025-12-05: TERMO DE QUITAÇÃO - Campo "10 PIS/PASEP" seguido de 11 dígitos
-        # Formato: "10 PIS/PASEP\n13222525543" (número pode estar colado com "11 Nome")
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 TRCT / TERMO DE QUITAÇÃO - Campo 10: PIS/PASEP
+        # ═══════════════════════════════════════════════════════════════
+        # "10 PIS/PASEP\n13222525543"
         r'10\s*PIS[/\s]*PASEP\s*(\d{11})',
-        # 🆕 PIS-PASEP com hífen
-        r'(?:pis[-\s]*pasep|pis/pasep)\s*[:\-]?\s*' + UNIVERSAL_PIS,
-        # 🆕 NIT (Número de Identificação do Trabalhador)
-        r'(?:^|[\s:])nit\s*[:\-]?\s*' + UNIVERSAL_PIS,
-        r'(?:^|[\s:])nit\s*[:\-]?\s*(\d{11})\b',
-        # 🆕 NIS (Número de Identificação Social)
-        r'(?:^|[\s:])nis\s*[:\-]?\s*' + UNIVERSAL_PIS,
-        r'(?:^|[\s:])nis\s*[:\-]?\s*(\d{11})\b',
-        # 🆕 "inscrito no PIS sob o número..."
-        r'inscrit[oa]\s+no\s+pis\s*(?:/pasep)?\s*(?:sob\s+o?\s*)?(?:n[úu]mero\s+)?' + UNIVERSAL_PIS,
-        # Genérico: qualquer combinação de 11 dígitos com separadores (mais flexível)
-        r'(?:^|[\s:,])pis\s*[:\-]?\s*' + UNIVERSAL_PIS,
-        # "cadastrado no pis sob o 164.295.786-75" (aceita espaços extras)
-        r'cadastrad\s*o\s+no\s+pis\s*(?:sob\s+o?\s*)?\s*' + UNIVERSAL_PIS,
-        # "pis 12345678901" (sem separadores)
-        r'(?:^|[\s:])pis\s*[:\-]?\s*(\d{11})\b',
-        # 🆕 "portador do PIS 123..."
-        r'portador[a]?\s+(?:do|da)\s+pis\s*(?:/pasep)?\s*' + UNIVERSAL_PIS,
+        # "10 PIS/PASEP 132.22525.54-3"
+        r'10\s*PIS[/\s]*PASEP\s*' + UNIVERSAL_PIS,
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FICHA DE REGISTRO / DECLARAÇÕES
+        # ═══════════════════════════════════════════════════════════════
+        # "Nº PIS: 12345678901" ou "N° PIS/PASEP: 123..."
+        r'N[º°]?\s*PIS\s*(?:/\s*PASEP)?\s*[:\s]*' + UNIVERSAL_PIS,
+        r'N[º°]?\s*PIS\s*(?:/\s*PASEP)?\s*[:\s]*(\d{11})',
+        # "PIS/PASEP: 123.45678.90-1"
+        r'PIS\s*/\s*PASEP\s*[:\s]*' + UNIVERSAL_PIS,
+        # "PASEP/PIS: 123..."
+        r'PASEP\s*/\s*PIS\s*[:\s]*' + UNIVERSAL_PIS,
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 GUIA FGTS / GRRF
+        # ═══════════════════════════════════════════════════════════════
+        # "PIS-PASEP" com hífen
+        r'PIS[-–]\s*PASEP\s*[:\-]?\s*' + UNIVERSAL_PIS,
+        # "PIS/PASEP/NIT" (múltiplas siglas)
+        r'(?:PIS\s*/?\s*PASEP\s*/?\s*NIT|NIT\s*/?\s*PIS)\s*[:\s]*' + UNIVERSAL_PIS,
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 NIT / NIS (outros identificadores sociais)
+        # ═══════════════════════════════════════════════════════════════
+        # "NIT: 12345678901"
+        r'(?:^|[\s:])NIT\s*[:\-]?\s*' + UNIVERSAL_PIS,
+        r'(?:^|[\s:])NIT\s*[:\-]?\s*(\d{11})\b',
+        # "NIS: 12345678901"
+        r'(?:^|[\s:])NIS\s*[:\-]?\s*' + UNIVERSAL_PIS,
+        r'(?:^|[\s:])NIS\s*[:\-]?\s*(\d{11})\b',
+        # "Nº NIT/NIS: 123..."
+        r'N[º°]?\s*(?:NIT|NIS)\s*[:\s]*' + UNIVERSAL_PIS,
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 PETIÇÕES / NARRATIVAS
+        # ═══════════════════════════════════════════════════════════════
+        # "inscrito no PIS sob o número..."
+        r'inscrit[oa]\s+no\s+PIS\s*(?:/\s*PASEP)?\s*(?:sob\s+o?\s*)?(?:n[úu]mero\s+)?' + UNIVERSAL_PIS,
+        # "cadastrado no PIS sob o nº 164.295.786-75"
+        r'cadastrad\s*[oa]\s+no\s+PIS\s*(?:sob\s+o?\s*)?\s*' + UNIVERSAL_PIS,
+        # "portador do PIS 123..."
+        r'portador(?:a)?\s+d[oa]\s+PIS\s*(?:/\s*PASEP)?\s*' + UNIVERSAL_PIS,
+        # "PIS nº 123..."
+        r'PIS\s+n[º°]\s*' + UNIVERSAL_PIS,
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FORMATOS GENÉRICOS
+        # ═══════════════════════════════════════════════════════════════
+        # "PIS: 123.45678.90-1"
+        r'(?:^|[\s:,])PIS\s*[:\-]?\s*' + UNIVERSAL_PIS,
+        # "PIS 12345678901" (sem separadores)
+        r'(?:^|[\s:])PIS\s*[:\-]?\s*(\d{11})\b',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FORMATOS OCR (com erros de leitura)
+        # ═══════════════════════════════════════════════════════════════
+        # "P I S" com espaços
+        r'P\s*I\s*S\s*[:\s]*' + UNIVERSAL_PIS,
+        # "PIS/PASEP" junto sem espaços
+        r'PISPASEP\s*[:\s]*' + UNIVERSAL_PIS,
     ]
     
     for i, pattern in enumerate(patterns):
@@ -2648,33 +2747,76 @@ def extract_ctps(text: str) -> str | None:
     text_norm = re.sub(r'\s+', ' ', text_norm)
     
     # PADRÕES COM NÚMERO (prioritários - tentar todos primeiro)
+    # 🆕 2025-12-05: Expandido para cobrir TODOS os formatos de documentos trabalhistas
     patterns_with_number = [
-        # 🆕 2025-12-05: TERMO DE QUITAÇÃO - Campo "17 CTPS (nº, série, UF)"
-        # Formato: "0000525234,003730,RJ" ou "0007899570.001234,PA"
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 TRCT / TERMO DE QUITAÇÃO - Campos numerados
+        # ═══════════════════════════════════════════════════════════════
+        # Campo 17: "17 CTPS (nº, série, UF)" → "0000525234,003730,RJ"
         r'17\s*CTPS[^\d]{0,30}(\d{7,})[.,](\d+)[.,]?([A-Z]{2})',
-        # 🆕 2025-12-05: TERMO DE DEVOLUÇÃO - Campo "RG/CTPS: 085227296"
-        r'RG/CTPS[:\s]*(\d{6,})',
-        # Formato COMPACTO: "CTPS sob nº 0048610 -00080/RJ" (PyPDF2 adiciona espaços)
-        r'(?:portador\s+da\s+)?CTPS\s+(?:sob\s+)?(\d+[\s\-]+\d+[/][A-Z]{2})',
-        # 🆕 Formato com série: "CTPS nº 1210996, série 2780/RJ" ou "CTPS 1210996, série 2780/MA"
+        # Campo 17 alternativo: apenas número e série separados por espaço/vírgula
+        r'17\s*(?:CTPS|Carteira)[^\d]{0,20}(\d{6,})\s*[,.\s]\s*(\d{3,6})\s*[,/.\s]?\s*([A-Z]{2})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 TERMO DE DEVOLUÇÃO (Uniforme/EPI)
+        # ═══════════════════════════════════════════════════════════════
+        # "RG/CTPS: 085227296" ou "RG/CTPS 085227296"
+        r'RG\s*/\s*CTPS\s*[:\s]*(\d{6,})',
+        # "CTPS/RG: 085227296"
+        r'CTPS\s*/\s*RG\s*[:\s]*(\d{6,})',
+        # "Nº CTPS: 085227296" (tabela)
+        r'N[º°]?\s*CTPS\s*[:\s]*(\d{6,})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FICHA DE REGISTRO / ASO / DECLARAÇÕES
+        # ═══════════════════════════════════════════════════════════════
+        # "Carteira de Trabalho: 1234567 série 001/RJ"
+        r'Carteira\s+de\s+Trabalho\s*[:\s]*(\d{6,})\s*(?:,?\s*s[ée]rie\s+)?(\d{3,6})?\s*[/-]?\s*([A-Z]{2})?',
+        # "CTPS/Série: 1234567/00123/RJ"
+        r'CTPS\s*/\s*S[ée]rie\s*[:\s]*(\d{6,})\s*[/,]\s*(\d{3,6})\s*[/-]?\s*([A-Z]{2})',
+        # "Nº Carteira: 1234567" (contracheque/holerite)
+        r'N[º°]?\s*Carteira\s*[:\s]*(\d{6,})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 PETIÇÕES / NARRATIVAS
+        # ═══════════════════════════════════════════════════════════════
+        # "portador(a) da CTPS nº 1234567"
+        r'portador(?:a)?\s+d[ao]\s+CTPS\s*(?:n[º°]?\s*)?(\d+[\s\-]+\d+[/][A-Z]{2})',
+        r'portador(?:a)?\s+d[ao]\s+CTPS\s*(?:n[º°]?\s*)?(\d{5,})',
+        # "inscrito na CTPS sob nº 0048610-00080/RJ"
+        r'inscrit[oa]\s+n[ao]\s+CTPS\s+(?:sob\s+)?(?:n[º°]?\s*)?(\d+[\s\-]+\d+[/][A-Z]{2})',
+        # "com CTPS registrada sob nº"
+        r'CTPS\s+registrada\s+sob\s+(?:n[º°]?\s*)?(\d{5,})',
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FORMATOS CLÁSSICOS
+        # ═══════════════════════════════════════════════════════════════
+        # Formato COMPACTO: "CTPS sob nº 0048610 -00080/RJ"
+        r'CTPS\s+(?:sob\s+)?(\d+[\s\-]+\d+[/][A-Z]{2})',
+        # "CTPS nº 1210996, série 2780/RJ" ou "CTPS 1210996, série 2780/MA"
         r'CTPS\s*(\d+)\s*,?\s*s[ée]rie\s+(\d+)\s*/?\s*([A-Z]{2})',
-        # Formato SEPARADO com vírgula: "CTPS nº 1210996, série 149/RJ"
+        # Formato SEPARADO: "CTPS nº 1210996, série 149/RJ"
         r'CTPS\s*(\d+)\s*,?\s*s[ée]rie\s+(\d+[-/][A-Z]{2})',
-        # 🆕 Formato série com hífen: "936665 série 00014-PB"
+        # Formato série com hífen: "936665 série 00014-PB"
         r'CTPS\s*(\d+)\s*,?\s*s[ée]rie\s+(\d+[-]\s*[A-Z]{2})',
-        # Formato apenas série: "série 149/RJ" ou "serie 00014-PB"
+        # Formato apenas série: "série 149/RJ"
         r'CTPS\s*(\d+)\s*,?\s*s[ée]rie\s+([\dA-Z\-/]+)',
-        # Formato COMPACTO genérico: "CTPS 98765-00123/SP"
+        # Formato COMPACTO: "CTPS 98765-00123/SP"
         r'CTPS\s*(\d+[-/]\d+[-/][A-Z]{2})',
-        # Apenas número com contexto: "portador da CTPS 123456" ou "CTPS 123456"
-        # ⚠️ IMPORTANTE: Não capturar "CTPS DIGITAL" como número
+        # "CTPS 123456" (número isolado)
         r'(?:portador\s+da\s+)?CTPS\s+(?!DIGITAL)(\d{5,})',
-        # 🆕 Formato sem prefixo CTPS: "número série" perto de contexto Carteira
+        # Contexto Carteira de Trabalho
         r'(?:Carteira\s+de\s+Trabalho|CTPS)[^\d]*(\d{5,8})\s*(?:s[ée]rie\s+)?(\d{3,6}[-/]?[A-Z]{0,2})',
-        # 🆕 Formato com parêntese colado: "CTPS)1173470" ou "CTPS )1173470"
+        
+        # ═══════════════════════════════════════════════════════════════
+        # 📋 FORMATOS OCR (com erros de leitura)
+        # ═══════════════════════════════════════════════════════════════
+        # "CTPS)1173470" ou "CTPS )1173470" (parêntese colado)
         r'CTPS\s*\)\s*(\d{5,})',
-        # 🆕 Formato "CTPSSCarteira": texto corrompido OCR "CTPSS" ou "CTPS S"
+        # "CTPSS" ou "CTPSSCarteira" (texto corrompido)
         r'CTPSS?\s*(?:Carteira[^\d]+)?(\d{5,})',
+        # "C T P S" com espaços
+        r'C\s*T\s*P\s*S\s*[:\s]*(\d{5,})',
     ]
     
     for pattern in patterns_with_number:
