@@ -339,7 +339,9 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                     poppler_path=POPPLER_PATH
                 )
                 
-                for img in images:
+                if images:
+                    # Apenas a PRIMEIRA imagem (página renderizada) - ignora imagens extras
+                    img = images[0]
                     img_gray = img.convert('L')
                     config = '--psm 6 -l por+eng'
                     texto_pagina = pytesseract.image_to_string(img_gray, config=config)
