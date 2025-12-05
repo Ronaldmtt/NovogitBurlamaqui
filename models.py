@@ -469,6 +469,7 @@ class BatchItem(db.Model):
     # Arquivo fonte
     source_filename = db.Column(db.String(255), nullable=False)
     upload_path = db.Column(db.String(500), nullable=False)
+    file_size = db.Column(db.BigInteger, nullable=True, index=True)  # Tamanho em bytes (para ordenação)
     
     # Status: pending, extracting, ready, running, success, error
     status = db.Column(db.String(20), nullable=False, default="pending", index=True)

@@ -349,10 +349,13 @@ def process_batch_async(batch_id, user_id):
         batch.status = 'processing'
         db.session.commit()
         
-        # Coletar itens pendentes
-        pending_items = BatchItem.query.filter_by(batch_id=batch_id, status='pending').all()
+        # Coletar itens pendentes ORDENADOS POR TAMANHO (menor primeiro)
+        # 2025-12-05: Processar PDFs menores primeiro dá sensação de progresso mais rápido
+        pending_items = BatchItem.query.filter_by(batch_id=batch_id, status='pending')\
+            .order_by(BatchItem.file_size.asc().nullslast())\
+            .all()
         total_items = len(pending_items)
-        logger.info(f"[BATCH] {total_items} itens pendentes para processar em paralelo (max {MAX_EXTRACTION_WORKERS} workers)")
+        logger.info(f"[BATCH] {total_items} itens pendentes ordenados por tamanho (menor→maior, max {MAX_EXTRACTION_WORKERS} workers)")
         
         if total_items == 0:
             batch.status = 'ready'
@@ -581,16 +584,18 @@ def batch_new():
                 raise
             
             # Criar BatchItems ANTES de salvar (para mostrar na tela)
+            # 2025-12-05: Salvar file_size para ordenação por tamanho (menor primeiro)
             logger.info(f"[UPLOAD][DEBUG] Criando {len(file_data)} BatchItems...")
-            for idx, (filename, _) in enumerate(file_data):
+            for idx, (filename, content) in enumerate(file_data):
                 item = BatchItem(
                     batch_id=batch.id,
                     source_filename=filename,
                     upload_path=str(batch_dir / filename),
+                    file_size=len(content),  # Tamanho em bytes
                     status='uploading'
                 )
                 db.session.add(item)
-                logger.info(f"[UPLOAD][DEBUG]   [{idx}] BatchItem criado: {filename}")
+                logger.info(f"[UPLOAD][DEBUG]   [{idx}] BatchItem criado: {filename} ({len(content):,} bytes)")
             
             batch.status = 'pending'
             logger.info(f"[UPLOAD][DEBUG] Fazendo commit no banco...")
