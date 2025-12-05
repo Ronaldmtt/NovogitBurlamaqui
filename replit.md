@@ -24,7 +24,11 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - `extract_pdf_bookmarks()`: Extrai mapeamento dos bookmarks (CTPS→pág.19, TRCT→pág.21, Contracheque→pág.29)
     - Identifica quais DOCUMENTOS são necessários (não campos): CTPS, TRCT ou Contracheque
     - OCR 1x por documento → extrai TODOS os campos daquele documento em uma passada
-    - Fallback hierárquico: Bookmarks → Sumário textual → Inferência Histórica → Heurística limitada
+    - Fallback hierárquico: Bookmarks → Sumário textual → Inferência Histórica → Heurística por documento
+    - **FIX 2025-12-05**: Heurística agora aplica por DOCUMENTO individual (não só quando tudo falha)
+      - TRCT: estimado em 87% do total de páginas
+      - Contracheque: estimado em 77% do total de páginas
+      - CTPS: estimado em 82% do total de páginas
     - Economia de ~90 segundos por PDF (2 páginas ao invés de 5)
     - Tesseract instalado com português para extração
 *   **Fila OCR Assíncrona (2025-12-05):** Sistema de fila para OCR quando múltiplos workers precisam simultaneamente:

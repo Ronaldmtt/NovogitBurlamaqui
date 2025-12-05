@@ -98,7 +98,8 @@ pdfInput.addEventListener('change', function(e) {
     let totalSize = 0;
     files.forEach(file => totalSize += file.size);
     const totalMB = (totalSize / (1024 * 1024)).toFixed(1);
-    const maxTotalMB = 350;
+    const maxTotalMB = 2000;  // 2GB total
+    const maxFileMB = 100;   // 100MB por arquivo
     const totalExceeded = totalSize > maxTotalMB * 1024 * 1024;
     
     if (totalExceeded) {
@@ -133,7 +134,7 @@ pdfInput.addEventListener('change', function(e) {
     files.forEach((file, index) => {
         const size = (file.size / (1024 * 1024)).toFixed(2);
         const icon = '<i class="fas fa-file-pdf text-danger me-2"></i>';
-        const sizeClass = file.size > 16 * 1024 * 1024 ? 'text-danger' : 'text-muted';
+        const sizeClass = file.size > maxFileMB * 1024 * 1024 ? 'text-danger' : 'text-muted';
         
         html += `<li class="list-group-item d-flex justify-content-between align-items-center py-1">
             <span class="small">${icon}${file.name}</span>
@@ -154,8 +155,8 @@ uploadForm.addEventListener('submit', function(e) {
     let totalSize = 0;
     files.forEach(file => totalSize += file.size);
     
-    if (totalSize > 350 * 1024 * 1024) {
-        alert('Erro: O tamanho total dos arquivos excede 350MB.');
+    if (totalSize > 2000 * 1024 * 1024) {
+        alert('Erro: O tamanho total dos arquivos excede 2GB.');
         return false;
     }
     

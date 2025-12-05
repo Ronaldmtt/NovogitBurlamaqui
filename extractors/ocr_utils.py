@@ -598,14 +598,33 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                 doc_pages[doc] = pages[0]  # Usar página mais provável
                 logger.info(f"[OCR] {doc.upper()} → página {pages[0]} (inferido do histórico)")
     
-    # Prioridade 3: Heurística LIMITADA (só últimas 30% páginas) se não encontrou nenhum
-    if not doc_pages:
-        # ⚠️ IMPORTANTE: search_all=False para não varrer o PDF inteiro (lento em PDFs grandes)
-        scanned = detect_scanned_pages(pdf_path, search_all=False)
-        if scanned:
-            # Usar primeira página escaneada como fallback geral
-            doc_pages["fallback"] = scanned[0]
-            logger.info(f"[OCR] Usando heurística → página {scanned[0]}")
+    # Prioridade 3: Heurística para documentos INDIVIDUAIS não encontrados
+    # ⚠️ 2025-12-05: Corrigido - aplica heurística para CADA documento faltante, não só quando tudo falhou
+    docs_sem_pagina = docs_needed - set(doc_pages.keys())
+    if docs_sem_pagina and total_pages > 0:
+        logger.info(f"[OCR] Documentos sem página: {docs_sem_pagina} - aplicando heurística")
+        
+        # Heurísticas baseadas em posição típica de documentos em PDFs trabalhistas
+        # TRCT: geralmente nas últimas 15% páginas
+        # Contracheque: geralmente nas últimas 25% páginas
+        # CTPS: geralmente nas últimas 20% páginas
+        
+        for doc in docs_sem_pagina:
+            if doc == "trct":
+                # TRCT normalmente está nas últimas 15% páginas
+                page_estimate = max(1, int(total_pages * 0.87))
+                doc_pages[doc] = page_estimate
+                logger.info(f"[OCR] TRCT → página {page_estimate} (heurística 87%)")
+            elif doc == "contracheque":
+                # Contracheque normalmente nas últimas 25% páginas
+                page_estimate = max(1, int(total_pages * 0.77))
+                doc_pages[doc] = page_estimate
+                logger.info(f"[OCR] CONTRACHEQUE → página {page_estimate} (heurística 77%)")
+            elif doc == "ctps":
+                # CTPS normalmente nas últimas 20% páginas
+                page_estimate = max(1, int(total_pages * 0.82))
+                doc_pages[doc] = page_estimate
+                logger.info(f"[OCR] CTPS → página {page_estimate} (heurística 82%)")
     
     if not doc_pages:
         logger.warning("[OCR] Nenhuma página de documento encontrada")
