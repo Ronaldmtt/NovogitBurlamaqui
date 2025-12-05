@@ -3355,13 +3355,25 @@ def load_process_data_for_fill(process_id: Optional[int] = None) -> Dict[str, An
                             data["reclamadas"] = reclamadas_from_db
                             log(f"[DATA][RECLAMADAS] Lista construída do banco: {len(reclamadas_from_db)} reclamadas")
                     
-                    # PEDIDOS: Carregar do campo pedidos_json
+                    # PEDIDOS: Carregar do campo pedidos_json (com suporte a double-encoding)
                     pedidos_json = getattr(p, 'pedidos_json', None) or ""
+                    data["pedidos_json"] = pedidos_json  # Guardar original para debug
                     if pedidos_json:
                         try:
                             import json
-                            data["pedidos"] = json.loads(pedidos_json)
-                            log(f"[DATA] Pedidos carregados do banco: {len(data['pedidos'])}")
+                            parsed = json.loads(pedidos_json)
+                            
+                            # FIX 2025-12-05: Lidar com double-encoding
+                            if isinstance(parsed, str):
+                                log("[DATA][PEDIDOS] Detectado double-encoding, parseando novamente...")
+                                parsed = json.loads(parsed)
+                            
+                            if isinstance(parsed, list):
+                                data["pedidos"] = parsed
+                                log(f"[DATA] Pedidos carregados do banco: {len(data['pedidos'])}")
+                            else:
+                                log(f"[DATA][WARN] pedidos_json não é lista após parse: {type(parsed)}")
+                                data["pedidos"] = []
                         except Exception as e:
                             log(f"[DATA][WARN] Erro ao carregar pedidos: {e}")
                             data["pedidos"] = []
@@ -6095,29 +6107,49 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 log("[RECLAMADAS] Apenas 1 reclamada - nenhuma extra para adicionar")
             
             # ✅ NOVO: Verificar e processar pedidos para TODOS os processos (com ou sem reclamadas extras)
-            # 2025-12-03: Corrigido para tratar pedidos_json como string JSON e parsear corretamente
+            # 2025-12-05: FIX para double-encoding (JSON dentro de JSON)
             raw_pedidos_json = data.get("pedidos_json")
             raw_pedidos = data.get("pedidos", [])
+            pedidos = []
             
-            # Se pedidos_json é uma string, parsear
-            if isinstance(raw_pedidos_json, str) and raw_pedidos_json.strip():
-                try:
-                    import json
-                    parsed_pedidos = json.loads(raw_pedidos_json)
-                    if isinstance(parsed_pedidos, list):
-                        pedidos = parsed_pedidos
-                    else:
-                        log(f"[PEDIDOS][WARN] pedidos_json parseado não é lista: {type(parsed_pedidos)}")
-                        pedidos = raw_pedidos if isinstance(raw_pedidos, list) else []
-                except Exception as e:
-                    log(f"[PEDIDOS][WARN] Erro ao parsear pedidos_json: {e}")
-                    pedidos = raw_pedidos if isinstance(raw_pedidos, list) else []
-            elif isinstance(raw_pedidos_json, list):
-                pedidos = raw_pedidos_json
-            elif isinstance(raw_pedidos, list):
-                pedidos = raw_pedidos
-            else:
-                pedidos = []
+            # Função auxiliar para parsear pedidos (lida com double-encoding)
+            def parse_pedidos_json(raw_value):
+                """Parseia pedidos_json lidando com double-encoding."""
+                if not raw_value:
+                    return []
+                
+                # Se já é lista, retorna
+                if isinstance(raw_value, list):
+                    return raw_value
+                
+                # Se é string, parsear
+                if isinstance(raw_value, str) and raw_value.strip():
+                    try:
+                        import json
+                        parsed = json.loads(raw_value)
+                        
+                        # Double-encoding: resultado é string, parsear novamente
+                        if isinstance(parsed, str):
+                            log("[PEDIDOS][DEBUG] Detectado double-encoding, parseando novamente...")
+                            parsed = json.loads(parsed)
+                        
+                        if isinstance(parsed, list):
+                            return parsed
+                        else:
+                            log(f"[PEDIDOS][WARN] pedidos_json parseado não é lista: {type(parsed)}")
+                            return []
+                    except Exception as e:
+                        log(f"[PEDIDOS][WARN] Erro ao parsear pedidos_json: {e}")
+                        return []
+                
+                return []
+            
+            # Tentar parsear pedidos_json
+            pedidos = parse_pedidos_json(raw_pedidos_json)
+            
+            # Fallback para data['pedidos'] se pedidos_json falhou
+            if not pedidos and raw_pedidos:
+                pedidos = parse_pedidos_json(raw_pedidos) if isinstance(raw_pedidos, str) else (raw_pedidos if isinstance(raw_pedidos, list) else [])
             
             # 🔧 DEBUG 2025-12-03: Log detalhado para identificar por que pedidos não estão sendo inseridos
             log(f"[PEDIDOS][DEBUG] process_id={process_id}")
