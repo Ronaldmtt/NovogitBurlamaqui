@@ -1530,6 +1530,275 @@ def batch_reprocess(id):
         return redirect(url_for('batch.batch_detail', id=id))
 
 
+@batch_bp.route("/<int:id>/reextract", methods=["POST"])
+@login_required
+def batch_reextract(id):
+    """
+    Reprocessar EXTRAÇÃO dos PDFs selecionados.
+    Reseta os dados do processo e executa novamente a extração.
+    """
+    import threading
+    from main import app as flask_app_main
+    
+    batch = BatchUpload.query.get_or_404(id)
+    
+    if batch.owner_id != current_user.id:
+        flash("Você não tem permissão para reprocessar este batch.", "danger")
+        return redirect(url_for('batch.batch_list'))
+    
+    item_ids_str = request.form.get('item_ids', '')
+    if not item_ids_str:
+        flash("Nenhum item selecionado para reprocessar.", "warning")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    try:
+        item_ids = [int(x.strip()) for x in item_ids_str.split(',') if x.strip().isdigit()]
+    except ValueError:
+        flash("IDs de itens inválidos.", "danger")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    if not item_ids:
+        flash("Nenhum item selecionado para reprocessar.", "warning")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    try:
+        items_to_reextract = BatchItem.query.filter(
+            BatchItem.id.in_(item_ids),
+            BatchItem.batch_id == id
+        ).all()
+        
+        if not items_to_reextract:
+            flash("Itens não encontrados.", "warning")
+            return redirect(url_for('batch.batch_detail', id=id))
+        
+        logger.info(f"[REEXTRACT] Iniciando reextração de {len(items_to_reextract)} itens do batch {id}")
+        
+        for item in items_to_reextract:
+            item.status = 'pending'
+            item.last_error = None
+            item.attempt_count = 0
+            
+            if item.process_id:
+                old_process_id = item.process_id
+                process = Process.query.get(item.process_id)
+                if process:
+                    db.session.delete(process)
+                    logger.info(f"[REEXTRACT] Processo #{old_process_id} deletado para reextração")
+                item.process_id = None
+        
+        batch.status = 'pending'
+        db.session.commit()
+        
+        user_id = current_user.id
+        items_data = [(item.id, item.upload_path, item.source_filename) for item in items_to_reextract]
+        
+        def execute_reextract_background():
+            with flask_app_main.app_context():
+                try:
+                    from concurrent.futures import ThreadPoolExecutor, as_completed
+                    
+                    batch_reload = BatchUpload.query.get(id)
+                    if not batch_reload:
+                        return
+                    
+                    batch_reload.status = 'processing'
+                    db.session.commit()
+                    
+                    logger.info(f"[REEXTRACT] Iniciando extração paralela de {len(items_data)} PDFs")
+                    
+                    extracted_count = 0
+                    extraction_errors = 0
+                    
+                    with ThreadPoolExecutor(max_workers=MAX_EXTRACTION_WORKERS) as executor:
+                        future_to_item = {
+                            executor.submit(
+                                _extract_single_item,
+                                item_id, upload_path, source_filename, user_id
+                            ): item_id
+                            for item_id, upload_path, source_filename in items_data
+                        }
+                        
+                        for future in as_completed(future_to_item):
+                            item_id = future_to_item[future]
+                            try:
+                                result = future.result()
+                                if result.get('success'):
+                                    extracted_count += 1
+                                    logger.info(f"[REEXTRACT] ✅ Item {item_id} extraído!")
+                                else:
+                                    extraction_errors += 1
+                                    logger.warning(f"[REEXTRACT] ❌ Item {item_id} falhou: {result.get('error')}")
+                            except Exception as ex:
+                                extraction_errors += 1
+                                logger.error(f"[REEXTRACT] Erro no item {item_id}: {ex}")
+                    
+                    batch_reload.status = 'ready' if extraction_errors == 0 else 'partial_ready'
+                    db.session.commit()
+                    
+                    logger.info(f"[REEXTRACT] ✅ Finalizado: {extracted_count} sucesso(s), {extraction_errors} erro(s)")
+                    
+                except Exception as e:
+                    logger.error(f"[REEXTRACT] Erro fatal: {e}", exc_info=True)
+                    try:
+                        batch_reload = BatchUpload.query.get(id)
+                        if batch_reload:
+                            batch_reload.status = 'partial_ready'
+                            db.session.commit()
+                    except:
+                        pass
+        
+        thread = threading.Thread(target=execute_reextract_background, daemon=True)
+        thread.start()
+        
+        flash(f"Reextração iniciada! {len(items_to_reextract)} PDF(s) serão reprocessados.", "success")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[REEXTRACT] Erro: {e}", exc_info=True)
+        flash(f"Erro ao reprocessar extração: {str(e)}", "danger")
+        return redirect(url_for('batch.batch_detail', id=id))
+
+
+@batch_bp.route("/<int:id>/rerpa", methods=["POST"])
+@login_required
+def batch_rerpa(id):
+    """
+    Reprocessar RPA (preenchimento eLaw) dos itens selecionados.
+    Não refaz a extração, apenas o envio para o eLaw.
+    """
+    import threading
+    from main import app as flask_app_main
+    import rpa
+    
+    batch = BatchUpload.query.get_or_404(id)
+    
+    if batch.owner_id != current_user.id:
+        flash("Você não tem permissão para reprocessar este batch.", "danger")
+        return redirect(url_for('batch.batch_list'))
+    
+    item_ids_str = request.form.get('item_ids', '')
+    if not item_ids_str:
+        flash("Nenhum item selecionado para reprocessar.", "warning")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    try:
+        item_ids = [int(x.strip()) for x in item_ids_str.split(',') if x.strip().isdigit()]
+    except ValueError:
+        flash("IDs de itens inválidos.", "danger")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    if not item_ids:
+        flash("Nenhum item selecionado para reprocessar.", "warning")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    try:
+        items_to_rerpa = BatchItem.query.filter(
+            BatchItem.id.in_(item_ids),
+            BatchItem.batch_id == id,
+            BatchItem.process_id.isnot(None)
+        ).all()
+        
+        if not items_to_rerpa:
+            flash("Nenhum item com processo associado encontrado.", "warning")
+            return redirect(url_for('batch.batch_detail', id=id))
+        
+        logger.info(f"[RERPA] Iniciando RPA para {len(items_to_rerpa)} itens do batch {id}")
+        
+        for item in items_to_rerpa:
+            item.status = 'ready'
+            item.last_error = None
+            
+            if item.process_id:
+                process = Process.query.get(item.process_id)
+                if process:
+                    process.elaw_status = 'pending'
+                    process.elaw_error_message = None
+                    process.elaw_filled_at = None
+        
+        batch.status = 'ready'
+        db.session.commit()
+        
+        process_ids = [item.process_id for item in items_to_rerpa]
+        
+        def execute_rerpa_background():
+            with flask_app_main.app_context():
+                try:
+                    rpa.flask_app = flask_app_main
+                    
+                    batch_reload = BatchUpload.query.get(id)
+                    if not batch_reload:
+                        return
+                    
+                    batch_reload.status = 'running'
+                    batch_reload.started_at = datetime.utcnow()
+                    db.session.commit()
+                    
+                    logger.info(f"[RERPA] Iniciando RPA paralelo para {len(process_ids)} processos")
+                    
+                    success_count = 0
+                    error_count = 0
+                    
+                    for process_id in process_ids:
+                        try:
+                            process = Process.query.get(process_id)
+                            if not process:
+                                continue
+                            
+                            batch_item = BatchItem.query.filter_by(process_id=process_id).first()
+                            if batch_item:
+                                batch_item.status = 'running'
+                                db.session.commit()
+                            
+                            success = rpa.fill_elaw_from_process(process_id)
+                            
+                            if success:
+                                success_count += 1
+                                if batch_item:
+                                    batch_item.status = 'success'
+                                logger.info(f"[RERPA] ✅ Processo #{process_id} preenchido com sucesso")
+                            else:
+                                error_count += 1
+                                if batch_item:
+                                    batch_item.status = 'error'
+                                    batch_item.last_error = 'Falha no RPA'
+                                logger.warning(f"[RERPA] ❌ Processo #{process_id} falhou")
+                            
+                            db.session.commit()
+                            
+                        except Exception as ex:
+                            error_count += 1
+                            logger.error(f"[RERPA] Erro no processo {process_id}: {ex}")
+                    
+                    batch_reload.status = 'completed' if error_count == 0 else 'partial_completed'
+                    batch_reload.finished_at = datetime.utcnow()
+                    db.session.commit()
+                    
+                    logger.info(f"[RERPA] ✅ Finalizado: {success_count} sucesso(s), {error_count} erro(s)")
+                    
+                except Exception as e:
+                    logger.error(f"[RERPA] Erro fatal: {e}", exc_info=True)
+                    try:
+                        batch_reload = BatchUpload.query.get(id)
+                        if batch_reload:
+                            batch_reload.status = 'partial_completed'
+                            db.session.commit()
+                    except:
+                        pass
+        
+        thread = threading.Thread(target=execute_rerpa_background, daemon=True)
+        thread.start()
+        
+        flash(f"Reprocessamento RPA iniciado! {len(items_to_rerpa)} processo(s) serão enviados ao eLaw.", "success")
+        return redirect(url_for('batch.batch_detail', id=id))
+    
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[RERPA] Erro: {e}", exc_info=True)
+        flash(f"Erro ao reprocessar RPA: {str(e)}", "danger")
+        return redirect(url_for('batch.batch_detail', id=id))
+
+
 @batch_bp.route("/<int:id>/delete", methods=["POST"])
 @login_required
 def batch_delete(id):
