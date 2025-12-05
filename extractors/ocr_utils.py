@@ -248,22 +248,25 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     """
     Resolve campos trabalhistas faltantes usando OCR seletivo via bookmarks.
     
-    2025-12-04: Nova camada de fallback inteligente.
-    2025-12-05: OTIMIZAÇÃO - Usa bookmarks do PDF primeiro (OCR em 1-2 páginas apenas)
+    2025-12-05: LÓGICA SIMPLIFICADA - OCR por DOCUMENTO, não por campo.
     
-    Estratégia (ordem de prioridade):
-    1. Extrai bookmarks do PDF (PDFs PJe têm links diretos para cada anexo)
-    2. Se não encontrar, analisa sumário textual
-    3. Se não encontrar, usa heurística de páginas escaneadas
-    4. Aplica OCR apenas nas páginas identificadas (mínimo possível)
+    Estratégia SIMPLES:
+    1. Ler bookmarks do PDF (CTPS→pág.X, TRCT→pág.Y, Contracheque→pág.Z)
+    2. Para cada documento necessário: OCR 1x na primeira página
+    3. Extrair TODOS os campos de cada documento em uma passada
+    
+    Documentos e seus campos:
+    - CTPS: data_admissao, pis, ctps, serie_ctps
+    - TRCT: data_demissao, salario (fallback)
+    - Contracheque: salario
     
     Args:
         pdf_path: Caminho do PDF
         current_data: Dados já extraídos (para não sobrescrever)
-        missing_fields: Lista de campos faltantes ["salario", "pis", "data_admissao", etc]
+        missing_fields: Lista de campos faltantes
     
     Returns:
-        Dict com campos recuperados via OCR seletivo
+        Dict com campos recuperados via OCR
     """
     import re
     
@@ -273,87 +276,60 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     if not missing_fields or not pdf_path:
         return result
     
-    logger.info(f"[OCR_SELETIVO] Iniciando fallback para: {missing_fields}")
+    logger.info(f"[OCR] Campos faltantes: {missing_fields}")
     
-    target_pages = set()
+    # ===== PASSO 1: Identificar quais DOCUMENTOS precisamos processar =====
+    docs_needed = set()
     
-    # Mapeamento de campo → tipos de documento que contêm o campo
-    field_to_doc = {
-        "salario": ["contracheque", "trct"],
-        "data_admissao": ["ctps", "trct"],
-        "data_demissao": ["trct"],
-        "pis": ["ctps", "trct"],
-        "ctps": ["ctps", "trct"],
-        "serie_ctps": ["ctps"],
-    }
+    # Mapeamento: qual documento contém qual campo
+    if any(f in missing_fields for f in ["data_admissao", "pis", "ctps", "serie_ctps"]):
+        docs_needed.add("ctps")
+    if any(f in missing_fields for f in ["data_demissao"]):
+        docs_needed.add("trct")
+    if "salario" in missing_fields:
+        docs_needed.add("contracheque")
+        docs_needed.add("trct")  # fallback para salário
     
-    # Carregar todas as fontes de mapeamento uma vez
-    bookmarks = extract_pdf_bookmarks(pdf_path)
-    toc_pages = parse_toc_from_pdf(pdf_path)
-    scanned_pages = None  # Lazy load
-    
-    if bookmarks:
-        logger.info(f"[OCR_SELETIVO] ✅ Bookmarks disponíveis: {bookmarks}")
-    if any(v for v in toc_pages.values()):
-        logger.info(f"[OCR_SELETIVO] ✅ TOC disponível: {toc_pages}")
-    
-    # ===== ESTRATÉGIA POR CAMPO: Fallback hierárquico para CADA campo =====
-    fields_resolved = {}
-    
-    for field in missing_fields:
-        doc_types = field_to_doc.get(field, [])
-        page_found = None
-        source = None
-        
-        # PRIORIDADE 1: Tentar bookmarks primeiro
-        for doc_type in doc_types:
-            if doc_type in bookmarks:
-                page_found = bookmarks[doc_type]
-                source = f"bookmark:{doc_type}"
-                break
-        
-        # PRIORIDADE 2: Tentar TOC se bookmark não encontrou
-        if not page_found:
-            for doc_type in doc_types:
-                if toc_pages.get(doc_type):
-                    page_found = toc_pages[doc_type][0]
-                    source = f"toc:{doc_type}"
-                    break
-        
-        # PRIORIDADE 3: Heurística se nada encontrou (lazy load)
-        if not page_found:
-            if scanned_pages is None:
-                scanned_pages = detect_scanned_pages(pdf_path)
-            if scanned_pages:
-                # Pegar primeiras 3 + últimas 2 páginas escaneadas
-                first_pages = scanned_pages[:3]
-                last_pages = scanned_pages[-2:] if len(scanned_pages) > 3 else []
-                heuristic_pages = list(set(first_pages + last_pages))
-                if heuristic_pages:
-                    page_found = heuristic_pages[0]  # Pegar primeira
-                    source = "heuristic"
-                    # Adicionar todas as heurísticas para campos não mapeados
-                    for hp in heuristic_pages:
-                        target_pages.add(hp)
-        
-        if page_found:
-            target_pages.add(page_found)
-            fields_resolved[field] = source
-            logger.debug(f"[OCR_SELETIVO] {field} → página {page_found} via {source}")
-    
-    if fields_resolved:
-        logger.info(f"[OCR_SELETIVO] Campos mapeados: {fields_resolved}")
-    
-    if not target_pages:
-        logger.debug("[OCR_SUMARIO] Nenhuma página alvo identificada")
+    if not docs_needed:
         return result
     
-    target_list = sorted(list(target_pages))[:5]
-    logger.info(f"[OCR_SUMARIO] 📷 Aplicando OCR nas páginas: {target_list}")
+    logger.info(f"[OCR] Documentos necessários: {docs_needed}")
+    
+    # ===== PASSO 2: Obter páginas dos documentos (bookmarks → TOC → heurística) =====
+    bookmarks = extract_pdf_bookmarks(pdf_path)
+    toc_pages = parse_toc_from_pdf(pdf_path) if not bookmarks else {}
+    
+    doc_pages = {}  # {doc_type: page_number}
+    
+    for doc in docs_needed:
+        # Prioridade 1: Bookmarks
+        if doc in bookmarks:
+            doc_pages[doc] = bookmarks[doc]
+            logger.info(f"[OCR] {doc.upper()} → página {bookmarks[doc]} (bookmark)")
+        # Prioridade 2: TOC
+        elif toc_pages.get(doc):
+            doc_pages[doc] = toc_pages[doc][0]
+            logger.info(f"[OCR] {doc.upper()} → página {toc_pages[doc][0]} (sumário)")
+    
+    # Prioridade 3: Heurística se não encontrou nenhum
+    if not doc_pages:
+        scanned = detect_scanned_pages(pdf_path)
+        if scanned:
+            # Usar primeira página escaneada como fallback geral
+            doc_pages["fallback"] = scanned[0]
+            logger.info(f"[OCR] Usando heurística → página {scanned[0]}")
+    
+    if not doc_pages:
+        logger.warning("[OCR] Nenhuma página de documento encontrada")
+        return result
+    
+    # ===== PASSO 3: OCR uma vez por documento =====
+    unique_pages = sorted(set(doc_pages.values()))
+    logger.info(f"[OCR] 📷 Processando {len(unique_pages)} página(s): {unique_pages}")
     
     try:
         texto_ocr = ""
-        for page_num in target_list:
+        for page_num in unique_pages:
             try:
                 images = convert_from_path(
                     pdf_path,
@@ -368,22 +344,20 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                     config = '--psm 6 -l por+eng'
                     texto_pagina = pytesseract.image_to_string(img_gray, config=config)
                     texto_ocr += f"\n--- PÁGINA {page_num} ---\n{texto_pagina}"
-                    logger.debug(f"[OCR_SUMARIO] Página {page_num}: {len(texto_pagina)} chars extraídos")
+                    logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
             except Exception as e:
-                logger.warning(f"[OCR_SUMARIO] Erro página {page_num}: {e}")
+                logger.warning(f"[OCR] Erro página {page_num}: {e}")
         
         if not texto_ocr:
             return result
         
-        logger.debug(f"[OCR_SUMARIO] Total texto OCR: {len(texto_ocr)} chars")
+        logger.debug(f"[OCR] Total: {len(texto_ocr)} chars")
         
+        # ===== PASSO 4: Extrair TODOS os campos do texto OCR =====
         if "salario" in missing_fields:
             salario_patterns = [
                 r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
                 r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-                r'(?:vencimento|proventos)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-                r'(?:total\s*bruto|bruto)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-                r'R\$\s*([\d]{1,3}(?:\.\d{3})*,\d{2})',
             ]
             for pattern in salario_patterns:
                 m = re.search(pattern, texto_ocr, re.IGNORECASE)
@@ -393,77 +367,50 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                         val = float(val_str)
                         if 1000 <= val <= 100000:
                             result["salario"] = f"R$ {m.group(1)}"
-                            logger.info(f"[OCR_SUMARIO] ✅ Salário: {result['salario']}")
+                            logger.info(f"[OCR] ✅ Salário: {result['salario']}")
                             break
                     except:
                         pass
         
         if "data_admissao" in missing_fields:
-            admissao_patterns = [
-                r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em|in[ií]cio\s*(?:do\s*)?contrato)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-                r'admiss[ãa]o[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-            ]
-            for pattern in admissao_patterns:
-                m = re.search(pattern, texto_ocr, re.IGNORECASE)
-                if m:
-                    result["data_admissao"] = m.group(1)
-                    logger.info(f"[OCR_SUMARIO] ✅ Data Admissão: {result['data_admissao']}")
-                    break
+            m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_ocr, re.IGNORECASE)
+            if m:
+                result["data_admissao"] = m.group(1)
+                logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
         
         if "data_demissao" in missing_fields:
-            demissao_patterns = [
-                r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|sa[ií]da|rescis[ãa]o)|demitido\s*em|t[eé]rmino\s*(?:do\s*)?contrato)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-                r'(?:aviso\s*pr[eé]vio\s*(?:at[eé]|fim)|[uú]ltimo\s*dia\s*trabalhado)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-            ]
-            for pattern in demissao_patterns:
-                m = re.search(pattern, texto_ocr, re.IGNORECASE)
-                if m:
-                    result["data_demissao"] = m.group(1)
-                    logger.info(f"[OCR_SUMARIO] ✅ Data Demissão: {result['data_demissao']}")
-                    break
+            m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_ocr, re.IGNORECASE)
+            if m:
+                result["data_demissao"] = m.group(1)
+                logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
         
         if "pis" in missing_fields:
-            pis_patterns = [
-                r'(?:PIS|PASEP|NIT|PIS/PASEP)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)',
-                r'\b(\d{3}\.\d{5}\.\d{2}[.-]\d)\b',
-                r'\b(\d{11})\b',
-            ]
-            for pattern in pis_patterns:
-                m = re.search(pattern, texto_ocr, re.IGNORECASE)
-                if m:
-                    pis_raw = re.sub(r'[^\d]', '', m.group(1))
-                    if len(pis_raw) == 11:
-                        result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
-                        logger.info(f"[OCR_SUMARIO] ✅ PIS: {result['pis']}")
-                        break
+            m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_ocr, re.IGNORECASE)
+            if m:
+                pis_raw = re.sub(r'[^\d]', '', m.group(1))
+                if len(pis_raw) == 11:
+                    result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
+                    logger.info(f"[OCR] ✅ PIS: {result['pis']}")
         
         if "ctps" in missing_fields:
-            ctps_patterns = [
-                r'(?:CTPS|Carteira\s*(?:de\s*)?Trabalho)[:\s]*[nN]?[º°]?\s*(\d{5,7})[/\s,]*(?:s[eé]rie|série)[:\s]*(\d{3,5})(?:[/\s-]*([A-Z]{2}))?',
-                r'[nN]?[º°]?\s*(\d{5,7})[/\s]*[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})(?:[/\s-]*([A-Z]{2}))?',
-            ]
-            for pattern in ctps_patterns:
-                m = re.search(pattern, texto_ocr, re.IGNORECASE)
-                if m:
-                    numero = m.group(1)
-                    serie = m.group(2)
-                    uf = m.group(3) if len(m.groups()) >= 3 and m.group(3) else None
-                    if uf:
-                        result["ctps"] = f"{numero} série {serie}-{uf}"
-                    else:
-                        result["ctps"] = f"{numero} série {serie}"
-                    logger.info(f"[OCR_SUMARIO] ✅ CTPS: {result['ctps']}")
-                    break
+            m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_ocr, re.IGNORECASE)
+            if m:
+                result["ctps"] = m.group(1)
+                logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
+        
+        if "serie_ctps" in missing_fields:
+            m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_ocr)
+            if m:
+                result["serie_ctps"] = m.group(1)
+                logger.info(f"[OCR] ✅ Série CTPS: {result['serie_ctps']}")
         
         if result:
-            logger.info(f"[OCR_SUMARIO] 🎯 Recuperados {len(result)} campos via OCR seletivo: {list(result.keys())}")
-        else:
-            logger.debug("[OCR_SUMARIO] Nenhum campo recuperado via OCR")
+            logger.info(f"[OCR] 🎯 Recuperados: {list(result.keys())}")
         
         return result
         
     except Exception as e:
-        logger.error(f"[OCR_SUMARIO] ❌ Erro no OCR seletivo: {e}")
+        logger.error(f"[OCR] ❌ Erro: {e}")
         return result
 
 
