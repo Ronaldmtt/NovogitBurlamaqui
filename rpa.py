@@ -6623,9 +6623,26 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
         # Loop para cada reclamada extra
         success_count = 0
         skipped_count = 0
+        
+        # ✅ CARREGAR VERIFICAÇÃO DE CLIENTES (para determinar se é "OUTROS CLIENTES RÉU")
+        from extractors.brand_map import find_cliente_by_parte_interessada
+        
+        # ✅ OBTER CLIENTE PRINCIPAL do processo para evitar duplicação
+        cliente_principal = data.get("cliente", "").strip().upper()
+        parte_interessada_principal = data.get("parte_interessada", "").strip().upper()
+        log(f"[RECLAMADAS][RPA] Cliente principal: {cliente_principal or parte_interessada_principal}")
+        
         for idx, reclamada in enumerate(extras):
             # ✅ VERIFICAR DUPLICATA antes de inserir
             nome_reclamada = reclamada.get("nome", "").strip().upper()
+            
+            # ✅ VERIFICAÇÃO 1: Não inserir a reclamada se for igual ao cliente principal
+            if nome_reclamada == cliente_principal or nome_reclamada == parte_interessada_principal:
+                log(f"[RECLAMADAS][RPA][SKIP] Reclamada '{reclamada['nome']}' é igual ao cliente principal - PULANDO")
+                skipped_count += 1
+                continue
+            
+            # ✅ VERIFICAÇÃO 2: Não inserir se já existe na tabela
             is_duplicate = False
             for existing in existing_names:
                 # Verificar se o nome é igual ou muito similar (um contém o outro)
@@ -6637,6 +6654,13 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
             
             if is_duplicate:
                 continue
+            
+            # ✅ VERIFICAÇÃO 3: Reclamada extra é cliente cadastrado? Se sim, usar "OUTROS CLIENTES RÉU"
+            cliente_match = find_cliente_by_parte_interessada(reclamada.get("nome", ""))
+            is_outro_cliente = cliente_match is not None
+            if is_outro_cliente:
+                log(f"[RECLAMADAS][RPA][CLIENTE] '{reclamada['nome']}' é cliente cadastrado ({cliente_match}) → OUTROS CLIENTES RÉU")
+            
             try:
                 log(f"[RECLAMADAS][RPA] ═══ RECLAMADA EXTRA {idx + 1}/{len(extras)} ═══")
                 update_status("reclamadas_inserindo", f"Inserindo reclamada {idx + 1}/{len(extras)}: {reclamada['nome'][:30]}...", process_id=process_id)
@@ -6744,9 +6768,14 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
                 await page.wait_for_selector('#PosicaoParteId', state='attached', timeout=3000)
                 log("[RECLAMADAS][RPA] Modal 'Nova Parte' aberto")
                 
-                # Selecionar Posição da Parte (RECLAMADO ou REU)
-                posicao = reclamada.get("posicao", "RECLAMADO")
-                log(f"[RECLAMADAS][RPA][POSICAO] Selecionando posição: {posicao}")
+                # Selecionar Posição da Parte
+                # ✅ 2025-12-05: Se for outro cliente cadastrado, usar "OUTROS CLIENTES RÉU"
+                if is_outro_cliente:
+                    posicao = "OUTROS CLIENTES RÉU"
+                    log(f"[RECLAMADAS][RPA][POSICAO] Reclamada é cliente → selecionando: {posicao}")
+                else:
+                    posicao = reclamada.get("posicao", "RECLAMADO")
+                    log(f"[RECLAMADAS][RPA][POSICAO] Selecionando posição: {posicao}")
                 
                 # Mapear posição para value do select
                 posicao_value = await _map_posicao_to_select_value(page, posicao)
@@ -6758,8 +6787,20 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
                     try:
                         await page.select_option('#PosicaoParteId', label=posicao)
                     except:
-                        log(f"[RECLAMADAS][RPA][WARN] Não encontrou posição '{posicao}', usando RECLAMADO")
-                        await page.select_option('#PosicaoParteId', value='52')  # 52 = RECLAMADO (valor comum no eLaw)
+                        # Se for outro cliente mas não encontrou a opção, tentar outros labels
+                        if is_outro_cliente:
+                            log(f"[RECLAMADAS][RPA][WARN] Tentando label alternativo para cliente...")
+                            try:
+                                await page.select_option('#PosicaoParteId', label="OUTROS CLIENTES REU")
+                            except:
+                                try:
+                                    await page.select_option('#PosicaoParteId', label="Outros Clientes Réu")
+                                except:
+                                    log(f"[RECLAMADAS][RPA][WARN] Não encontrou opção de cliente, usando RECLAMADO")
+                                    await page.select_option('#PosicaoParteId', value='52')
+                        else:
+                            log(f"[RECLAMADAS][RPA][WARN] Não encontrou posição '{posicao}', usando RECLAMADO")
+                            await page.select_option('#PosicaoParteId', value='52')  # 52 = RECLAMADO (valor comum no eLaw)
                 
                 await short_sleep_ms(500)
                 
@@ -6876,6 +6917,7 @@ async def _map_posicao_to_select_value(page, posicao: str) -> str:
     
     # Mapeamento de posições comuns para values do eLaw
     # Esses values são os mais comuns no eLaw, mas podem variar por instalação
+    # ✅ 2025-12-05: Adicionado "OUTROS CLIENTES RÉU" para clientes cadastrados como reclamada extra
     POSICAO_MAP = {
         "RECLAMADO": "52",
         "RECLAMADA": "52",
@@ -6886,6 +6928,9 @@ async def _map_posicao_to_select_value(page, posicao: str) -> str:
         "AGRAVADO": "12",
         "EXECUTADO": "21",
         "REQUERIDO": "35",
+        "OUTROS CLIENTES RÉU": "71",   # ✅ Para clientes cadastrados no dicionário
+        "OUTROS CLIENTES REU": "71",
+        "OUTRA PARTE": "39",
     }
     
     # Tentar mapeamento direto
