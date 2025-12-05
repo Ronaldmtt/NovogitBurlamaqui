@@ -158,7 +158,8 @@ def _update_process_with_ocr_results(process_id: int, ocr_data: Dict[str, str]):
     logger = logging.getLogger(__name__)
     
     try:
-        from app import app, db
+        from main import app
+        from extensions import db
         from models import Process
         
         with app.app_context():
