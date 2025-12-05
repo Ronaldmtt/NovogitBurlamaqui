@@ -323,27 +323,42 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         logger.warning("[OCR] Nenhuma página de documento encontrada")
         return result
     
-    # ===== PASSO 3: OCR uma vez por documento =====
+    # ===== PASSO 3: OCR ULTRA-RÁPIDO - máximo 2 páginas =====
+    # Prioridade: Contracheque (salário) > TRCT (demissão) > CTPS (admissão/pis)
     unique_pages = sorted(set(doc_pages.values()))
+    
+    # Limitar a 2 páginas máximo para velocidade
+    if len(unique_pages) > 2:
+        priority_pages = []
+        if doc_pages.get("contracheque"):
+            priority_pages.append(doc_pages["contracheque"])
+        if doc_pages.get("trct") and len(priority_pages) < 2:
+            priority_pages.append(doc_pages["trct"])
+        if doc_pages.get("ctps") and len(priority_pages) < 2:
+            priority_pages.append(doc_pages["ctps"])
+        unique_pages = sorted(priority_pages)
+    
     logger.info(f"[OCR] 📷 Processando {len(unique_pages)} página(s): {unique_pages}")
     
     try:
         texto_ocr = ""
         for page_num in unique_pages:
             try:
+                # DPI reduzido para 150 (mais rápido, ainda legível)
                 images = convert_from_path(
                     pdf_path,
-                    dpi=200,
+                    dpi=150,
                     first_page=page_num,
                     last_page=page_num,
                     poppler_path=POPPLER_PATH
                 )
                 
                 if images:
-                    # Apenas a PRIMEIRA imagem (página renderizada) - ignora imagens extras
+                    # Apenas a PRIMEIRA imagem (página renderizada)
                     img = images[0]
                     img_gray = img.convert('L')
-                    config = '--psm 6 -l por+eng'
+                    # PSM 6 = bloco uniforme de texto, mais rápido
+                    config = '--psm 6 -l por'
                     texto_pagina = pytesseract.image_to_string(img_gray, config=config)
                     texto_ocr += f"\n--- PÁGINA {page_num} ---\n{texto_pagina}"
                     logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
