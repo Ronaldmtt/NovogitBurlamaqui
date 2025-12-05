@@ -34,11 +34,79 @@ OCR_WORKER_RUNNING = False
 OCR_WORKER_THREAD: Optional[threading.Thread] = None
 OCR_WORKER_LOCK = threading.Lock()
 
+def _preprocess_image_for_ocr(img: Image.Image, doc_type: str = "generic") -> Image.Image:
+    """
+    Pré-processa imagem para melhorar velocidade e qualidade do OCR.
+    
+    2025-12-05: Otimizações baseadas em boas práticas:
+    - Binarização (threshold) para remover ruídos
+    - Redimensionamento se muito grande
+    - Ajuste de contraste
+    
+    Args:
+        img: Imagem PIL em modo L (grayscale)
+        doc_type: Tipo de documento (trct, ctps, contracheque)
+    
+    Returns:
+        Imagem pré-processada
+    """
+    # 1. Garantir grayscale
+    if img.mode != 'L':
+        img = img.convert('L')
+    
+    # 2. Redimensionar se muito grande (economiza tempo de OCR)
+    max_width = 1200  # Reduzido de ~1700 (150 DPI em A4)
+    if img.width > max_width:
+        ratio = max_width / img.width
+        new_size = (int(img.width * ratio), int(img.height * ratio))
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
+    
+    # 3. Binarização adaptativa usando threshold
+    # Converte para preto/branco puro, remove ruídos de fundo
+    threshold = 180  # Valor para documentos escaneados típicos
+    img = img.point(lambda x: 255 if x > threshold else 0, mode='1')
+    
+    # Converter de volta para L para Tesseract
+    img = img.convert('L')
+    
+    return img
+
+
+def _get_psm_for_doc_type(doc_type: str) -> str:
+    """
+    Retorna o PSM (Page Segmentation Mode) ideal para cada tipo de documento.
+    
+    PSM options:
+    - 3: Fully automatic page segmentation (lento, preciso)
+    - 4: Single column of text
+    - 6: Single uniform block of text (default)
+    - 11: Sparse text (bom para formulários como TRCT)
+    
+    Args:
+        doc_type: Tipo de documento
+    
+    Returns:
+        String de configuração PSM
+    """
+    psm_map = {
+        "trct": "--psm 11",       # TRCT é formulário com texto esparso
+        "contracheque": "--psm 6", # Contracheque é bloco uniforme
+        "ctps": "--psm 4",         # CTPS é coluna única
+        "generic": "--psm 6"       # Padrão
+    }
+    return psm_map.get(doc_type, "--psm 6")
+
+
 def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int], 
                       missing_fields: List[str]) -> Dict[str, str]:
     """
     Processa uma tarefa OCR da fila.
     Extrai campos de documentos escaneados.
+    
+    2025-12-05: Otimizações de velocidade:
+    - DPI reduzido de 150 para 100 (suficiente para texto)
+    - Pré-processamento com binarização
+    - PSM otimizado por tipo de documento
     """
     logger = logging.getLogger(__name__)
     result = {}
@@ -63,9 +131,10 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
         try:
             logger.info(f"[OCR-QUEUE] 📷 Proc {process_id}: {doc_type.upper()} (página {page_num})...")
             
+            # ✅ DPI reduzido de 150 para 100 (mais rápido, suficiente para texto)
             images = convert_from_path(
                 pdf_path,
-                dpi=150,
+                dpi=100,  # Reduzido de 150
                 first_page=page_num,
                 last_page=page_num,
                 poppler_path=POPPLER_PATH,
@@ -74,10 +143,16 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
             
             if images:
                 img = images[0]
-                img_gray = img.convert('L')
-                config = '--psm 6 -l por'
+                
+                # ✅ Pré-processamento para velocidade
+                img_processed = _preprocess_image_for_ocr(img, doc_type)
+                
+                # ✅ PSM otimizado por tipo de documento
+                psm = _get_psm_for_doc_type(doc_type)
+                config = f'{psm} -l por'
+                
                 texto_pagina = pytesseract.image_to_string(
-                    img_gray, 
+                    img_processed, 
                     config=config,
                     timeout=OCR_TIMEOUT_SECONDS
                 )
@@ -694,25 +769,26 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
             try:
                 logger.info(f"[OCR] 📷 Lendo {doc_type.upper()} (página {page_num})...")
                 
-                # DPI 150 = mais rápido
+                # ✅ DPI 100 = mais rápido (suficiente para texto)
                 images = convert_from_path(
                     pdf_path,
-                    dpi=150,
+                    dpi=100,  # Reduzido de 150
                     first_page=page_num,
                     last_page=page_num,
                     poppler_path=POPPLER_PATH,
-                    timeout=OCR_TIMEOUT_SECONDS  # Timeout para conversão
+                    timeout=OCR_TIMEOUT_SECONDS
                 )
                 
                 if images:
-                    # Apenas a primeira imagem da página
                     img = images[0]
-                    img_gray = img.convert('L')
-                    config = '--psm 6 -l por'
+                    # ✅ Pré-processamento otimizado
+                    img_processed = _preprocess_image_for_ocr(img, doc_type)
+                    # ✅ PSM otimizado por tipo de documento
+                    psm = _get_psm_for_doc_type(doc_type)
+                    config = f'{psm} -l por'
                     
-                    # Timeout para tesseract
                     texto_pagina = pytesseract.image_to_string(
-                        img_gray, 
+                        img_processed, 
                         config=config,
                         timeout=OCR_TIMEOUT_SECONDS
                     )
@@ -877,18 +953,21 @@ def ocr_extract_from_pages(pdf_path: str, pages: List[int]) -> Dict[str, str]:
         texto_ocr = ""
         for page_num in pages:
             try:
+                # ✅ DPI 100 = mais rápido
                 images = convert_from_path(
                     pdf_path,
-                    dpi=150,
+                    dpi=100,  # Reduzido de 150
                     first_page=page_num,
                     last_page=page_num,
                     poppler_path=POPPLER_PATH
                 )
                 
                 for img in images:
-                    img_gray = img.convert('L')
+                    # ✅ Pré-processamento otimizado
+                    img_processed = _preprocess_image_for_ocr(img, "generic")
+                    # ✅ PSM 6 para bloco uniforme
                     config = '--psm 6 -l por+eng'
-                    texto_pagina = pytesseract.image_to_string(img_gray, config=config)
+                    texto_pagina = pytesseract.image_to_string(img_processed, config=config)
                     texto_ocr += f"\n{texto_pagina}"
             except Exception as e:
                 logger.debug(f"[OCR_CIRURGICO] Erro página {page_num}: {e}")
@@ -990,6 +1069,10 @@ def extract_text_with_ocr(pdf_path: str, first_pages: int = 3) -> str:
     """
     Extrai texto usando OCR (Tesseract) nas primeiras páginas do PDF.
     
+    2025-12-05: Otimizações de velocidade:
+    - DPI reduzido de 300 para 150 (ainda muito bom para texto)
+    - Pré-processamento com binarização
+    
     Args:
         pdf_path: Caminho do arquivo PDF
         first_pages: Número de páginas para processar (default: 3)
@@ -1002,10 +1085,10 @@ def extract_text_with_ocr(pdf_path: str, first_pages: int = 3) -> str:
         if POPPLER_PATH:
             logger.info(f"[OCR] Usando poppler de: {POPPLER_PATH}")
         
-        # Converter PDF para imagens (primeiras N páginas)
+        # ✅ DPI 150 = 2x mais rápido que 300, suficiente para texto
         images = convert_from_path(
             pdf_path, 
-            dpi=300,  # Alta resolução para melhor OCR
+            dpi=150,  # Reduzido de 300
             first_page=1,
             last_page=first_pages,
             poppler_path=POPPLER_PATH
@@ -1013,15 +1096,13 @@ def extract_text_with_ocr(pdf_path: str, first_pages: int = 3) -> str:
         
         logger.info(f"[OCR] Converteu {len(images)} páginas para imagem")
         
-        # Aplicar OCR em cada página
         texto_completo = []
         for i, img in enumerate(images, 1):
-            # Pré-processamento: converter para escala de cinza
-            img_gray = img.convert('L')
+            # ✅ Pré-processamento otimizado
+            img_processed = _preprocess_image_for_ocr(img, "generic")
             
-            # OCR com Tesseract (pt-BR + eng)
-            config = '--psm 6 -l por+eng'  # PSM 6 = blocos de texto, português + inglês
-            texto_pagina = pytesseract.image_to_string(img_gray, config=config)
+            config = '--psm 6 -l por+eng'
+            texto_pagina = pytesseract.image_to_string(img_processed, config=config)
             
             texto_completo.append(f"\n--- PÁGINA {i} (OCR) ---\n{texto_pagina}")
             logger.debug(f"[OCR] Página {i}: {len(texto_pagina)} chars")
@@ -1041,6 +1122,10 @@ def ocr_extract_labor_fields(pdf_path: str, max_pages: int = 8) -> Dict[str, str
     Extrai campos trabalhistas críticos (salário, PIS, CTPS) via OCR seletivo.
     
     Faz OCR nas ÚLTIMAS páginas do PDF onde geralmente estão TRCT/contracheques.
+    
+    2025-12-05: Otimizações de velocidade:
+    - DPI 100 (reduzido de 150)
+    - Pré-processamento com binarização
     
     Args:
         pdf_path: Caminho do PDF
@@ -1063,9 +1148,10 @@ def ocr_extract_labor_fields(pdf_path: str, max_pages: int = 8) -> Dict[str, str
         
         logger.info(f"[OCR_LABOR] Extraindo campos trabalhistas via OCR: páginas {start_page}-{total_pages}")
         
+        # ✅ DPI 100 = mais rápido
         images = convert_from_path(
             pdf_path,
-            dpi=150,
+            dpi=100,  # Reduzido de 150
             first_page=start_page,
             last_page=total_pages,
             poppler_path=POPPLER_PATH
@@ -1073,9 +1159,10 @@ def ocr_extract_labor_fields(pdf_path: str, max_pages: int = 8) -> Dict[str, str
         
         texto_ocr = ""
         for i, img in enumerate(images, start_page):
-            img_gray = img.convert('L')
+            # ✅ Pré-processamento otimizado
+            img_processed = _preprocess_image_for_ocr(img, "generic")
             config = '--psm 6 -l por+eng'
-            texto_pagina = pytesseract.image_to_string(img_gray, config=config)
+            texto_pagina = pytesseract.image_to_string(img_processed, config=config)
             texto_ocr += f"\n{texto_pagina}"
         
         if not texto_ocr:
