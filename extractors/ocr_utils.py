@@ -22,7 +22,8 @@ from PIL import Image
 # Semáforo global para limitar OCRs simultâneos (evita sobrecarga do sistema)
 # 2025-12-05: Reduzido de ilimitado para 2 simultâneos após travamentos com 5 workers
 OCR_SEMAPHORE = threading.Semaphore(2)
-OCR_TIMEOUT_SECONDS = 60  # Timeout por página para evitar travamento
+# 2025-12-05: Timeout aumentado de 60s para 120s - páginas complexas levam 25-30s para OCR
+OCR_TIMEOUT_SECONDS = 120  # Timeout por página para evitar travamento
 
 # ============================================================================
 # SISTEMA DE FILA OCR ASSÍNCRONA
@@ -86,7 +87,13 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
             OCR_SEMAPHORE.release()
         
         if not texto_pagina:
+            logger.warning(f"[OCR-QUEUE] ⚠️ Proc {process_id}: {doc_type.upper()} página {page_num} - sem texto extraído!")
             continue
+        
+        # ✅ DEBUG: Mostrar primeiros 500 chars do texto para diagnóstico
+        logger.debug(f"[OCR-QUEUE] Proc {process_id} {doc_type.upper()}: {len(texto_pagina)} chars")
+        preview = texto_pagina[:500].replace('\n', ' ')
+        logger.debug(f"[OCR-QUEUE] Preview: {preview}")
         
         # Extrair campos
         if "salario" in campos_faltantes:
@@ -144,6 +151,13 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
                 result["serie_ctps"] = m.group(1)
                 campos_faltantes.discard("serie_ctps")
                 logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Série CTPS: {result['serie_ctps']}")
+    
+    # ✅ Log final do resultado
+    if result:
+        logger.info(f"[OCR-QUEUE] 🎯 Proc {process_id}: Extraído {list(result.keys())}")
+    else:
+        logger.warning(f"[OCR-QUEUE] ⚠️ Proc {process_id}: NENHUM campo extraído das páginas {list(doc_pages.values())}")
+        logger.warning(f"[OCR-QUEUE] ⚠️ Campos faltantes ainda: {list(campos_faltantes)}")
     
     return result
 

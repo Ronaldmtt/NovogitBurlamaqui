@@ -39,6 +39,11 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - routes_batch enfileira OCR após criar process_id: `queue_ocr_task()`
     - Worker de background (`_ocr_queue_worker_loop`) processa fila e atualiza processos
     - Resultado: workers continuam processando outros PDFs sem esperar OCR
+*   **OCR Timeout Aumentado (2025-12-05):** Timeout do Tesseract aumentado de 60s para 120s:
+    - Páginas complexas de TRCT/CTPS levavam 25-30s para processar
+    - Timeout de 60s causava falhas em muitas páginas
+    - Novo timeout de 120s permite processar páginas mais complexas
+    - Endpoint `/processos/batch/queue-ocr-batch` para reprocessar OCRs de processos com campos faltantes
 *   **Inteligência de Localização de Anexos (2025-12-05):** Sistema de aprendizado que mapeia onde documentos (CTPS, TRCT, Contracheque) aparecem em PDFs processados:
     - Tabela `AnnexLocation`: Armazena page_number, page_ratio, doc_type, confidence para cada documento encontrado
     - `infer_annex_pages_from_history()`: Consulta estatísticas históricas por faixa de tamanho do PDF

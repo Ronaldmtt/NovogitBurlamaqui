@@ -2078,3 +2078,97 @@ def reextract_single(process_id):
         logger.error(f"[REEXTRACT_SINGLE] Erro: {e}", exc_info=True)
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+@batch_bp.route("/queue-ocr-batch", methods=["POST"])
+@login_required
+def queue_ocr_batch():
+    """
+    Enfileira OCR assíncrono para todos os processos com campos trabalhistas faltantes.
+    Usa o worker de background do servidor para processar e salvar no banco.
+    
+    2025-12-05: Criado para reprocessar OCR com timeout aumentado (120s).
+    """
+    from sqlalchemy import or_
+    from extractors.ocr_utils import queue_ocr_task, extract_pdf_bookmarks, get_pdf_total_pages, get_ocr_queue_status
+    
+    try:
+        # Encontrar processos com campos trabalhistas faltantes
+        processes_with_missing = Process.query.filter(
+            Process.user_id == current_user.id,
+            or_(
+                Process.pis.is_(None), Process.pis == "",
+                Process.ctps.is_(None), Process.ctps == "",
+                Process.data_admissao.is_(None), Process.data_admissao == "",
+                Process.data_demissao.is_(None), Process.data_demissao == ""
+            )
+        ).limit(20).all()
+        
+        if not processes_with_missing:
+            return jsonify({"message": "Nenhum processo com campos faltantes encontrado", "queued": 0})
+        
+        queued_count = 0
+        errors = []
+        
+        for process in processes_with_missing:
+            # Identificar campos faltantes
+            missing = []
+            if not process.pis: missing.append("pis")
+            if not process.ctps: missing.append("ctps")
+            if not process.data_admissao: missing.append("data_admissao")
+            if not process.data_demissao: missing.append("data_demissao")
+            
+            if not missing:
+                continue
+            
+            # Encontrar PDF associado
+            batch_item = BatchItem.query.filter_by(process_id=process.id).first()
+            if not batch_item or not batch_item.upload_path:
+                errors.append(f"Processo {process.id}: PDF não encontrado")
+                continue
+            
+            pdf_path = batch_item.upload_path
+            if not os.path.exists(pdf_path):
+                errors.append(f"Processo {process.id}: Arquivo não existe")
+                continue
+            
+            # Determinar páginas para OCR
+            docs_needed = set()
+            if any(f in missing for f in ["data_admissao", "pis", "ctps"]):
+                docs_needed.add("ctps")
+            if "data_demissao" in missing:
+                docs_needed.add("trct")
+            
+            total_pages = get_pdf_total_pages(pdf_path)
+            bookmarks = extract_pdf_bookmarks(pdf_path)
+            
+            doc_pages = {}
+            for doc in docs_needed:
+                if doc in bookmarks:
+                    doc_pages[doc] = bookmarks[doc]
+                else:
+                    # Heurística
+                    if doc == "trct":
+                        doc_pages[doc] = max(1, int(total_pages * 0.87))
+                    elif doc == "ctps":
+                        doc_pages[doc] = max(1, int(total_pages * 0.82))
+            
+            # Enfileirar para OCR
+            if doc_pages:
+                queued = queue_ocr_task(process.id, pdf_path, doc_pages, missing)
+                if queued:
+                    queued_count += 1
+                    logger.info(f"[OCR-BATCH] Enfileirado processo {process.id}: {missing}")
+        
+        status = get_ocr_queue_status()
+        
+        return jsonify({
+            "message": f"OCR enfileirado para {queued_count} processos",
+            "queued": queued_count,
+            "queue_status": status,
+            "errors": errors[:5] if errors else []
+        })
+        
+    except Exception as e:
+        logger.error(f"[OCR-BATCH] Erro: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
