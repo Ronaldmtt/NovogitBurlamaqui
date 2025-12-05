@@ -178,6 +178,9 @@ class Process(db.Model):
     
     # ✅ PEDIDOS - Lista de pedidos extraídos do PDF (JSON)
     pedidos_json = db.Column(db.Text, nullable=True)                 # JSON com lista de pedidos extraídos
+    
+    # ✅ METADADOS DO PDF - Para mapeamento inteligente de anexos
+    pdf_total_pages = db.Column(db.Integer, nullable=True)           # Total de páginas do PDF original
 
     created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -407,6 +410,53 @@ class BatchUpload(db.Model):
     
     def __repr__(self) -> str:
         return f"<BatchUpload id={self.id} status={self.status!r} {self.processed_count}/{self.total_count}>"
+
+
+# ---------------------------------------------------------------------
+# Localização de Anexos (Inteligência para OCR)
+# ---------------------------------------------------------------------
+class AnnexLocation(db.Model):
+    """
+    Armazena onde cada tipo de documento (CTPS, TRCT, Contracheque) foi 
+    encontrado em PDFs processados. Usado para inferir localizações em 
+    novos PDFs sem bookmarks.
+    
+    Exemplo: Em um PDF de 100 páginas, a CTPS foi encontrada na página 85.
+    page_ratio = 85/100 = 0.85 (85% do PDF)
+    
+    Estatísticas agregadas são calculadas por doc_type para inferência.
+    """
+    __tablename__ = "annex_location"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    process_id = db.Column(db.Integer, db.ForeignKey("process.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Tipo de documento: ctps, trct, contracheque
+    doc_type = db.Column(db.String(20), nullable=False, index=True)
+    
+    # Página onde foi encontrado (1-indexed)
+    page_number = db.Column(db.Integer, nullable=False)
+    
+    # Total de páginas do PDF (para calcular ratio)
+    total_pages = db.Column(db.Integer, nullable=False)
+    
+    # Ratio = page_number / total_pages (ex: 0.85 = 85% do PDF)
+    page_ratio = db.Column(db.Float, nullable=False)
+    
+    # Fonte da informação: bookmark, toc, ocr_found
+    source = db.Column(db.String(20), nullable=False, default="ocr_found")
+    
+    # Confiança: 1.0 = bookmark, 0.9 = toc, 0.7 = ocr
+    confidence = db.Column(db.Float, nullable=False, default=0.7)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
+    
+    # Relacionamento
+    process = db.relationship("Process", backref=db.backref("annex_locations", cascade="all, delete-orphan"))
+    
+    def __repr__(self) -> str:
+        return f"<AnnexLocation {self.doc_type} page={self.page_number}/{self.total_pages} ({self.page_ratio:.0%})>"
 
 
 class BatchItem(db.Model):

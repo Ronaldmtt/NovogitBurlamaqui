@@ -295,9 +295,10 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     
     logger.info(f"[OCR] Documentos necessários: {docs_needed}")
     
-    # ===== PASSO 2: Obter páginas dos documentos (bookmarks → TOC → heurística) =====
+    # ===== PASSO 2: Obter páginas dos documentos (bookmarks → TOC → inferência → heurística) =====
     bookmarks = extract_pdf_bookmarks(pdf_path)
     toc_pages = parse_toc_from_pdf(pdf_path) if not bookmarks else {}
+    total_pages = get_pdf_total_pages(pdf_path)
     
     doc_pages = {}  # {doc_type: page_number}
     
@@ -311,7 +312,16 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
             doc_pages[doc] = toc_pages[doc][0]
             logger.info(f"[OCR] {doc.upper()} → página {toc_pages[doc][0]} (sumário)")
     
-    # Prioridade 3: Heurística LIMITADA (só últimas 15 páginas) se não encontrou nenhum
+    # Prioridade 2.5: Inferência baseada em histórico do banco
+    docs_sem_pagina = docs_needed - set(doc_pages.keys())
+    if docs_sem_pagina and total_pages > 0:
+        inferred = infer_annex_pages_from_history(total_pages, docs_sem_pagina)
+        for doc, pages in inferred.items():
+            if pages and doc not in doc_pages:
+                doc_pages[doc] = pages[0]  # Usar página mais provável
+                logger.info(f"[OCR] {doc.upper()} → página {pages[0]} (inferido do histórico)")
+    
+    # Prioridade 3: Heurística LIMITADA (só últimas 30% páginas) se não encontrou nenhum
     if not doc_pages:
         # ⚠️ IMPORTANTE: search_all=False para não varrer o PDF inteiro (lento em PDFs grandes)
         scanned = detect_scanned_pages(pdf_path, search_all=False)
@@ -1451,3 +1461,172 @@ def extract_fields_with_ocr(pdf_path: str) -> Dict[str, Optional[str]]:
     log_info(f"OCR extraiu {extracted_count} campos", region="OCR_EXTRACTOR")
     
     return result
+
+
+# =============================================================================
+# INTELIGÊNCIA DE LOCALIZAÇÃO DE ANEXOS
+# =============================================================================
+
+def infer_annex_pages_from_history(total_pages: int, docs_needed: set) -> Dict[str, List[int]]:
+    """
+    Infere páginas prováveis de anexos baseado em dados históricos do banco.
+    
+    Consulta a tabela AnnexLocation para obter estatísticas de onde cada tipo
+    de documento geralmente aparece em PDFs de tamanho similar.
+    
+    Args:
+        total_pages: Total de páginas do PDF atual
+        docs_needed: Set de tipos de documento necessários (ctps, trct, contracheque)
+    
+    Returns:
+        Dict com {doc_type: [página1, página2, ...]} ordenado por probabilidade
+    """
+    from extensions import db
+    from models import AnnexLocation
+    from sqlalchemy import func
+    
+    logger = logging.getLogger(__name__)
+    result = {}
+    
+    if not docs_needed or total_pages < 10:
+        return result
+    
+    try:
+        for doc_type in docs_needed:
+            # Buscar estatísticas para este tipo de documento
+            # Agrupar por faixas de tamanho de PDF (0-50, 51-100, 101-150, >150)
+            page_range_start = (total_pages // 50) * 50
+            page_range_end = page_range_start + 50
+            
+            stats = db.session.query(
+                func.avg(AnnexLocation.page_ratio).label('avg_ratio'),
+                func.min(AnnexLocation.page_ratio).label('min_ratio'),
+                func.max(AnnexLocation.page_ratio).label('max_ratio'),
+                func.count(AnnexLocation.id).label('count')
+            ).filter(
+                AnnexLocation.doc_type == doc_type,
+                AnnexLocation.total_pages >= page_range_start,
+                AnnexLocation.total_pages < page_range_end
+            ).first()
+            
+            if stats and stats.count and stats.count >= 3:
+                # Temos dados suficientes para inferir
+                avg_ratio = stats.avg_ratio
+                min_ratio = stats.min_ratio
+                max_ratio = stats.max_ratio
+                
+                # Calcular páginas candidatas
+                avg_page = int(total_pages * avg_ratio)
+                min_page = max(1, int(total_pages * min_ratio) - 1)
+                max_page = min(total_pages, int(total_pages * max_ratio) + 1)
+                
+                # Retornar 3 candidatos: média, -2, +2
+                candidates = sorted(set([
+                    max(1, avg_page - 2),
+                    avg_page,
+                    min(total_pages, avg_page + 2)
+                ]))
+                
+                result[doc_type] = candidates
+                logger.info(f"[INFER] {doc_type.upper()}: média página {avg_page} ({avg_ratio:.0%}), range [{min_page}-{max_page}], {stats.count} amostras")
+            else:
+                # Fallback: usar heurística baseada em padrões típicos de PDFs trabalhistas
+                # CTPS geralmente ~80-85% do PDF
+                # TRCT geralmente ~85-90% do PDF  
+                # Contracheque geralmente ~75-80% do PDF
+                defaults = {
+                    'ctps': 0.82,
+                    'trct': 0.87,
+                    'contracheque': 0.77
+                }
+                if doc_type in defaults:
+                    ratio = defaults[doc_type]
+                    page = int(total_pages * ratio)
+                    result[doc_type] = [max(1, page - 1), page, min(total_pages, page + 1)]
+                    logger.info(f"[INFER] {doc_type.upper()}: usando default {ratio:.0%} → página {page}")
+    
+    except Exception as e:
+        logger.warning(f"[INFER] Erro ao consultar histórico: {e}")
+    
+    return result
+
+
+def record_annex_location(process_id: int, doc_type: str, page_number: int, 
+                          total_pages: int, source: str = "ocr_found") -> bool:
+    """
+    Registra a localização de um anexo encontrado para uso futuro.
+    
+    Args:
+        process_id: ID do processo
+        doc_type: Tipo do documento (ctps, trct, contracheque)
+        page_number: Página onde foi encontrado (1-indexed)
+        total_pages: Total de páginas do PDF
+        source: Origem da informação (bookmark, toc, ocr_found)
+    
+    Returns:
+        True se registrou com sucesso
+    """
+    from extensions import db
+    from models import AnnexLocation
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Calcular ratio
+        page_ratio = page_number / total_pages
+        
+        # Definir confiança baseada na fonte
+        confidence_map = {
+            'bookmark': 1.0,
+            'toc': 0.9,
+            'ocr_found': 0.7
+        }
+        confidence = confidence_map.get(source, 0.5)
+        
+        # Verificar se já existe registro para este processo/doc_type
+        existing = AnnexLocation.query.filter_by(
+            process_id=process_id,
+            doc_type=doc_type
+        ).first()
+        
+        if existing:
+            # Atualizar se a nova fonte for mais confiável
+            if confidence > existing.confidence:
+                existing.page_number = page_number
+                existing.total_pages = total_pages
+                existing.page_ratio = page_ratio
+                existing.source = source
+                existing.confidence = confidence
+                db.session.commit()
+                logger.info(f"[ANNEX_LOC] Atualizado: {doc_type} → pág {page_number}/{total_pages} ({page_ratio:.0%})")
+        else:
+            # Criar novo registro
+            new_loc = AnnexLocation(
+                process_id=process_id,
+                doc_type=doc_type,
+                page_number=page_number,
+                total_pages=total_pages,
+                page_ratio=page_ratio,
+                source=source,
+                confidence=confidence
+            )
+            db.session.add(new_loc)
+            db.session.commit()
+            logger.info(f"[ANNEX_LOC] Registrado: {doc_type} → pág {page_number}/{total_pages} ({page_ratio:.0%})")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"[ANNEX_LOC] Erro ao registrar localização: {e}")
+        db.session.rollback()
+        return False
+
+
+def get_pdf_total_pages(pdf_path: str) -> int:
+    """Retorna o total de páginas de um PDF."""
+    try:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(pdf_path)
+        return len(reader.pages)
+    except Exception:
+        return 0

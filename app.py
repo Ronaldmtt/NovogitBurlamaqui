@@ -86,7 +86,7 @@ def create_app():
 
     # Uploads
     app.config["UPLOAD_FOLDER"] = os.path.join(os.getcwd(), "uploads")
-    app.config["MAX_CONTENT_LENGTH"] = 350 * 1024 * 1024  # 350MB (20 arquivos x 16MB + overhead)
+    app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024  # 2GB (20 arquivos x 100MB cada)
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     # Recarregar templates automaticamente em dev

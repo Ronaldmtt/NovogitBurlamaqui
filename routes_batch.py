@@ -27,7 +27,7 @@ batch_bp = Blueprint("batch", __name__, url_prefix="/processos/batch")
 
 # Configurações
 ALLOWED_EXTENSIONS = {'pdf'}
-MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB por arquivo
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB por arquivo (suporte a PDFs grandes)
 MAX_FILES_PER_BATCH = 20  # Máximo de PDFs por batch
 
 
