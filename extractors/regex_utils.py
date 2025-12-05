@@ -2374,6 +2374,10 @@ def extract_cargo_funcao(text: str) -> str | None:
     # Isso evita problemas com cargos longos como "Técnico em Segurança do Trabalho"
     
     patterns = [
+        # 🆕 2025-12-05: TERMO DE DEVOLUÇÃO - Campo "Função" seguido de valor
+        # Formato: "Função    MAQUINISTA DE TEATRO" (com espaços/tabs)
+        r'Fun[çc][ãa]o\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,40})(?:\n|Setor|$)',
+        
         # PRIORIDADE 1: Padrões específicos de contratação (case sensitive para cargos em maiúsculo)
         # Captura até 60 caracteres greedy, depois limpa
         r'para\s+exercer\s+(?:a\s+)?fun[cç][aã]o\s+de\s+([A-ZÀ-Ú][A-ZÀ-Ú\s]{3,60})',
@@ -2648,6 +2652,8 @@ def extract_ctps(text: str) -> str | None:
         # 🆕 2025-12-05: TERMO DE QUITAÇÃO - Campo "17 CTPS (nº, série, UF)"
         # Formato: "0000525234,003730,RJ" ou "0007899570.001234,PA"
         r'17\s*CTPS[^\d]{0,30}(\d{7,})[.,](\d+)[.,]?([A-Z]{2})',
+        # 🆕 2025-12-05: TERMO DE DEVOLUÇÃO - Campo "RG/CTPS: 085227296"
+        r'RG/CTPS[:\s]*(\d{6,})',
         # Formato COMPACTO: "CTPS sob nº 0048610 -00080/RJ" (PyPDF2 adiciona espaços)
         r'(?:portador\s+da\s+)?CTPS\s+(?:sob\s+)?(\d+[\s\-]+\d+[/][A-Z]{2})',
         # 🆕 Formato com série: "CTPS nº 1210996, série 2780/RJ" ou "CTPS 1210996, série 2780/MA"
