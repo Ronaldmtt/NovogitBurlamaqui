@@ -585,44 +585,36 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
     else:
         logger.debug("[LLM_SKIP] Regex extraiu campos críticos - LLM não necessário")
     
-    # ✅ CAMADA 4: OCR SELETIVO INTELIGENTE (2025-12-01 - Plano Batman)
-    # Aplica OCR APENAS em páginas escaneadas detectadas automaticamente
-    # Evita OCR cego em 8 páginas - otimiza tempo sem perder cobertura
+    # ✅ CAMADA 4: OCR SELETIVO VIA SUMÁRIO (2025-12-04)
+    # Analisa sumário do PDF para encontrar páginas de TRCT/Contracheques
+    # Aplica OCR APENAS nessas páginas específicas (máx 5 páginas)
+    # Muito mais rápido que OCR cego em todas as páginas
     
     campos_ocr = []
     if not data.get("salario"): campos_ocr.append("salario")
     if not data.get("pis"): campos_ocr.append("pis")
     if not data.get("ctps"): campos_ocr.append("ctps")
+    if not data.get("data_admissao"): campos_ocr.append("data_admissao")
+    if not data.get("data_demissao"): campos_ocr.append("data_demissao")
     
     if campos_ocr and pdf_path:
         try:
-            from .ocr_utils import detect_scanned_pages, ocr_extract_from_pages
+            from .ocr_utils import resolve_missing_labor_fields
             
-            # Detectar páginas escaneadas (text_len < 100)
-            scanned_pages = detect_scanned_pages(pdf_path)
+            logger.info(f"[OCR_SUMARIO] Campos trabalhistas faltantes: {campos_ocr}")
+            ocr_result = resolve_missing_labor_fields(pdf_path, data, campos_ocr)
             
-            if scanned_pages:
-                logger.info(f"[OCR_BATMAN] Detectadas {len(scanned_pages)} páginas escaneadas: {scanned_pages}")
-                # OCR apenas nas páginas escaneadas (máx 5 para performance)
-                target_pages = scanned_pages[-5:]  # Últimas 5 páginas escaneadas (TRCT/contracheques)
-                ocr_result = ocr_extract_from_pages(pdf_path, target_pages)
+            if ocr_result:
+                for field, value in ocr_result.items():
+                    if not data.get(field) and value:
+                        data[field] = value
+                        logger.info(f"[{field.upper()}] 📷 Recuperado via OCR Sumário: {value}")
                 
-                if ocr_result:
-                    if not data.get("salario") and ocr_result.get("salario"):
-                        data["salario"] = ocr_result["salario"]
-                        logger.info(f"[SALARIO] 📷 OCR cirúrgico: {ocr_result['salario']}")
-                    
-                    if not data.get("pis") and ocr_result.get("pis"):
-                        data["pis"] = ocr_result["pis"]
-                        logger.info(f"[PIS] 📷 OCR cirúrgico: {ocr_result['pis']}")
-                    
-                    if not data.get("ctps") and ocr_result.get("ctps"):
-                        data["ctps"] = ocr_result["ctps"]
-                        logger.info(f"[CTPS] 📷 OCR cirúrgico: {ocr_result['ctps']}")
+                logger.info(f"[OCR_SUMARIO] ✅ {len(ocr_result)} campos recuperados via OCR seletivo")
             else:
-                logger.debug(f"[OCR_SKIP] Campos {campos_ocr} vazios mas PDF é 100% texto nativo - OCR não necessário")
+                logger.debug(f"[OCR_SUMARIO] Nenhum campo recuperado - dados podem estar em texto ou indisponíveis")
         except Exception as e:
-            logger.debug(f"[OCR_FALLBACK] Erro: {e}")
+            logger.warning(f"[OCR_SUMARIO] Erro no fallback: {e}")
     elif campos_ocr:
         logger.debug(f"[OCR_SKIP] Campos {campos_ocr} vazios mas pdf_path não fornecido")
 

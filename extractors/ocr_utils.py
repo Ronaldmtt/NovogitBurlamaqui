@@ -48,6 +48,290 @@ else:
     logging.getLogger(__name__).warning("[OCR] Poppler não encontrado - OCR usará configuração padrão do sistema")
 
 
+ANNEX_KEYWORDS = {
+    "trct": ["trct", "termo de rescisão", "termo rescisório", "rescisao contrato", "rescisão do contrato"],
+    "contracheque": ["contracheque", "holerite", "recibo de pagamento", "demonstrativo de pagamento", "folha de pagamento"],
+    "documentos": ["documentos", "anexos", "docs", "comprovantes"],
+    "ctps": ["ctps", "carteira de trabalho", "carteira profissional"],
+    "pis": ["pis", "pasep", "nit"],
+}
+
+def parse_toc_from_pdf(pdf_path: str, max_pages: int = 6) -> Dict[str, List[int]]:
+    """
+    Analisa o sumário (TOC) do PDF para encontrar páginas de anexos trabalhistas.
+    
+    2025-12-04: OCR Seletivo via Sumário - Extrai links do índice para TRCT, Contracheques, etc.
+    2025-12-05: Corrigido para buscar sumário também nas últimas páginas (PJe coloca no final)
+    
+    Padrões reconhecidos no sumário:
+    - "TRCT............45" ou "TRCT - pg 45" ou "TRCT (página 45)"
+    - "Contracheques...........67-72"
+    - Links clicáveis com destino para páginas
+    
+    Args:
+        pdf_path: Caminho do PDF
+        max_pages: Quantas páginas iniciais E finais analisar para o sumário (default: 6)
+    
+    Returns:
+        Dict com {categoria: [páginas]} ex: {"trct": [45], "contracheque": [67, 68, 69]}
+    """
+    import re
+    from PyPDF2 import PdfReader
+    
+    result = {k: [] for k in ANNEX_KEYWORDS.keys()}
+    logger = logging.getLogger(__name__)
+    
+    try:
+        reader = PdfReader(pdf_path)
+        total_pages = len(reader.pages)
+        
+        pages_to_read = set()
+        for i in range(min(max_pages, total_pages)):
+            pages_to_read.add(i)
+        for i in range(max(0, total_pages - max_pages), total_pages):
+            pages_to_read.add(i)
+        
+        toc_text = ""
+        for i in sorted(pages_to_read):
+            page = reader.pages[i]
+            text = page.extract_text() or ""
+            toc_text += f"\n{text}"
+        
+        toc_lower = toc_text.lower()
+        
+        toc_patterns = [
+            r'([A-Za-zÀ-ú\s]+)[\.\s]{3,}(\d+)',
+            r'([A-Za-zÀ-ú\s]+)\s*[-–—]\s*(?:pg\.?|p\.?|página)\s*(\d+)',
+            r'([A-Za-zÀ-ú\s]+)\s*\((?:pg\.?|p\.?|página)\s*(\d+)\)',
+            r'([A-Za-zÀ-ú\s]+)\s+(\d{2,3})$',
+        ]
+        
+        for pattern in toc_patterns:
+            matches = re.finditer(pattern, toc_text, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                label = match.group(1).strip().lower()
+                try:
+                    page_num = int(match.group(2))
+                    if page_num > 0 and page_num <= total_pages:
+                        for category, keywords in ANNEX_KEYWORDS.items():
+                            for kw in keywords:
+                                if kw in label:
+                                    if page_num not in result[category]:
+                                        result[category].append(page_num)
+                                        logger.debug(f"[TOC_PARSER] '{label}' → {category} página {page_num}")
+                                    break
+                except ValueError:
+                    continue
+        
+        range_pattern = r'([A-Za-zÀ-ú\s]+)[\.\s]{3,}(\d+)\s*[-–—a]\s*(\d+)'
+        range_matches = re.finditer(range_pattern, toc_text, re.IGNORECASE)
+        for match in range_matches:
+            label = match.group(1).strip().lower()
+            try:
+                start_page = int(match.group(2))
+                end_page = int(match.group(3))
+                if start_page > 0 and end_page <= total_pages and end_page >= start_page:
+                    for category, keywords in ANNEX_KEYWORDS.items():
+                        for kw in keywords:
+                            if kw in label:
+                                for pg in range(start_page, min(end_page + 1, start_page + 5)):
+                                    if pg not in result[category]:
+                                        result[category].append(pg)
+                                break
+            except ValueError:
+                continue
+        
+        found_any = any(pages for pages in result.values())
+        if found_any:
+            summary = {k: v for k, v in result.items() if v}
+            logger.info(f"[TOC_PARSER] ✅ Sumário encontrado: {summary}")
+        else:
+            logger.debug("[TOC_PARSER] Nenhum link de anexo trabalhista encontrado no sumário")
+        
+        return result
+        
+    except Exception as e:
+        logger.warning(f"[TOC_PARSER] Erro ao analisar sumário: {e}")
+        return result
+
+
+def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any], 
+                                  missing_fields: List[str]) -> Dict[str, str]:
+    """
+    Resolve campos trabalhistas faltantes usando OCR seletivo via sumário.
+    
+    2025-12-04: Nova camada de fallback inteligente.
+    
+    Estratégia:
+    1. Analisa o sumário do PDF para encontrar páginas de TRCT/Contracheques
+    2. Aplica OCR apenas nessas páginas específicas (máx 5)
+    3. Extrai os campos faltantes das imagens
+    
+    Args:
+        pdf_path: Caminho do PDF
+        current_data: Dados já extraídos (para não sobrescrever)
+        missing_fields: Lista de campos faltantes ["salario", "pis", "data_admissao", etc]
+    
+    Returns:
+        Dict com campos recuperados via OCR seletivo
+    """
+    import re
+    
+    result = {}
+    logger = logging.getLogger(__name__)
+    
+    if not missing_fields or not pdf_path:
+        return result
+    
+    logger.info(f"[OCR_SUMARIO] Iniciando fallback via sumário para: {missing_fields}")
+    
+    toc_pages = parse_toc_from_pdf(pdf_path)
+    
+    target_pages = set()
+    
+    field_to_category = {
+        "salario": ["contracheque", "trct"],
+        "data_admissao": ["trct", "ctps", "contracheque"],
+        "data_demissao": ["trct"],
+        "pis": ["trct", "pis", "contracheque"],
+        "ctps": ["trct", "ctps"],
+    }
+    
+    for field in missing_fields:
+        categories = field_to_category.get(field, [])
+        for cat in categories:
+            if toc_pages.get(cat):
+                target_pages.update(toc_pages[cat][:3])
+    
+    if not target_pages:
+        logger.info("[OCR_SUMARIO] Sumário não encontrou páginas - usando heurística de anexos")
+        scanned = detect_scanned_pages(pdf_path)
+        if scanned:
+            target_pages = set(scanned[-5:])
+    
+    if not target_pages:
+        logger.debug("[OCR_SUMARIO] Nenhuma página alvo identificada")
+        return result
+    
+    target_list = sorted(list(target_pages))[:5]
+    logger.info(f"[OCR_SUMARIO] 📷 Aplicando OCR nas páginas: {target_list}")
+    
+    try:
+        texto_ocr = ""
+        for page_num in target_list:
+            try:
+                images = convert_from_path(
+                    pdf_path,
+                    dpi=200,
+                    first_page=page_num,
+                    last_page=page_num,
+                    poppler_path=POPPLER_PATH
+                )
+                
+                for img in images:
+                    img_gray = img.convert('L')
+                    config = '--psm 6 -l por+eng'
+                    texto_pagina = pytesseract.image_to_string(img_gray, config=config)
+                    texto_ocr += f"\n--- PÁGINA {page_num} ---\n{texto_pagina}"
+                    logger.debug(f"[OCR_SUMARIO] Página {page_num}: {len(texto_pagina)} chars extraídos")
+            except Exception as e:
+                logger.warning(f"[OCR_SUMARIO] Erro página {page_num}: {e}")
+        
+        if not texto_ocr:
+            return result
+        
+        logger.debug(f"[OCR_SUMARIO] Total texto OCR: {len(texto_ocr)} chars")
+        
+        if "salario" in missing_fields:
+            salario_patterns = [
+                r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                r'(?:vencimento|proventos)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                r'(?:total\s*bruto|bruto)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                r'R\$\s*([\d]{1,3}(?:\.\d{3})*,\d{2})',
+            ]
+            for pattern in salario_patterns:
+                m = re.search(pattern, texto_ocr, re.IGNORECASE)
+                if m:
+                    val_str = m.group(1).replace('.', '').replace(',', '.')
+                    try:
+                        val = float(val_str)
+                        if 1000 <= val <= 100000:
+                            result["salario"] = f"R$ {m.group(1)}"
+                            logger.info(f"[OCR_SUMARIO] ✅ Salário: {result['salario']}")
+                            break
+                    except:
+                        pass
+        
+        if "data_admissao" in missing_fields:
+            admissao_patterns = [
+                r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em|in[ií]cio\s*(?:do\s*)?contrato)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                r'admiss[ãa]o[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+            ]
+            for pattern in admissao_patterns:
+                m = re.search(pattern, texto_ocr, re.IGNORECASE)
+                if m:
+                    result["data_admissao"] = m.group(1)
+                    logger.info(f"[OCR_SUMARIO] ✅ Data Admissão: {result['data_admissao']}")
+                    break
+        
+        if "data_demissao" in missing_fields:
+            demissao_patterns = [
+                r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|sa[ií]da|rescis[ãa]o)|demitido\s*em|t[eé]rmino\s*(?:do\s*)?contrato)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                r'(?:aviso\s*pr[eé]vio\s*(?:at[eé]|fim)|[uú]ltimo\s*dia\s*trabalhado)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+            ]
+            for pattern in demissao_patterns:
+                m = re.search(pattern, texto_ocr, re.IGNORECASE)
+                if m:
+                    result["data_demissao"] = m.group(1)
+                    logger.info(f"[OCR_SUMARIO] ✅ Data Demissão: {result['data_demissao']}")
+                    break
+        
+        if "pis" in missing_fields:
+            pis_patterns = [
+                r'(?:PIS|PASEP|NIT|PIS/PASEP)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)',
+                r'\b(\d{3}\.\d{5}\.\d{2}[.-]\d)\b',
+                r'\b(\d{11})\b',
+            ]
+            for pattern in pis_patterns:
+                m = re.search(pattern, texto_ocr, re.IGNORECASE)
+                if m:
+                    pis_raw = re.sub(r'[^\d]', '', m.group(1))
+                    if len(pis_raw) == 11:
+                        result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
+                        logger.info(f"[OCR_SUMARIO] ✅ PIS: {result['pis']}")
+                        break
+        
+        if "ctps" in missing_fields:
+            ctps_patterns = [
+                r'(?:CTPS|Carteira\s*(?:de\s*)?Trabalho)[:\s]*[nN]?[º°]?\s*(\d{5,7})[/\s,]*(?:s[eé]rie|série)[:\s]*(\d{3,5})(?:[/\s-]*([A-Z]{2}))?',
+                r'[nN]?[º°]?\s*(\d{5,7})[/\s]*[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})(?:[/\s-]*([A-Z]{2}))?',
+            ]
+            for pattern in ctps_patterns:
+                m = re.search(pattern, texto_ocr, re.IGNORECASE)
+                if m:
+                    numero = m.group(1)
+                    serie = m.group(2)
+                    uf = m.group(3) if len(m.groups()) >= 3 and m.group(3) else None
+                    if uf:
+                        result["ctps"] = f"{numero} série {serie}-{uf}"
+                    else:
+                        result["ctps"] = f"{numero} série {serie}"
+                    logger.info(f"[OCR_SUMARIO] ✅ CTPS: {result['ctps']}")
+                    break
+        
+        if result:
+            logger.info(f"[OCR_SUMARIO] 🎯 Recuperados {len(result)} campos via OCR seletivo: {list(result.keys())}")
+        else:
+            logger.debug("[OCR_SUMARIO] Nenhum campo recuperado via OCR")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"[OCR_SUMARIO] ❌ Erro no OCR seletivo: {e}")
+        return result
+
+
 def detect_scanned_pages(pdf_path: str, min_text_len: int = 50) -> List[int]:
     """
     Detecta páginas escaneadas em um PDF usando heurística robusta.

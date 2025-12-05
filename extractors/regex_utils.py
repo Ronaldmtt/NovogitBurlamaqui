@@ -16,6 +16,8 @@ def normalize_text(text: str) -> str:
     Normalização básica de texto para TODOS os campos.
     Remove espaços múltiplos, normaliza quebras de linha, limpa hífens especiais.
     
+    2025-12-05: Adicionada correção de palavras quebradas por PDF (ex: "ou tubro" → "outubro")
+    
     Usar como PRIMEIRO passo em todas as funções extract_*.
     """
     if not text:
@@ -24,11 +26,41 @@ def normalize_text(text: str) -> str:
     text = text.replace('–', '-').replace('—', '-')
     # Remover quebras de linha múltiplas
     text = re.sub(r'\n{3,}', '\n\n', text)
+    # CORREÇÃO 2025-12-05: Corrigir meses quebrados por PyPDF2
+    # Problema real: "ou tubro" no PDF original ao invés de "outubro"
+    text = _fix_broken_months(text)
     # Normalizar espaços múltiplos para um só
     text = re.sub(r' {2,}', ' ', text)
     # Remover espaços no início/fim de linhas
     text = re.sub(r'^ +| +$', '', text, flags=re.MULTILINE)
     return text.strip()
+
+
+# Padrões de meses quebrados por PyPDF2 → mês correto
+# Formato: (regex case-insensitive, substituição)
+_BROKEN_MONTHS = [
+    (r'ja\s*nei\s*ro', 'janeiro'),
+    (r'fe\s*ve\s*rei\s*ro', 'fevereiro'),
+    (r'mar\s*[çc]\s*o', 'março'),
+    (r'ab\s*ril', 'abril'),
+    (r'ma\s*io', 'maio'),
+    (r'ju\s*nho', 'junho'),
+    (r'ju\s*lho', 'julho'),
+    (r'a\s*gos\s*to', 'agosto'),
+    (r'se\s*tem\s*bro', 'setembro'),
+    (r'ou\s*tu\s*bro', 'outubro'),
+    (r'no\s*vem\s*bro', 'novembro'),
+    (r'de\s*zem\s*bro', 'dezembro'),
+]
+
+def _fix_broken_months(text: str) -> str:
+    """
+    Corrige meses quebrados por extração de PDF.
+    Exemplo: "ou tubro" → "outubro", "de\nzembro" → "dezembro"
+    """
+    for pattern, replacement in _BROKEN_MONTHS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text
 
 def normalize_monetary(text: str) -> str:
     """
