@@ -311,9 +311,10 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
             doc_pages[doc] = toc_pages[doc][0]
             logger.info(f"[OCR] {doc.upper()} → página {toc_pages[doc][0]} (sumário)")
     
-    # Prioridade 3: Heurística se não encontrou nenhum
+    # Prioridade 3: Heurística LIMITADA (só últimas 15 páginas) se não encontrou nenhum
     if not doc_pages:
-        scanned = detect_scanned_pages(pdf_path)
+        # ⚠️ IMPORTANTE: search_all=False para não varrer o PDF inteiro (lento em PDFs grandes)
+        scanned = detect_scanned_pages(pdf_path, search_all=False)
         if scanned:
             # Usar primeira página escaneada como fallback geral
             doc_pages["fallback"] = scanned[0]

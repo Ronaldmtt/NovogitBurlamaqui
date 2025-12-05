@@ -247,21 +247,14 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
         data["audiencia_inicial"] = ai
         data["cadastrar_primeira_audiencia"] = True  # ✅ Marcar automaticamente quando audiência for detectada
         logger.info(f"[AUDIENCIA_INICIAL] ✅ Detectada: {ai} - cadastrar_primeira_audiencia=True")
-    elif pdf_path:
-        # ✅ FALLBACK OCR: Tenta extrair audiência de páginas escaneadas via mapeamento cirúrgico
-        try:
-            from .ocr_utils import extract_audiencia_from_mapping
-            aud_ocr = extract_audiencia_from_mapping(pdf_path)
-            if aud_ocr:
-                data_aud = aud_ocr.get('data_audiencia', '')
-                hora_aud = aud_ocr.get('hora_audiencia', '')
-                if data_aud:
-                    ai_combined = f"{data_aud} {hora_aud}".strip() if hora_aud else data_aud
-                    data["audiencia_inicial"] = ai_combined
-                    data["cadastrar_primeira_audiencia"] = True
-                    logger.info(f"[AUDIENCIA_INICIAL_OCR] ✅ Detectada via OCR: {ai_combined}")
-        except Exception as e:
-            logger.debug(f"[AUDIENCIA_INICIAL_OCR] Fallback OCR não disponível: {e}")
+    # ❌ DESABILITADO (2025-12-05): OCR de audiência via mapeamento é muito lento em PDFs grandes
+    # elif pdf_path:
+    #     try:
+    #         from .ocr_utils import extract_audiencia_from_mapping
+    #         aud_ocr = extract_audiencia_from_mapping(pdf_path)
+    #         ...
+    #     except Exception as e:
+    #         logger.debug(f"[AUDIENCIA_INICIAL_OCR] Fallback desabilitado")
     
     # ✅ Extrair link de audiência telepresencial (Zoom, Meet, Teams)
     link_aud = extract_link_audiencia(t)
