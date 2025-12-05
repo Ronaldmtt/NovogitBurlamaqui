@@ -60,6 +60,13 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - Query ordena por `file_size ASC` (menor primeiro, NULL por último)
     - Benefício visual: mais itens concluídos rapidamente no início, sensação de progresso mais rápido
     - Log mostra ordenação: "itens pendentes ordenados por tamanho (menor→maior)"
+*   **Reprocessamento Seletivo (2025-12-05):** Interface para selecionar e reprocessar PDFs específicos de um batch:
+    - Checkbox em cada item da tabela para seleção individual
+    - "Selecionar Todos" no header para toggle de seleção em massa
+    - Barra de ações aparece quando itens selecionados: mostra contador e botões de ação
+    - **Reprocessar Extração**: Deleta processo existente e refaz extração do PDF (endpoint `/reextract`)
+    - **Reprocessar RPA**: Mantém dados extraídos e apenas reenvia para eLaw (endpoint `/rerpa`)
+    - Processamento assíncrono em background thread com feedback via flash messages
 *   **Limpeza Automática de Screenshots (2025-12-03):** Sistema automático que remove screenshots de RPA antigos após 2 dias do processamento, liberando espaço em disco. Executa automaticamente 30 segundos após o servidor iniciar. Também remove status RPA concluídos há mais de 7 dias. Funções disponíveis: `cleanup_old_screenshots(days_old=2)`, `cleanup_old_statuses(days_old=7)`, `run_all_cleanup()`.
 *   **LLM Fallback Otimizado (2025-12-02):** Novas funções LLM para extração avançada:
     - `extract_pedidos_with_llm()`: Extrai pedidos com categorização (verbas_rescisorias, salariais, indenizatorios, acessorios) quando regex falha.
