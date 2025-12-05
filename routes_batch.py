@@ -2084,16 +2084,26 @@ def reextract_single(process_id):
 @login_required
 def queue_ocr_batch():
     """
-    Enfileira OCR assíncrono para todos os processos com campos trabalhistas faltantes.
-    Usa o worker de background do servidor para processar e salvar no banco.
+    Enfileira OCR assíncrono para processos com campos trabalhistas faltantes.
     
     2025-12-05: Criado para reprocessar OCR com timeout aumentado (120s).
+    2025-12-05: OTIMIZAÇÃO - Ordenar por número de campos faltantes (mais faltantes primeiro)
+                           - Só processar campos realmente faltantes
+                           - Melhor validação de PDF
     """
-    from sqlalchemy import or_
+    from sqlalchemy import or_, case, func
     from extractors.ocr_utils import queue_ocr_task, extract_pdf_bookmarks, get_pdf_total_pages, get_ocr_queue_status
     
     try:
-        # Encontrar processos com campos trabalhistas faltantes
+        # Calcular número de campos faltantes para ordenação
+        missing_count = (
+            case((or_(Process.pis.is_(None), Process.pis == ""), 1), else_=0) +
+            case((or_(Process.ctps.is_(None), Process.ctps == ""), 1), else_=0) +
+            case((or_(Process.data_admissao.is_(None), Process.data_admissao == ""), 1), else_=0) +
+            case((or_(Process.data_demissao.is_(None), Process.data_demissao == ""), 1), else_=0)
+        )
+        
+        # ✅ OTIMIZAÇÃO: Ordenar por MAIS campos faltantes primeiro (DESC)
         processes_with_missing = Process.query.filter(
             Process.user_id == current_user.id,
             or_(
@@ -2102,37 +2112,45 @@ def queue_ocr_batch():
                 Process.data_admissao.is_(None), Process.data_admissao == "",
                 Process.data_demissao.is_(None), Process.data_demissao == ""
             )
-        ).limit(20).all()
+        ).order_by(missing_count.desc()).limit(20).all()
         
         if not processes_with_missing:
             return jsonify({"message": "Nenhum processo com campos faltantes encontrado", "queued": 0})
         
         queued_count = 0
         errors = []
+        details = []
         
         for process in processes_with_missing:
-            # Identificar campos faltantes
+            # ✅ OTIMIZAÇÃO: Identificar APENAS campos realmente faltantes
             missing = []
-            if not process.pis: missing.append("pis")
-            if not process.ctps: missing.append("ctps")
-            if not process.data_admissao: missing.append("data_admissao")
-            if not process.data_demissao: missing.append("data_demissao")
+            if not process.pis or process.pis.strip() == "": 
+                missing.append("pis")
+            if not process.ctps or process.ctps.strip() == "": 
+                missing.append("ctps")
+            if not process.data_admissao or process.data_admissao.strip() == "": 
+                missing.append("data_admissao")
+            if not process.data_demissao or process.data_demissao.strip() == "": 
+                missing.append("data_demissao")
             
             if not missing:
                 continue
             
-            # Encontrar PDF associado
+            # ✅ Validação rigorosa do PDF
             batch_item = BatchItem.query.filter_by(process_id=process.id).first()
-            if not batch_item or not batch_item.upload_path:
-                errors.append(f"Processo {process.id}: PDF não encontrado")
+            if not batch_item:
+                errors.append(f"Processo {process.id}: Sem batch_item")
+                continue
+            if not batch_item.upload_path:
+                errors.append(f"Processo {process.id}: upload_path vazio")
                 continue
             
             pdf_path = batch_item.upload_path
             if not os.path.exists(pdf_path):
-                errors.append(f"Processo {process.id}: Arquivo não existe")
+                errors.append(f"Processo {process.id}: Arquivo não existe: {pdf_path}")
                 continue
             
-            # Determinar páginas para OCR
+            # ✅ OTIMIZAÇÃO: Só determinar páginas para docs necessários
             docs_needed = set()
             if any(f in missing for f in ["data_admissao", "pis", "ctps"]):
                 docs_needed.add("ctps")
@@ -2153,19 +2171,28 @@ def queue_ocr_batch():
                     elif doc == "ctps":
                         doc_pages[doc] = max(1, int(total_pages * 0.82))
             
+            # ✅ Log detalhado antes de enfileirar
+            logger.info(f"[OCR-BATCH] Proc {process.id}: {len(missing)} campos faltantes: {missing}")
+            logger.info(f"[OCR-BATCH] Proc {process.id}: PDF={pdf_path}, páginas={doc_pages}")
+            
             # Enfileirar para OCR
             if doc_pages:
                 queued = queue_ocr_task(process.id, pdf_path, doc_pages, missing)
                 if queued:
                     queued_count += 1
-                    logger.info(f"[OCR-BATCH] Enfileirado processo {process.id}: {missing}")
+                    details.append({
+                        "process_id": process.id,
+                        "missing_fields": missing,
+                        "doc_pages": doc_pages
+                    })
         
         status = get_ocr_queue_status()
         
         return jsonify({
-            "message": f"OCR enfileirado para {queued_count} processos",
+            "message": f"OCR enfileirado para {queued_count} processos (ordenado por mais campos faltantes)",
             "queued": queued_count,
             "queue_status": status,
+            "details": details[:10],
             "errors": errors[:5] if errors else []
         })
         
