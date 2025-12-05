@@ -102,17 +102,38 @@
 
         <!-- Tabela de Items -->
         <div class="card shadow-lg">
-            <div class="card-header bg-light">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-list me-2"></i>
                     Arquivos do Batch
                 </h5>
+                <!-- Barra de Ações em Lote -->
+                <div id="bulk-actions" class="d-flex align-items-center gap-2" style="display: none !important;">
+                    <span class="text-muted me-2">
+                        <span id="selected-count">0</span> selecionado(s)
+                    </span>
+                    <form id="bulk-extract-form" action="{{ url_for('batch.batch_reextract', id=batch.id) }}" method="POST" class="d-inline">
+                        <input type="hidden" name="item_ids" id="bulk-extract-ids">
+                        <button type="submit" class="btn btn-warning btn-sm" onclick="return confirmBulkAction('Reprocessar extração dos itens selecionados?')">
+                            <i class="fas fa-sync-alt me-1"></i>Reprocessar Extração
+                        </button>
+                    </form>
+                    <form id="bulk-rpa-form" action="{{ url_for('batch.batch_rerpa', id=batch.id) }}" method="POST" class="d-inline">
+                        <input type="hidden" name="item_ids" id="bulk-rpa-ids">
+                        <button type="submit" class="btn btn-info btn-sm" onclick="return confirmBulkAction('Reprocessar RPA dos itens selecionados?')">
+                            <i class="fas fa-robot me-1"></i>Reprocessar RPA
+                        </button>
+                    </form>
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover" id="items-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="select-all" class="form-check-input" title="Selecionar Todos">
+                                </th>
                                 <th>#</th>
                                 <th>Arquivo</th>
                                 <th>Status</th>
@@ -126,10 +147,17 @@
                         <tbody>
                             {% for item in items %}
                             <tr data-item-id="{{ item.id }}">
+                                <td>
+                                    <input type="checkbox" class="form-check-input item-checkbox" 
+                                           value="{{ item.id }}" data-item-id="{{ item.id }}">
+                                </td>
                                 <td>{{ loop.index }}</td>
                                 <td>
                                     <i class="fas fa-file-pdf text-danger me-2"></i>
                                     {{ item.source_filename }}
+                                    {% if item.file_size %}
+                                    <small class="text-muted">({{ (item.file_size / 1024 / 1024)|round(1) }}MB)</small>
+                                    {% endif %}
                                 </td>
                                 <td class="status-cell">
                                     {% if item.status == 'success' %}
@@ -736,6 +764,71 @@ startPolling();
 
 // Cleanup ao sair da página
 window.addEventListener('beforeunload', stopPolling);
+
+// ========== SISTEMA DE SELEÇÃO EM LOTE ==========
+const selectAllCheckbox = document.getElementById('select-all');
+const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+const bulkActions = document.getElementById('bulk-actions');
+const selectedCountEl = document.getElementById('selected-count');
+const bulkExtractIds = document.getElementById('bulk-extract-ids');
+const bulkRpaIds = document.getElementById('bulk-rpa-ids');
+
+function updateBulkActions() {
+    const selectedItems = document.querySelectorAll('.item-checkbox:checked');
+    const count = selectedItems.length;
+    
+    selectedCountEl.textContent = count;
+    
+    // Mostrar/ocultar barra de ações
+    if (count > 0) {
+        bulkActions.style.cssText = 'display: flex !important;';
+    } else {
+        bulkActions.style.cssText = 'display: none !important;';
+    }
+    
+    // Atualizar campos hidden com IDs selecionados
+    const ids = Array.from(selectedItems).map(cb => cb.value).join(',');
+    bulkExtractIds.value = ids;
+    bulkRpaIds.value = ids;
+    
+    // Atualizar estado do "Selecionar Todos"
+    if (count === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (count === itemCheckboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+// Event: Selecionar Todos
+selectAllCheckbox.addEventListener('change', function() {
+    itemCheckboxes.forEach(cb => {
+        cb.checked = this.checked;
+    });
+    updateBulkActions();
+});
+
+// Event: Checkbox individual
+itemCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateBulkActions);
+});
+
+// Confirmar ação em lote
+function confirmBulkAction(message) {
+    const selectedItems = document.querySelectorAll('.item-checkbox:checked');
+    if (selectedItems.length === 0) {
+        alert('Selecione pelo menos um item.');
+        return false;
+    }
+    return confirm(message);
+}
+
+// Inicializar estado
+updateBulkActions();
 </script>
 
 <style>
