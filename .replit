@@ -2,7 +2,7 @@ modules = ["python-3.11", "web", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["gitFull", "libiconv", "libxcrypt", "poppler", "poppler_utils", "unzip", "zlib", "chromium"]
+packages = ["gitFull", "libiconv", "libxcrypt", "poppler", "poppler_utils", "unzip", "zlib", "chromium", "tesseract"]
 
 [deployment]
 deploymentTarget = "vm"
@@ -45,10 +45,6 @@ externalPort = 3003
 [[ports]]
 localPort = 37081
 externalPort = 3001
-
-[[ports]]
-localPort = 42563
-externalPort = 4200
 
 [[ports]]
 localPort = 46681

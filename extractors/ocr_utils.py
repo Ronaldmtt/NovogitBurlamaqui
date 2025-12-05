@@ -207,7 +207,12 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         logger.info("[OCR_SUMARIO] Sumário não encontrou páginas - usando heurística de anexos")
         scanned = detect_scanned_pages(pdf_path)
         if scanned:
-            target_pages = set(scanned[-5:])
+            # 2025-12-05: Selecionar páginas de forma inteligente
+            # TRCT/CTPS geralmente estão nas PRIMEIRAS páginas escaneadas (não nas últimas)
+            # Pegar: 3 primeiras + 2 últimas para cobrir ambos os casos
+            first_pages = scanned[:3]
+            last_pages = scanned[-2:] if len(scanned) > 3 else []
+            target_pages = set(first_pages + last_pages)
     
     if not target_pages:
         logger.debug("[OCR_SUMARIO] Nenhuma página alvo identificada")
@@ -332,22 +337,26 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         return result
 
 
-def detect_scanned_pages(pdf_path: str, min_text_len: int = 50) -> List[int]:
+def detect_scanned_pages(pdf_path: str, min_text_len: int = 200, 
+                         search_all: bool = True) -> List[int]:
     """
-    Detecta páginas escaneadas em um PDF usando heurística robusta.
+    Detecta páginas escaneadas/imagens em um PDF usando heurística robusta.
     
     2025-12-01: Plano Batman - Mapeamento cirúrgico para OCR seletivo.
+    2025-12-05: Corrigido para buscar em TODO o PDF (não só últimas 30%).
+               PDFs do PJe têm anexos em qualquer posição.
     
-    Heurística: Uma página é considerada escaneada se:
-    - Tem menos de 50 caracteres de texto nativo E
-    - Está nas últimas 30% do documento (onde anexos como TRCT/contracheques costumam estar)
+    Heurística: Uma página é considerada escaneada/imagem se:
+    - Tem menos de 200 caracteres de texto nativo E
+    - Contém apenas texto de rodapé ("Documento assinado eletronicamente...")
     
     Args:
         pdf_path: Caminho do PDF
-        min_text_len: Mínimo de caracteres para considerar página como texto (default: 50)
+        min_text_len: Mínimo de caracteres para considerar página como texto (default: 200)
+        search_all: Se True, busca em todo o PDF. Se False, só nas últimas 30%.
     
     Returns:
-        Lista de números de páginas escaneadas nas últimas 30% do PDF (1-indexed)
+        Lista de números de páginas escaneadas (1-indexed)
     """
     from PyPDF2 import PdfReader
     
@@ -358,24 +367,26 @@ def detect_scanned_pages(pdf_path: str, min_text_len: int = 50) -> List[int]:
         reader = PdfReader(pdf_path)
         total_pages = len(reader.pages)
         
-        # Só considera páginas nas últimas 30% do PDF (onde anexos costumam estar)
-        annex_start = max(1, int(total_pages * 0.7))
+        # Determinar onde começar a busca
+        if search_all:
+            start_page = 1
+        else:
+            start_page = max(1, int(total_pages * 0.7))
         
         for i, page in enumerate(reader.pages, 1):
-            # Pular páginas que não estão na zona de anexos
-            if i < annex_start:
+            if i < start_page:
                 continue
             
             text = page.extract_text() or ""
             text_len = len(text.strip())
             
-            # Página com menos de 50 chars na zona de anexos = provável scan
+            # Página com menos de 200 chars = provável imagem/scan
             if text_len < min_text_len:
                 scanned_pages.append(i)
                 logger.debug(f"[DETECT_SCANNED] Página {i}/{total_pages}: {text_len} chars - ESCANEADA")
         
         if scanned_pages:
-            logger.info(f"[DETECT_SCANNED] {len(scanned_pages)} páginas escaneadas na zona de anexos: {scanned_pages}")
+            logger.info(f"[DETECT_SCANNED] {len(scanned_pages)} páginas escaneadas encontradas: {scanned_pages}")
         
     except Exception as e:
         logger.debug(f"[DETECT_SCANNED] Erro ao analisar PDF: {e}")
