@@ -39,3 +39,10 @@ static/rpa_screenshots/
 # Node (se houver)
 node_modules/
 npm-debug.log
+
+# RPA Monitor Client (biblioteca local)
+rpa_monitor_client/
+
+# Bundle files (geração de contexto para LLM)
+bundle.txt
+make_bundle.py
