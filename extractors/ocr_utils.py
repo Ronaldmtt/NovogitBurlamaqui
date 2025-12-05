@@ -501,7 +501,8 @@ def extract_pdf_bookmarks(pdf_path: str) -> Dict[str, int]:
                         result["trct"] = page_num
                         logger.info(f"[BOOKMARK] ✅ TRCT → página {page_num}")
                 
-                elif "contracheque" in title_lower or "holerite" in title_lower or "recibo de salário" in title_lower:
+                # 🆕 2025-12-05: Expandido para incluir DEMONSTRATIVO e RECIBO DE PAGAMENTO
+                elif any(kw in title_lower for kw in ["contracheque", "holerite", "recibo de salário", "recibo de pagamento", "demonstrativo de pagamento", "demonstrativo"]):
                     if "contracheque" not in result:
                         result["contracheque"] = page_num
                         logger.info(f"[BOOKMARK] ✅ Contracheque → página {page_num}")
@@ -860,10 +861,55 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
             
             logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
             
+            # 🆕 2025-12-05: EXTRAÇÃO COMBINADA TRCT
+            # Quando TRCT tem layout: "23 Remuneração...\n1.610,00 15/04/2024 05/06/2025 SJ2"
+            # Extrair TODOS os dados de uma vez quando estão na mesma linha
+            if any(f in campos_faltantes for f in ["salario", "data_admissao", "data_demissao"]):
+                # Procurar linha após "23 Remuneração" com formato: SALARIO DATA DATA SJ2
+                m = re.search(
+                    r'23\s*(?:Remunera|Rem)[^\n]*\n\s*'
+                    r'([\d]{1,3}[.,]\d{3}[,\.]\d{2}|[\d]{1,3}[,\.]\d{2})\s+'
+                    r'(\d{1,2}/\d{1,2}/\d{4})\s+'
+                    r'(\d{1,2}/\d{1,2}/\d{4})',
+                    texto_pagina, re.IGNORECASE
+                )
+                if m:
+                    sal_str = m.group(1)
+                    val_str = sal_str.replace('.', '').replace(',', '.')
+                    try:
+                        val = float(val_str)
+                        if 1000 <= val <= 100000:
+                            if "salario" in campos_faltantes:
+                                result["salario"] = f"R$ {sal_str}"
+                                campos_faltantes.discard("salario")
+                                logger.info(f"[OCR] ✅ Salário (TRCT combinado): {result['salario']}")
+                            if "data_admissao" in campos_faltantes:
+                                result["data_admissao"] = m.group(2)
+                                campos_faltantes.discard("data_admissao")
+                                logger.info(f"[OCR] ✅ Data Admissão (TRCT combinado): {result['data_admissao']}")
+                            if "data_demissao" in campos_faltantes:
+                                result["data_demissao"] = m.group(3)
+                                campos_faltantes.discard("data_demissao")
+                                logger.info(f"[OCR] ✅ Data Demissão (TRCT combinado): {result['data_demissao']}")
+                    except:
+                        pass
+            
             # Extrair campos desta página - EARLY EXIT por campo
+            # 🆕 2025-12-05: Padrões expandidos baseados em mapeamento manual dos PDFs
             if "salario" in campos_faltantes:
                 salario_patterns = [
-                    r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    # TRCT Campo 23 próxima linha: "23 Remuneração...\n1.610,00"
+                    r'23\s*(?:Remunera|Rem)[^\n]*\n\s*([\d]{1,3}[.,]\d{3}[,\.]\d{2}|[\d]{1,3}[,\.]\d{2})',
+                    # TRCT Campo 23: "23 Remuneração Mês Ant. 2.862,76"
+                    r'23\s*(?:Remunera[çc][ãa]o|Rem\.?\s*M[eê]s)[^\d]{0,20}([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    # Contracheque: "Salário Base 2.152,46" ou "Salário Base: 1.518,00"
+                    r'[Ss]al[aá]rio\s*[Bb]ase[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    # Petição: "salário de R$ 1.823,06" ou "remuneração o valor de R$ 1.780,00"
+                    r'(?:sal[aá]rio|remunera[çc][ãa]o)[^\d]{0,30}R\$\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    # Demonstrativo CBSI: "Salário Base : 1.518,00"
+                    r'Sal[aá]rio\s*(?:Base|Hora)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    # Genérico: "Remuneração Mensal" ou similar
+                    r'(?:remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
                     r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
                 ]
                 for pattern in salario_patterns:
@@ -881,11 +927,22 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                             pass
             
             if "data_admissao" in campos_faltantes:
-                # Padrões tradicionais + CTPS Digital
+                # 🆕 2025-12-05: Padrões expandidos + flexíveis para OCR fragmentado
                 admissao_patterns = [
-                    r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # TRCT Campo 24 próxima linha: "24 Data de Admissão\n15/04/2024"
+                    r'24\s*(?:Data|Dt)[^\n]*\n\s*(\d{1,2}/\d{1,2}/\d{4})',
+                    # TRCT Campo 24 na mesma linha
+                    r'24\s*(?:Data\s*(?:de\s*)?Admiss[ãa]o|Dt\.?\s*Adm)[^\d]{0,15}(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Demonstrativo CBSI: "Admissão: 20.12.2024"
+                    r'Admiss[ãa]o[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Petição: "admitido em 15/04/2024"
+                    r'(?:admitid[oa]|contratad[oa])[^\d]{0,40}(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Petição vínculo: "período de 15/06/2024 a 18/03/2025"
+                    r'per[ií]odo\s*(?:de\s*)?(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\s*(?:a|até)\s*\d',
                     # CTPS Digital: "Contratos de trabalho 15/04/2024 - 05/06/2025"
                     r'[Cc]ontratos?\s*(?:de\s*)?trabalho\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\s*[-–]\s*\d',
+                    # Genérico
+                    r'(?:data\s*(?:de\s*)?admiss[ãa]o)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
                 ]
                 for pattern in admissao_patterns:
                     m = re.search(pattern, texto_pagina, re.IGNORECASE)
@@ -896,13 +953,24 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                         break
             
             if "data_demissao" in campos_faltantes:
-                # Padrões tradicionais + CTPS Digital
+                # 🆕 2025-12-05: Padrões expandidos + flexíveis para OCR fragmentado
                 demissao_patterns = [
-                    r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-                    # CTPS Digital: "Contratos de trabalho 15/04/2024 - 05/06/2025"
+                    # TRCT Campo 26 próxima linha: "26 Data de Afastamento\n05/06/2025"
+                    r'26\s*(?:Data|Dt)[^\n]*\n[^\d]*(\d{1,2}/\d{1,2}/\d{4})',
+                    # TRCT Campo 26 na mesma linha
+                    r'26\s*(?:Data\s*(?:de\s*)?Afastamento|Dt\.?\s*Afast)[^\d]{0,15}(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Petição: "demissão em 15/05/2024"
+                    r'(?:demiss[ãa]o|demitid[oa])[^\d]{0,40}(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Petição: "pediu demissão no dia 03/02/2025"
+                    r'pediu\s*demiss[ãa]o[^\d]{0,30}(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Petição vínculo: "período de 15/06/2024 a 18/03/2025" (segunda data)
+                    r'per[ií]odo\s*(?:de\s*)?\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\s*(?:a|até)\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # CTPS Digital
                     r'[Cc]ontratos?\s*(?:de\s*)?trabalho\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\s*[-–]\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
-                    # "projeção do aviso prévio indenizado 08/07/2025"
+                    # Projeção aviso prévio
                     r'(?:proje[çc][ãa]o\s*(?:do\s*)?aviso\s*pr[ée]vio)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
+                    # Genérico
+                    r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})',
                 ]
                 for pattern in demissao_patterns:
                     m = re.search(pattern, texto_pagina, re.IGNORECASE)
@@ -913,23 +981,42 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                         break
             
             if "pis" in campos_faltantes:
-                m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
-                if m:
-                    pis_raw = re.sub(r'[^\d]', '', m.group(1))
-                    if len(pis_raw) == 11:
-                        result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
-                        campos_faltantes.discard("pis")
-                        logger.info(f"[OCR] ✅ PIS: {result['pis']}")
+                # 🆕 2025-12-05: Padrões expandidos baseados em mapeamento manual
+                pis_patterns = [
+                    # TRCT Campo 10: "10 PIS/PASEP 12157296923"
+                    r'10\s*(?:PIS|PASEP)[^\d]{0,10}(\d{11})',
+                    # CTPS Digital: "PIS / PASEP 20484422108"
+                    r'PIS\s*/?\s*PASEP\s*[:\s]*(\d{11})',
+                    # Demonstrativo: "PIS/PASEP: 12157296923"
+                    r'(?:PIS|PASEP|NIT)[:\s/]*(\d{11})',
+                    # Com formatação: "PIS: 121.57296.92-3"
+                    r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)',
+                ]
+                for pattern in pis_patterns:
+                    m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                    if m:
+                        pis_raw = re.sub(r'[^\d]', '', m.group(1))
+                        if len(pis_raw) == 11:
+                            result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
+                            campos_faltantes.discard("pis")
+                            logger.info(f"[OCR] ✅ PIS: {result['pis']}")
+                            break
             
             if "ctps" in campos_faltantes:
-                # 🆕 2025-12-05: Padrões ordenados por prioridade (específicos primeiro)
+                # 🆕 2025-12-05: Padrões expandidos + flexíveis para OCR de baixa qualidade
                 ctps_patterns = [
-                    # TERMO DE DEVOLUÇÃO: "RG/CTPS: 085227296" ou OCR "RGICTPS: |085227296"
+                    # TRCT Campo 17: "17 CTPS... [0007236033, 000060, RJ"
+                    r'17\s*(?:CTPS|6168)[^\d]{0,30}(\d{7,12})',
+                    # TRCT OCR sujo: sequência de 10 dígitos após colchete ou pipe
+                    r'[\[\|]\s*(\d{10}),?\s*\d{5,6}',
+                    # Demonstrativo CBSI: "CTPS nº: 31822-5"
+                    r'CTPS\s*[nN][º°o]?\.?\s*[:\s]*(\d{5,12})',
+                    # CTPS Digital: "Carteira de trabalho 20761141RJ"
+                    r'[Cc]arteira\s*(?:de\s*)?[Tt]rabalho\s*[:\s]*(\d{6,12})',
+                    # TERMO DE DEVOLUÇÃO: "RG/CTPS: 085227296"
                     r'RG\s*/\s*CTPS\s*[:\s]*(\d{6,12})',
-                    r'RGICTPS\s*[:\s]*[\|\[\]]?(\d{6,12})',  # OCR lê "/" como "I"
-                    # TERMO DE QUITAÇÃO Campo 17
-                    r'17\s*CTPS[^\d]{0,20}(\d{6,12})',
-                    # Genérico com contexto
+                    r'RGICTPS\s*[:\s]*[\|\[\]]?(\d{6,12})',
+                    # Genérico
                     r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,12})',
                 ]
                 for pattern in ctps_patterns:
