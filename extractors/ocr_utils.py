@@ -5,10 +5,17 @@ Aplica OCR seletivo apenas quando texto nativo é insuficiente.
 """
 import logging
 import os
+import threading
+import signal
 from typing import Optional, Dict, List
 from pdf2image import convert_from_path
 import pytesseract
 from PIL import Image
+
+# Semáforo global para limitar OCRs simultâneos (evita sobrecarga do sistema)
+# 2025-12-05: Reduzido de ilimitado para 2 simultâneos após travamentos com 5 workers
+OCR_SEMAPHORE = threading.Semaphore(2)
+OCR_TIMEOUT_SECONDS = 60  # Timeout por página para evitar travamento
 
 def _get_poppler_path() -> Optional[str]:
     """
@@ -355,91 +362,104 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                 logger.info(f"[OCR] ✅ Todos os campos encontrados - parando")
                 break
             
-            logger.info(f"[OCR] 📷 Lendo {doc_type.upper()} (página {page_num})...")
+            # 2025-12-05: Usar semáforo para limitar OCRs simultâneos (máx 2)
+            acquired = OCR_SEMAPHORE.acquire(timeout=OCR_TIMEOUT_SECONDS)
+            if not acquired:
+                logger.warning(f"[OCR] ⏱️ Timeout aguardando slot OCR - pulando página {page_num}")
+                continue
             
+            texto_pagina = ""
             try:
+                logger.info(f"[OCR] 📷 Lendo {doc_type.upper()} (página {page_num})...")
+                
                 # DPI 150 = mais rápido
                 images = convert_from_path(
                     pdf_path,
                     dpi=150,
                     first_page=page_num,
                     last_page=page_num,
-                    poppler_path=POPPLER_PATH
+                    poppler_path=POPPLER_PATH,
+                    timeout=OCR_TIMEOUT_SECONDS  # Timeout para conversão
                 )
                 
-                if not images:
-                    continue
-                
-                # Apenas a primeira imagem da página
-                img = images[0]
-                img_gray = img.convert('L')
-                config = '--psm 6 -l por'
-                texto_pagina = pytesseract.image_to_string(img_gray, config=config)
-                
-                if not texto_pagina:
-                    continue
-                
-                logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
-                
-                # Extrair campos desta página - EARLY EXIT por campo
-                if "salario" in campos_faltantes:
-                    salario_patterns = [
-                        r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-                        r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-                    ]
-                    for pattern in salario_patterns:
-                        m = re.search(pattern, texto_pagina, re.IGNORECASE)
-                        if m:
-                            val_str = m.group(1).replace('.', '').replace(',', '.')
-                            try:
-                                val = float(val_str)
-                                if 1000 <= val <= 100000:
-                                    result["salario"] = f"R$ {m.group(1)}"
-                                    campos_faltantes.discard("salario")
-                                    logger.info(f"[OCR] ✅ Salário: {result['salario']}")
-                                    break
-                            except:
-                                pass
-                
-                if "data_admissao" in campos_faltantes:
-                    m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
-                    if m:
-                        result["data_admissao"] = m.group(1)
-                        campos_faltantes.discard("data_admissao")
-                        logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
-                
-                if "data_demissao" in campos_faltantes:
-                    m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
-                    if m:
-                        result["data_demissao"] = m.group(1)
-                        campos_faltantes.discard("data_demissao")
-                        logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
-                
-                if "pis" in campos_faltantes:
-                    m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
-                    if m:
-                        pis_raw = re.sub(r'[^\d]', '', m.group(1))
-                        if len(pis_raw) == 11:
-                            result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
-                            campos_faltantes.discard("pis")
-                            logger.info(f"[OCR] ✅ PIS: {result['pis']}")
-                
-                if "ctps" in campos_faltantes:
-                    m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_pagina, re.IGNORECASE)
-                    if m:
-                        result["ctps"] = m.group(1)
-                        campos_faltantes.discard("ctps")
-                        logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
-                
-                if "serie_ctps" in campos_faltantes:
-                    m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_pagina)
-                    if m:
-                        result["serie_ctps"] = m.group(1)
-                        campos_faltantes.discard("serie_ctps")
-                        logger.info(f"[OCR] ✅ Série CTPS: {result['serie_ctps']}")
-                
+                if images:
+                    # Apenas a primeira imagem da página
+                    img = images[0]
+                    img_gray = img.convert('L')
+                    config = '--psm 6 -l por'
+                    
+                    # Timeout para tesseract
+                    texto_pagina = pytesseract.image_to_string(
+                        img_gray, 
+                        config=config,
+                        timeout=OCR_TIMEOUT_SECONDS
+                    )
             except Exception as e:
                 logger.warning(f"[OCR] Erro página {page_num}: {e}")
+            finally:
+                OCR_SEMAPHORE.release()
+            
+            if not texto_pagina:
+                continue
+            
+            logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
+            
+            # Extrair campos desta página - EARLY EXIT por campo
+            if "salario" in campos_faltantes:
+                salario_patterns = [
+                    r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                ]
+                for pattern in salario_patterns:
+                    m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                    if m:
+                        val_str = m.group(1).replace('.', '').replace(',', '.')
+                        try:
+                            val = float(val_str)
+                            if 1000 <= val <= 100000:
+                                result["salario"] = f"R$ {m.group(1)}"
+                                campos_faltantes.discard("salario")
+                                logger.info(f"[OCR] ✅ Salário: {result['salario']}")
+                                break
+                        except:
+                            pass
+            
+            if "data_admissao" in campos_faltantes:
+                m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
+                if m:
+                    result["data_admissao"] = m.group(1)
+                    campos_faltantes.discard("data_admissao")
+                    logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
+            
+            if "data_demissao" in campos_faltantes:
+                m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
+                if m:
+                    result["data_demissao"] = m.group(1)
+                    campos_faltantes.discard("data_demissao")
+                    logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
+            
+            if "pis" in campos_faltantes:
+                m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
+                if m:
+                    pis_raw = re.sub(r'[^\d]', '', m.group(1))
+                    if len(pis_raw) == 11:
+                        result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
+                        campos_faltantes.discard("pis")
+                        logger.info(f"[OCR] ✅ PIS: {result['pis']}")
+            
+            if "ctps" in campos_faltantes:
+                m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_pagina, re.IGNORECASE)
+                if m:
+                    result["ctps"] = m.group(1)
+                    campos_faltantes.discard("ctps")
+                    logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
+            
+            if "serie_ctps" in campos_faltantes:
+                m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_pagina)
+                if m:
+                    result["serie_ctps"] = m.group(1)
+                    campos_faltantes.discard("serie_ctps")
+                    logger.info(f"[OCR] ✅ Série CTPS: {result['serie_ctps']}")
         
         if result:
             logger.info(f"[OCR] 🎯 Recuperados: {list(result.keys())}")
