@@ -56,6 +56,94 @@ ANNEX_KEYWORDS = {
     "pis": ["pis", "pasep", "nit"],
 }
 
+
+def extract_pdf_bookmarks(pdf_path: str) -> Dict[str, int]:
+    """
+    Extrai bookmarks/outlines do PDF e mapeia para números de página.
+    
+    2025-12-05: Nova função para extrair mapeamento EXATO de documentos PJe.
+    Os PDFs do PJe têm bookmarks clicáveis que apontam diretamente para cada anexo.
+    
+    Args:
+        pdf_path: Caminho do PDF
+    
+    Returns:
+        Dict com {tipo_documento: página} ex: {"ctps": 19, "trct": 21, "contracheque": 29}
+    """
+    from PyPDF2 import PdfReader
+    
+    result = {}
+    logger = logging.getLogger(__name__)
+    
+    try:
+        reader = PdfReader(pdf_path)
+        outlines = reader.outline if hasattr(reader, 'outline') else None
+        
+        if not outlines:
+            logger.debug("[BOOKMARK] PDF não tem bookmarks")
+            return result
+        
+        logger.info(f"[BOOKMARK] PDF tem {len(outlines)} bookmarks")
+        
+        for outline in outlines:
+            try:
+                title = outline.get('/Title', '')
+                page_ref = outline.get('/Page')
+                
+                if not page_ref:
+                    continue
+                
+                # Encontrar número da página
+                page_num = None
+                for i, page in enumerate(reader.pages, 1):
+                    if page.indirect_reference == page_ref:
+                        page_num = i
+                        break
+                
+                if not page_num:
+                    continue
+                
+                # Classificar tipo de documento
+                title_lower = title.lower()
+                
+                if "ctps" in title_lower or "carteira de trabalho" in title_lower:
+                    if "ctps" not in result:
+                        result["ctps"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ CTPS → página {page_num}")
+                
+                elif "trct" in title_lower or ("rescis" in title_lower and "termo" in title_lower):
+                    if "trct" not in result:
+                        result["trct"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ TRCT → página {page_num}")
+                
+                elif "contracheque" in title_lower or "holerite" in title_lower or "recibo de salário" in title_lower:
+                    if "contracheque" not in result:
+                        result["contracheque"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ Contracheque → página {page_num}")
+                
+                elif "ficha de registro" in title_lower:
+                    if "ficha_registro" not in result:
+                        result["ficha_registro"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ Ficha Registro → página {page_num}")
+                
+                elif "ppp" in title_lower or "perfil profissiográfico" in title_lower:
+                    if "ppp" not in result:
+                        result["ppp"] = page_num
+                        logger.info(f"[BOOKMARK] ✅ PPP → página {page_num}")
+            
+            except Exception as e:
+                continue
+        
+        if result:
+            logger.info(f"[BOOKMARK] 🎯 Mapeamento extraído: {result}")
+        
+        return result
+    
+    except Exception as e:
+        logger.debug(f"[BOOKMARK] Erro ao extrair bookmarks: {e}")
+        return result
+
+
 def parse_toc_from_pdf(pdf_path: str, max_pages: int = 6) -> Dict[str, List[int]]:
     """
     Analisa o sumário (TOC) do PDF para encontrar páginas de anexos trabalhistas.
@@ -158,14 +246,16 @@ def parse_toc_from_pdf(pdf_path: str, max_pages: int = 6) -> Dict[str, List[int]
 def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any], 
                                   missing_fields: List[str]) -> Dict[str, str]:
     """
-    Resolve campos trabalhistas faltantes usando OCR seletivo via sumário.
+    Resolve campos trabalhistas faltantes usando OCR seletivo via bookmarks.
     
     2025-12-04: Nova camada de fallback inteligente.
+    2025-12-05: OTIMIZAÇÃO - Usa bookmarks do PDF primeiro (OCR em 1-2 páginas apenas)
     
-    Estratégia:
-    1. Analisa o sumário do PDF para encontrar páginas de TRCT/Contracheques
-    2. Aplica OCR apenas nessas páginas específicas (máx 5)
-    3. Extrai os campos faltantes das imagens
+    Estratégia (ordem de prioridade):
+    1. Extrai bookmarks do PDF (PDFs PJe têm links diretos para cada anexo)
+    2. Se não encontrar, analisa sumário textual
+    3. Se não encontrar, usa heurística de páginas escaneadas
+    4. Aplica OCR apenas nas páginas identificadas (mínimo possível)
     
     Args:
         pdf_path: Caminho do PDF
@@ -183,36 +273,76 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     if not missing_fields or not pdf_path:
         return result
     
-    logger.info(f"[OCR_SUMARIO] Iniciando fallback via sumário para: {missing_fields}")
-    
-    toc_pages = parse_toc_from_pdf(pdf_path)
+    logger.info(f"[OCR_SELETIVO] Iniciando fallback para: {missing_fields}")
     
     target_pages = set()
     
-    field_to_category = {
+    # Mapeamento de campo → tipos de documento que contêm o campo
+    field_to_doc = {
         "salario": ["contracheque", "trct"],
-        "data_admissao": ["trct", "ctps", "contracheque"],
+        "data_admissao": ["ctps", "trct"],
         "data_demissao": ["trct"],
-        "pis": ["trct", "pis", "contracheque"],
-        "ctps": ["trct", "ctps"],
+        "pis": ["ctps", "trct"],
+        "ctps": ["ctps", "trct"],
+        "serie_ctps": ["ctps"],
     }
     
-    for field in missing_fields:
-        categories = field_to_category.get(field, [])
-        for cat in categories:
-            if toc_pages.get(cat):
-                target_pages.update(toc_pages[cat][:3])
+    # Carregar todas as fontes de mapeamento uma vez
+    bookmarks = extract_pdf_bookmarks(pdf_path)
+    toc_pages = parse_toc_from_pdf(pdf_path)
+    scanned_pages = None  # Lazy load
     
-    if not target_pages:
-        logger.info("[OCR_SUMARIO] Sumário não encontrou páginas - usando heurística de anexos")
-        scanned = detect_scanned_pages(pdf_path)
-        if scanned:
-            # 2025-12-05: Selecionar páginas de forma inteligente
-            # TRCT/CTPS geralmente estão nas PRIMEIRAS páginas escaneadas (não nas últimas)
-            # Pegar: 3 primeiras + 2 últimas para cobrir ambos os casos
-            first_pages = scanned[:3]
-            last_pages = scanned[-2:] if len(scanned) > 3 else []
-            target_pages = set(first_pages + last_pages)
+    if bookmarks:
+        logger.info(f"[OCR_SELETIVO] ✅ Bookmarks disponíveis: {bookmarks}")
+    if any(v for v in toc_pages.values()):
+        logger.info(f"[OCR_SELETIVO] ✅ TOC disponível: {toc_pages}")
+    
+    # ===== ESTRATÉGIA POR CAMPO: Fallback hierárquico para CADA campo =====
+    fields_resolved = {}
+    
+    for field in missing_fields:
+        doc_types = field_to_doc.get(field, [])
+        page_found = None
+        source = None
+        
+        # PRIORIDADE 1: Tentar bookmarks primeiro
+        for doc_type in doc_types:
+            if doc_type in bookmarks:
+                page_found = bookmarks[doc_type]
+                source = f"bookmark:{doc_type}"
+                break
+        
+        # PRIORIDADE 2: Tentar TOC se bookmark não encontrou
+        if not page_found:
+            for doc_type in doc_types:
+                if toc_pages.get(doc_type):
+                    page_found = toc_pages[doc_type][0]
+                    source = f"toc:{doc_type}"
+                    break
+        
+        # PRIORIDADE 3: Heurística se nada encontrou (lazy load)
+        if not page_found:
+            if scanned_pages is None:
+                scanned_pages = detect_scanned_pages(pdf_path)
+            if scanned_pages:
+                # Pegar primeiras 3 + últimas 2 páginas escaneadas
+                first_pages = scanned_pages[:3]
+                last_pages = scanned_pages[-2:] if len(scanned_pages) > 3 else []
+                heuristic_pages = list(set(first_pages + last_pages))
+                if heuristic_pages:
+                    page_found = heuristic_pages[0]  # Pegar primeira
+                    source = "heuristic"
+                    # Adicionar todas as heurísticas para campos não mapeados
+                    for hp in heuristic_pages:
+                        target_pages.add(hp)
+        
+        if page_found:
+            target_pages.add(page_found)
+            fields_resolved[field] = source
+            logger.debug(f"[OCR_SELETIVO] {field} → página {page_found} via {source}")
+    
+    if fields_resolved:
+        logger.info(f"[OCR_SELETIVO] Campos mapeados: {fields_resolved}")
     
     if not target_pages:
         logger.debug("[OCR_SUMARIO] Nenhuma página alvo identificada")
