@@ -323,28 +323,31 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         logger.warning("[OCR] Nenhuma página de documento encontrada")
         return result
     
-    # ===== PASSO 3: OCR ULTRA-RÁPIDO - máximo 2 páginas =====
-    # Prioridade: Contracheque (salário) > TRCT (demissão) > CTPS (admissão/pis)
-    unique_pages = sorted(set(doc_pages.values()))
+    # ===== PASSO 3: OCR SEQUENCIAL COM EARLY EXIT =====
+    # Abre uma página, lê, achou os dados? PARA. Não achou? Próxima página.
     
-    # Limitar a 2 páginas máximo para velocidade
-    if len(unique_pages) > 2:
-        priority_pages = []
-        if doc_pages.get("contracheque"):
-            priority_pages.append(doc_pages["contracheque"])
-        if doc_pages.get("trct") and len(priority_pages) < 2:
-            priority_pages.append(doc_pages["trct"])
-        if doc_pages.get("ctps") and len(priority_pages) < 2:
-            priority_pages.append(doc_pages["ctps"])
-        unique_pages = sorted(priority_pages)
+    # Ordenar páginas por prioridade: Contracheque > TRCT > CTPS
+    ordered_pages = []
+    if doc_pages.get("contracheque"):
+        ordered_pages.append(("contracheque", doc_pages["contracheque"]))
+    if doc_pages.get("trct"):
+        ordered_pages.append(("trct", doc_pages["trct"]))
+    if doc_pages.get("ctps"):
+        ordered_pages.append(("ctps", doc_pages["ctps"]))
     
-    logger.info(f"[OCR] 📷 Processando {len(unique_pages)} página(s): {unique_pages}")
+    campos_faltantes = set(missing_fields)
     
     try:
-        texto_ocr = ""
-        for page_num in unique_pages:
+        for doc_type, page_num in ordered_pages:
+            # Se já encontrou todos os campos, PARA
+            if not campos_faltantes:
+                logger.info(f"[OCR] ✅ Todos os campos encontrados - parando")
+                break
+            
+            logger.info(f"[OCR] 📷 Lendo {doc_type.upper()} (página {page_num})...")
+            
             try:
-                # DPI reduzido para 150 (mais rápido, ainda legível)
+                # DPI 150 = mais rápido
                 images = convert_from_path(
                     pdf_path,
                     dpi=150,
@@ -353,73 +356,79 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
                     poppler_path=POPPLER_PATH
                 )
                 
-                if images:
-                    # Apenas a PRIMEIRA imagem (página renderizada)
-                    img = images[0]
-                    img_gray = img.convert('L')
-                    # PSM 6 = bloco uniforme de texto, mais rápido
-                    config = '--psm 6 -l por'
-                    texto_pagina = pytesseract.image_to_string(img_gray, config=config)
-                    texto_ocr += f"\n--- PÁGINA {page_num} ---\n{texto_pagina}"
-                    logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
+                if not images:
+                    continue
+                
+                # Apenas a primeira imagem da página
+                img = images[0]
+                img_gray = img.convert('L')
+                config = '--psm 6 -l por'
+                texto_pagina = pytesseract.image_to_string(img_gray, config=config)
+                
+                if not texto_pagina:
+                    continue
+                
+                logger.debug(f"[OCR] Página {page_num}: {len(texto_pagina)} chars")
+                
+                # Extrair campos desta página - EARLY EXIT por campo
+                if "salario" in campos_faltantes:
+                    salario_patterns = [
+                        r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                        r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                    ]
+                    for pattern in salario_patterns:
+                        m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                        if m:
+                            val_str = m.group(1).replace('.', '').replace(',', '.')
+                            try:
+                                val = float(val_str)
+                                if 1000 <= val <= 100000:
+                                    result["salario"] = f"R$ {m.group(1)}"
+                                    campos_faltantes.discard("salario")
+                                    logger.info(f"[OCR] ✅ Salário: {result['salario']}")
+                                    break
+                            except:
+                                pass
+                
+                if "data_admissao" in campos_faltantes:
+                    m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
+                    if m:
+                        result["data_admissao"] = m.group(1)
+                        campos_faltantes.discard("data_admissao")
+                        logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
+                
+                if "data_demissao" in campos_faltantes:
+                    m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
+                    if m:
+                        result["data_demissao"] = m.group(1)
+                        campos_faltantes.discard("data_demissao")
+                        logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
+                
+                if "pis" in campos_faltantes:
+                    m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
+                    if m:
+                        pis_raw = re.sub(r'[^\d]', '', m.group(1))
+                        if len(pis_raw) == 11:
+                            result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
+                            campos_faltantes.discard("pis")
+                            logger.info(f"[OCR] ✅ PIS: {result['pis']}")
+                
+                if "ctps" in campos_faltantes:
+                    m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_pagina, re.IGNORECASE)
+                    if m:
+                        result["ctps"] = m.group(1)
+                        campos_faltantes.discard("ctps")
+                        logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
+                
+                if "serie_ctps" in campos_faltantes:
+                    m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_pagina)
+                    if m:
+                        result["serie_ctps"] = m.group(1)
+                        campos_faltantes.discard("serie_ctps")
+                        logger.info(f"[OCR] ✅ Série CTPS: {result['serie_ctps']}")
+                
             except Exception as e:
                 logger.warning(f"[OCR] Erro página {page_num}: {e}")
-        
-        if not texto_ocr:
-            return result
-        
-        logger.debug(f"[OCR] Total: {len(texto_ocr)} chars")
-        
-        # ===== PASSO 4: Extrair TODOS os campos do texto OCR =====
-        if "salario" in missing_fields:
-            salario_patterns = [
-                r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-                r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
-            ]
-            for pattern in salario_patterns:
-                m = re.search(pattern, texto_ocr, re.IGNORECASE)
-                if m:
-                    val_str = m.group(1).replace('.', '').replace(',', '.')
-                    try:
-                        val = float(val_str)
-                        if 1000 <= val <= 100000:
-                            result["salario"] = f"R$ {m.group(1)}"
-                            logger.info(f"[OCR] ✅ Salário: {result['salario']}")
-                            break
-                    except:
-                        pass
-        
-        if "data_admissao" in missing_fields:
-            m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_ocr, re.IGNORECASE)
-            if m:
-                result["data_admissao"] = m.group(1)
-                logger.info(f"[OCR] ✅ Data Admissão: {result['data_admissao']}")
-        
-        if "data_demissao" in missing_fields:
-            m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_ocr, re.IGNORECASE)
-            if m:
-                result["data_demissao"] = m.group(1)
-                logger.info(f"[OCR] ✅ Data Demissão: {result['data_demissao']}")
-        
-        if "pis" in missing_fields:
-            m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_ocr, re.IGNORECASE)
-            if m:
-                pis_raw = re.sub(r'[^\d]', '', m.group(1))
-                if len(pis_raw) == 11:
-                    result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
-                    logger.info(f"[OCR] ✅ PIS: {result['pis']}")
-        
-        if "ctps" in missing_fields:
-            m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_ocr, re.IGNORECASE)
-            if m:
-                result["ctps"] = m.group(1)
-                logger.info(f"[OCR] ✅ CTPS: {result['ctps']}")
-        
-        if "serie_ctps" in missing_fields:
-            m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_ocr)
-            if m:
-                result["serie_ctps"] = m.group(1)
-                logger.info(f"[OCR] ✅ Série CTPS: {result['serie_ctps']}")
         
         if result:
             logger.info(f"[OCR] 🎯 Recuperados: {list(result.keys())}")
