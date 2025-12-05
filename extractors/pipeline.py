@@ -590,12 +590,15 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
     if not data.get("data_admissao"): campos_ocr.append("data_admissao")
     if not data.get("data_demissao"): campos_ocr.append("data_demissao")
     
+    # Variável para armazenar tarefa OCR diferida (quando slots ocupados)
+    deferred_ocr_task = None
+    
     if campos_ocr and pdf_path:
         try:
             from .ocr_utils import resolve_missing_labor_fields
             
             logger.info(f"[OCR_SUMARIO] Campos trabalhistas faltantes: {campos_ocr}")
-            ocr_result = resolve_missing_labor_fields(pdf_path, data, campos_ocr)
+            ocr_result, deferred_ocr_task = resolve_missing_labor_fields(pdf_path, data, campos_ocr)
             
             if ocr_result:
                 for field, value in ocr_result.items():
@@ -604,12 +607,18 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
                         logger.info(f"[{field.upper()}] 📷 Recuperado via OCR Sumário: {value}")
                 
                 logger.info(f"[OCR_SUMARIO] ✅ {len(ocr_result)} campos recuperados via OCR seletivo")
+            elif deferred_ocr_task:
+                logger.info(f"[OCR_SUMARIO] 📥 OCR diferido - será processado em background")
             else:
                 logger.debug(f"[OCR_SUMARIO] Nenhum campo recuperado - dados podem estar em texto ou indisponíveis")
         except Exception as e:
             logger.warning(f"[OCR_SUMARIO] Erro no fallback: {e}")
     elif campos_ocr:
         logger.debug(f"[OCR_SKIP] Campos {campos_ocr} vazios mas pdf_path não fornecido")
+    
+    # Armazenar tarefa diferida nos dados para routes_batch enfileirar depois
+    if deferred_ocr_task:
+        data["_deferred_ocr_task"] = deferred_ocr_task
 
     # 12) Pós-processamento (inclui inferência de célula a partir do cliente)
     from .postprocess import full_postprocess

@@ -2,12 +2,19 @@
 """
 Módulo OCR para extração de PDFs escaneados usando Tesseract.
 Aplica OCR seletivo apenas quando texto nativo é insuficiente.
+
+2025-12-05: Sistema de Fila OCR Assíncrona
+- Se não conseguir slot OCR imediato, adiciona à fila e retorna
+- Worker de background processa a fila quando slots liberarem
+- Atualiza os processos no banco quando OCR completar
+- Isso acelera a extração geral pois outros processos não ficam esperando
 """
 import logging
 import os
 import threading
-import signal
-from typing import Optional, Dict, List
+import queue
+import re
+from typing import Optional, Dict, List, Tuple, Callable, Any
 from pdf2image import convert_from_path
 import pytesseract
 from PIL import Image
@@ -16,6 +23,264 @@ from PIL import Image
 # 2025-12-05: Reduzido de ilimitado para 2 simultâneos após travamentos com 5 workers
 OCR_SEMAPHORE = threading.Semaphore(2)
 OCR_TIMEOUT_SECONDS = 60  # Timeout por página para evitar travamento
+
+# ============================================================================
+# SISTEMA DE FILA OCR ASSÍNCRONA
+# ============================================================================
+# Estrutura da tarefa: (process_id, pdf_path, doc_pages, missing_fields)
+OCR_QUEUE: queue.Queue = queue.Queue()
+OCR_WORKER_RUNNING = False
+OCR_WORKER_THREAD: Optional[threading.Thread] = None
+OCR_WORKER_LOCK = threading.Lock()
+
+def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int], 
+                      missing_fields: List[str]) -> Dict[str, str]:
+    """
+    Processa uma tarefa OCR da fila.
+    Extrai campos de documentos escaneados.
+    """
+    logger = logging.getLogger(__name__)
+    result = {}
+    campos_faltantes = set(missing_fields)
+    
+    # Ordenar páginas por prioridade: Contracheque > TRCT > CTPS
+    ordered_pages = []
+    if doc_pages.get("contracheque"):
+        ordered_pages.append(("contracheque", doc_pages["contracheque"]))
+    if doc_pages.get("trct"):
+        ordered_pages.append(("trct", doc_pages["trct"]))
+    if doc_pages.get("ctps"):
+        ordered_pages.append(("ctps", doc_pages["ctps"]))
+    
+    for doc_type, page_num in ordered_pages:
+        if not campos_faltantes:
+            break
+        
+        # Aguarda slot (bloqueante, pois estamos no worker de background)
+        OCR_SEMAPHORE.acquire()
+        texto_pagina = ""
+        try:
+            logger.info(f"[OCR-QUEUE] 📷 Proc {process_id}: {doc_type.upper()} (página {page_num})...")
+            
+            images = convert_from_path(
+                pdf_path,
+                dpi=150,
+                first_page=page_num,
+                last_page=page_num,
+                poppler_path=POPPLER_PATH,
+                timeout=OCR_TIMEOUT_SECONDS
+            )
+            
+            if images:
+                img = images[0]
+                img_gray = img.convert('L')
+                config = '--psm 6 -l por'
+                texto_pagina = pytesseract.image_to_string(
+                    img_gray, 
+                    config=config,
+                    timeout=OCR_TIMEOUT_SECONDS
+                )
+        except Exception as e:
+            logger.warning(f"[OCR-QUEUE] Erro proc {process_id} página {page_num}: {e}")
+        finally:
+            OCR_SEMAPHORE.release()
+        
+        if not texto_pagina:
+            continue
+        
+        # Extrair campos
+        if "salario" in campos_faltantes:
+            salario_patterns = [
+                r'(?:sal[aá]rio\s*(?:base|contratual|mensal)?|remunera[çc][ãa]o(?:\s*mensal)?)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+                r'(?:maior\s*remunera[çc][ãa]o|base\s*de\s*c[aá]lculo)[:\s]*R?\$?\s*([\d]{1,3}(?:[.,]\d{3})*[,\.]\d{2})',
+            ]
+            for pattern in salario_patterns:
+                m = re.search(pattern, texto_pagina, re.IGNORECASE)
+                if m:
+                    val_str = m.group(1).replace('.', '').replace(',', '.')
+                    try:
+                        val = float(val_str)
+                        if 1000 <= val <= 100000:
+                            result["salario"] = f"R$ {m.group(1)}"
+                            campos_faltantes.discard("salario")
+                            logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Salário: {result['salario']}")
+                            break
+                    except:
+                        pass
+        
+        if "data_admissao" in campos_faltantes:
+            m = re.search(r'(?:data\s*(?:de\s*)?admiss[ãa]o|admitido\s*em)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
+            if m:
+                result["data_admissao"] = m.group(1)
+                campos_faltantes.discard("data_admissao")
+                logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Data Admissão: {result['data_admissao']}")
+        
+        if "data_demissao" in campos_faltantes:
+            m = re.search(r'(?:data\s*(?:de\s*)?(?:demiss[ãa]o|desligamento|rescis[ãa]o|afastamento))[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})', texto_pagina, re.IGNORECASE)
+            if m:
+                result["data_demissao"] = m.group(1)
+                campos_faltantes.discard("data_demissao")
+                logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Data Demissão: {result['data_demissao']}")
+        
+        if "pis" in campos_faltantes:
+            m = re.search(r'(?:PIS|PASEP|NIT)[:\s/]*(\d{3}[.\s]?\d{5}[.\s]?\d{2}[.\s-]?\d)', texto_pagina, re.IGNORECASE)
+            if m:
+                pis_raw = re.sub(r'[^\d]', '', m.group(1))
+                if len(pis_raw) == 11:
+                    result["pis"] = f"{pis_raw[:3]}.{pis_raw[3:8]}.{pis_raw[8:10]}-{pis_raw[10]}"
+                    campos_faltantes.discard("pis")
+                    logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} PIS: {result['pis']}")
+        
+        if "ctps" in campos_faltantes:
+            m = re.search(r'(?:CTPS|Carteira)[:\s]*[nN]?[º°]?\s*(\d{5,7})', texto_pagina, re.IGNORECASE)
+            if m:
+                result["ctps"] = m.group(1)
+                campos_faltantes.discard("ctps")
+                logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} CTPS: {result['ctps']}")
+        
+        if "serie_ctps" in campos_faltantes:
+            m = re.search(r'[sS][eéE][rR][iI][eE][:\s]*(\d{3,5})', texto_pagina)
+            if m:
+                result["serie_ctps"] = m.group(1)
+                campos_faltantes.discard("serie_ctps")
+                logger.info(f"[OCR-QUEUE] ✅ Proc {process_id} Série CTPS: {result['serie_ctps']}")
+    
+    return result
+
+
+def _update_process_with_ocr_results(process_id: int, ocr_data: Dict[str, str]):
+    """
+    Atualiza o processo no banco com os dados extraídos via OCR.
+    """
+    if not ocr_data:
+        return
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        from app import app, db
+        from models import Process
+        
+        with app.app_context():
+            process = db.session.get(Process, process_id)
+            if not process:
+                logger.warning(f"[OCR-QUEUE] Processo {process_id} não encontrado no banco")
+                return
+            
+            updated = []
+            for field, value in ocr_data.items():
+                current = getattr(process, field, None)
+                if not current and value:
+                    setattr(process, field, value)
+                    updated.append(field)
+            
+            if updated:
+                db.session.commit()
+                logger.info(f"[OCR-QUEUE] ✅ Processo {process_id} atualizado: {updated}")
+            
+    except Exception as e:
+        logger.error(f"[OCR-QUEUE] ❌ Erro ao atualizar processo {process_id}: {e}")
+
+
+def _ocr_queue_worker():
+    """
+    Worker de background que processa a fila de OCR.
+    Roda em thread separada para não bloquear a extração principal.
+    """
+    global OCR_WORKER_RUNNING
+    logger = logging.getLogger(__name__)
+    logger.info("[OCR-QUEUE] 🚀 Worker iniciado")
+    
+    while OCR_WORKER_RUNNING:
+        try:
+            # Aguarda tarefa com timeout para poder verificar OCR_WORKER_RUNNING
+            task = OCR_QUEUE.get(timeout=2.0)
+            
+            process_id, pdf_path, doc_pages, missing_fields = task
+            logger.info(f"[OCR-QUEUE] 📋 Processando tarefa: processo {process_id}, campos {missing_fields}")
+            
+            # Processa OCR
+            ocr_data = _process_ocr_task(process_id, pdf_path, doc_pages, missing_fields)
+            
+            # Atualiza banco
+            if ocr_data:
+                _update_process_with_ocr_results(process_id, ocr_data)
+            
+            OCR_QUEUE.task_done()
+            
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.error(f"[OCR-QUEUE] ❌ Erro no worker: {e}")
+    
+    logger.info("[OCR-QUEUE] 🛑 Worker encerrado")
+
+
+def start_ocr_queue_worker():
+    """
+    Inicia o worker de processamento da fila OCR.
+    """
+    global OCR_WORKER_RUNNING, OCR_WORKER_THREAD
+    
+    with OCR_WORKER_LOCK:
+        if OCR_WORKER_RUNNING:
+            return
+        
+        OCR_WORKER_RUNNING = True
+        OCR_WORKER_THREAD = threading.Thread(target=_ocr_queue_worker, daemon=True)
+        OCR_WORKER_THREAD.start()
+        logging.getLogger(__name__).info("[OCR-QUEUE] 🟢 Worker de fila OCR iniciado")
+
+
+def stop_ocr_queue_worker():
+    """
+    Para o worker de processamento da fila OCR.
+    """
+    global OCR_WORKER_RUNNING, OCR_WORKER_THREAD
+    
+    with OCR_WORKER_LOCK:
+        OCR_WORKER_RUNNING = False
+        if OCR_WORKER_THREAD:
+            OCR_WORKER_THREAD.join(timeout=5.0)
+            OCR_WORKER_THREAD = None
+        logging.getLogger(__name__).info("[OCR-QUEUE] 🔴 Worker de fila OCR encerrado")
+
+
+def queue_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int], 
+                   missing_fields: List[str]) -> bool:
+    """
+    Adiciona uma tarefa de OCR à fila para processamento assíncrono.
+    
+    Returns:
+        True se adicionou à fila, False se fila cheia
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Garantir que worker está rodando
+    start_ocr_queue_worker()
+    
+    try:
+        OCR_QUEUE.put_nowait((process_id, pdf_path, doc_pages, missing_fields))
+        logger.info(f"[OCR-QUEUE] 📥 Tarefa enfileirada: processo {process_id} ({OCR_QUEUE.qsize()} na fila)")
+        return True
+    except queue.Full:
+        logger.warning(f"[OCR-QUEUE] ⚠️ Fila cheia, tarefa descartada: processo {process_id}")
+        return False
+
+
+def get_ocr_queue_status() -> Dict:
+    """
+    Retorna status da fila OCR.
+    """
+    return {
+        "queue_size": OCR_QUEUE.qsize(),
+        "worker_running": OCR_WORKER_RUNNING,
+        "max_concurrent": 2
+    }
+
+# ============================================================================
+# FIM DO SISTEMA DE FILA OCR
+# ============================================================================
 
 def _get_poppler_path() -> Optional[str]:
     """
@@ -251,11 +516,13 @@ def parse_toc_from_pdf(pdf_path: str, max_pages: int = 6) -> Dict[str, List[int]
 
 
 def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any], 
-                                  missing_fields: List[str]) -> Dict[str, str]:
+                                  missing_fields: List[str],
+                                  defer_if_busy: bool = True) -> Tuple[Dict[str, str], Optional[Dict]]:
     """
     Resolve campos trabalhistas faltantes usando OCR seletivo via bookmarks.
     
     2025-12-05: LÓGICA SIMPLIFICADA - OCR por DOCUMENTO, não por campo.
+    2025-12-05: FILA ASSÍNCRONA - Se slots ocupados, retorna tarefa diferida
     
     Estratégia SIMPLES:
     1. Ler bookmarks do PDF (CTPS→pág.X, TRCT→pág.Y, Contracheque→pág.Z)
@@ -271,17 +538,19 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         pdf_path: Caminho do PDF
         current_data: Dados já extraídos (para não sobrescrever)
         missing_fields: Lista de campos faltantes
+        defer_if_busy: Se True, retorna tarefa diferida quando slots ocupados
     
     Returns:
-        Dict com campos recuperados via OCR
+        Tuple: (ocr_data, deferred_task)
+        - ocr_data: Dict com campos recuperados via OCR
+        - deferred_task: Dict com info para enfileirar depois, ou None se processou imediato
     """
-    import re
-    
     result = {}
+    deferred_task = None
     logger = logging.getLogger(__name__)
     
     if not missing_fields or not pdf_path:
-        return result
+        return result, None
     
     logger.info(f"[OCR] Campos faltantes: {missing_fields}")
     
@@ -298,7 +567,7 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         docs_needed.add("trct")  # fallback para salário
     
     if not docs_needed:
-        return result
+        return result, None
     
     logger.info(f"[OCR] Documentos necessários: {docs_needed}")
     
@@ -339,9 +608,28 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
     
     if not doc_pages:
         logger.warning("[OCR] Nenhuma página de documento encontrada")
-        return result
+        return result, None
     
-    # ===== PASSO 3: OCR SEQUENCIAL COM EARLY EXIT =====
+    # ===== PASSO 3: TENTAR OCR IMEDIATO OU RETORNAR TAREFA DIFERIDA =====
+    # Tenta adquirir slot imediato (timeout curto de 0.5 segundos)
+    # Se não conseguir e defer_if_busy=True, retorna tarefa para enfileirar depois
+    
+    if defer_if_busy:
+        acquired = OCR_SEMAPHORE.acquire(timeout=0.5)
+        if not acquired:
+            # Slots ocupados → retorna tarefa para enfileirar após criar processo
+            logger.info(f"[OCR] 📥 Slots ocupados - preparando tarefa diferida")
+            deferred_task = {
+                "pdf_path": pdf_path,
+                "doc_pages": doc_pages,
+                "missing_fields": list(missing_fields)
+            }
+            return result, deferred_task
+        else:
+            # Conseguiu slot → libera imediatamente, vai processar normalmente
+            OCR_SEMAPHORE.release()
+    
+    # ===== PASSO 4: OCR SEQUENCIAL COM EARLY EXIT =====
     # Abre uma página, lê, achou os dados? PARA. Não achou? Próxima página.
     
     # Ordenar páginas por prioridade: Contracheque > TRCT > CTPS
@@ -464,11 +752,11 @@ def resolve_missing_labor_fields(pdf_path: str, current_data: Dict[str, any],
         if result:
             logger.info(f"[OCR] 🎯 Recuperados: {list(result.keys())}")
         
-        return result
+        return result, None  # Processou imediato, sem tarefa diferida
         
     except Exception as e:
         logger.error(f"[OCR] ❌ Erro: {e}")
-        return result
+        return result, None
 
 
 def detect_scanned_pages(pdf_path: str, min_text_len: int = 200, 

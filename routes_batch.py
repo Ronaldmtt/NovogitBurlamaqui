@@ -267,8 +267,25 @@ def _extract_single_item(item_id: int, upload_path: str, source_filename: str, u
                 # ✅ CRÍTICO: Incluir pdf_filename para permitir extração de reclamadas no RPA
                 extracted_data["pdf_filename"] = upload_path
                 
+                # Extrair tarefa OCR diferida antes de criar processo (não deve ir pro banco)
+                deferred_ocr = extracted_data.pop("_deferred_ocr_task", None)
+                
                 # Criar processo no banco
                 process_id = _create_process_from_data(extracted_data, user_id)
+                
+                # 2025-12-05: Enfileirar OCR diferido agora que temos process_id
+                if deferred_ocr and process_id:
+                    try:
+                        from extractors.ocr_utils import queue_ocr_task
+                        queue_ocr_task(
+                            process_id, 
+                            deferred_ocr["pdf_path"],
+                            deferred_ocr["doc_pages"],
+                            deferred_ocr["missing_fields"]
+                        )
+                        logger.info(f"[EXTRACT][THREAD] 📥 OCR diferido enfileirado para processo {process_id}")
+                    except Exception as ocr_ex:
+                        logger.warning(f"[EXTRACT][THREAD] Erro ao enfileirar OCR: {ocr_ex}")
                 
                 # Atualizar item com sucesso
                 item.process_id = process_id

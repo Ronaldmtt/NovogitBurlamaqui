@@ -27,6 +27,14 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     - Fallback hierárquico: Bookmarks → Sumário textual → Inferência Histórica → Heurística limitada
     - Economia de ~90 segundos por PDF (2 páginas ao invés de 5)
     - Tesseract instalado com português para extração
+*   **Fila OCR Assíncrona (2025-12-05):** Sistema de fila para OCR quando múltiplos workers precisam simultaneamente:
+    - `OCR_SEMAPHORE`: Limita a 2 OCRs simultâneos (Tesseract é CPU-intensive)
+    - `resolve_missing_labor_fields()` retorna Tuple: (ocr_data, deferred_task)
+    - Se slots ocupados: retorna tarefa diferida ao invés de bloquear
+    - Pipeline propaga `_deferred_ocr_task` para routes_batch
+    - routes_batch enfileira OCR após criar process_id: `queue_ocr_task()`
+    - Worker de background (`_ocr_queue_worker_loop`) processa fila e atualiza processos
+    - Resultado: workers continuam processando outros PDFs sem esperar OCR
 *   **Inteligência de Localização de Anexos (2025-12-05):** Sistema de aprendizado que mapeia onde documentos (CTPS, TRCT, Contracheque) aparecem em PDFs processados:
     - Tabela `AnnexLocation`: Armazena page_number, page_ratio, doc_type, confidence para cada documento encontrado
     - `infer_annex_pages_from_history()`: Consulta estatísticas históricas por faixa de tamanho do PDF
