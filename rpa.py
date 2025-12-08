@@ -3318,40 +3318,42 @@ def load_process_data_for_fill(process_id: Optional[int] = None) -> Dict[str, An
                         log(f"[DATA][WARN] PDF não encontrado: {pdf_filename}")
                         data["reclamadas"] = []
                     
-                    # 🔧 2025-11-27: FALLBACK - Se não extraiu do PDF, usar outra_reclamada_cliente do banco
+                    # 🔧 2025-12-08: FALLBACK MELHORADO - Construir lista de reclamadas do banco quando PDF não disponível
+                    # Agora sempre adiciona parte_adversa como primeira reclamada se a lista está vazia
                     if len(data.get("reclamadas", [])) <= 1:
                         outra_reclamada = (data.get("outra_reclamada_cliente") or "").strip()
+                        parte_adversa = (data.get("parte_adversa_nome") or "").strip()
+                        
+                        # Criar lista de reclamadas a partir do banco
+                        reclamadas_from_db = []
+                        
+                        # Normalizar para comparação
+                        parte_normalizada = parte_adversa.upper().strip() if parte_adversa else ""
+                        outra_normalizada = outra_reclamada.upper().strip() if outra_reclamada else ""
+                        
+                        # ✅ SEMPRE adicionar parte_adversa como primeira reclamada (se existir)
+                        if parte_adversa:
+                            reclamadas_from_db.append({
+                                "nome": parte_adversa,
+                                "posicao": "RECLAMADO",
+                                "tipo_pessoa": "juridica" if any(x in parte_adversa.upper() for x in ["LTDA", "S/A", "S.A.", "EIRELI", "ME", "EPP", "CIA", "COMPANHIA", "INDUSTRIA", "COMERCIO"]) else "fisica"
+                            })
+                            log(f"[DATA][RECLAMADAS] Primeira reclamada (parte_adversa): {parte_adversa[:50]}")
+                        
+                        # Segunda reclamada = outra_reclamada_cliente (somente se existir e não for duplicata)
                         if outra_reclamada:
-                            log(f"[DATA][RECLAMADAS] Usando outra_reclamada_cliente do banco: {outra_reclamada}")
-                            # Criar lista de reclamadas com parte_adversa + outra_reclamada
-                            reclamadas_from_db = []
-                            
-                            # Primeira reclamada = parte_adversa_nome (a principal)
-                            parte_adversa = (data.get("parte_adversa_nome") or "").strip()
-                            
-                            # 🔧 2025-11-27: DEDUPLICAÇÃO - Verificar se outra_reclamada é diferente de parte_adversa
-                            # Normalizar para comparação (ignorar case, espaços extras)
-                            parte_normalizada = parte_adversa.upper().strip() if parte_adversa else ""
-                            outra_normalizada = outra_reclamada.upper().strip()
-                            
-                            if parte_adversa:
-                                reclamadas_from_db.append({
-                                    "nome": parte_adversa,
-                                    "posicao": "RECLAMADO",
-                                    "tipo_pessoa": "juridica" if any(x in parte_adversa.upper() for x in ["LTDA", "S/A", "S.A.", "EIRELI", "ME", "EPP", "CIA", "COMPANHIA", "INDUSTRIA", "COMERCIO"]) else "fisica"
-                                })
-                            
-                            # Segunda reclamada = outra_reclamada_cliente (somente se não for duplicata)
                             if outra_normalizada and outra_normalizada != parte_normalizada:
                                 reclamadas_from_db.append({
                                     "nome": outra_reclamada,
                                     "posicao": "RECLAMADO",
                                     "tipo_pessoa": "juridica" if any(x in outra_reclamada.upper() for x in ["LTDA", "S/A", "S.A.", "EIRELI", "ME", "EPP", "CIA", "COMPANHIA", "INDUSTRIA", "COMERCIO"]) else "fisica"
                                 })
-                                log(f"[DATA][RECLAMADAS] ✅ Adicionada outra_reclamada: {outra_reclamada}")
+                                log(f"[DATA][RECLAMADAS] ✅ Segunda reclamada (outra_reclamada_cliente): {outra_reclamada[:50]}")
                             elif outra_normalizada == parte_normalizada:
                                 log(f"[DATA][RECLAMADAS] ⚠️ outra_reclamada é igual a parte_adversa - ignorando duplicata")
-                            
+                        
+                        # Atualizar lista se temos algo do banco
+                        if reclamadas_from_db:
                             data["reclamadas"] = reclamadas_from_db
                             log(f"[DATA][RECLAMADAS] Lista construída do banco: {len(reclamadas_from_db)} reclamadas")
                     
@@ -3436,6 +3438,22 @@ def load_process_data_for_fill(process_id: Optional[int] = None) -> Dict[str, An
                 else:
                     log(f"[DATA][WARN] PDF não encontrado: {pdf_filename}")
                     data["reclamadas"] = []
+                
+                # 🔧 2025-12-08: FALLBACK - Construir lista de reclamadas do banco se não extraiu do PDF
+                if len(data.get("reclamadas", [])) <= 1:
+                    parte_adversa = (data.get("parte_adversa_nome") or "").strip()
+                    reclamadas_from_db = []
+                    
+                    if parte_adversa:
+                        reclamadas_from_db.append({
+                            "nome": parte_adversa,
+                            "posicao": "RECLAMADO",
+                            "tipo_pessoa": "juridica" if any(x in parte_adversa.upper() for x in ["LTDA", "S/A", "S.A.", "EIRELI", "ME", "EPP", "CIA", "COMPANHIA", "INDUSTRIA", "COMERCIO"]) else "fisica"
+                        })
+                        log(f"[DATA][RECLAMADAS] Primeira reclamada (parte_adversa): {parte_adversa[:50]}")
+                    
+                    if reclamadas_from_db:
+                        data["reclamadas"] = reclamadas_from_db
                 
                 log(f"[DATA] DB (último processo atualizado) OK - ID: {p.id}, CNJ: {data.get('cnj', 'N/A')}, Parte Adversa: {data.get('parte_adversa_nome', 'N/A')}, Reclamadas: {len(data.get('reclamadas', []))}")
                 return data
