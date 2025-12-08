@@ -7012,8 +7012,11 @@ async def _take_reclamadas_screenshot(page, process_id: int):
     
     try:
         # Garantir que aba está visível
-        await page.click('a[href="#box-outraspartes"]')
-        await short_sleep_ms(500)
+        try:
+            await page.click('a[href="#box-outraspartes"]')
+            await short_sleep_ms(500)
+        except Exception as e:
+            log(f"[RECLAMADAS][RPA][SHOT][WARN] Não conseguiu clicar na aba: {e}")
         
         # Gerar nome do arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -7024,22 +7027,36 @@ async def _take_reclamadas_screenshot(page, process_id: int):
         screenshot_path = screenshot_dir / screenshot_filename
         
         await page.screenshot(path=str(screenshot_path), full_page=True)
-        log(f"[RECLAMADAS][RPA][SHOT] Screenshot salvo: {screenshot_path}")
+        log(f"[RECLAMADAS][RPA][SHOT] Screenshot salvo em disco: {screenshot_path}")
         
         # Salvar no banco de dados
+        saved_to_db = False
         if flask_app:
-            from models import Process, db
-            with flask_app.app_context():
-                proc = Process.query.get(process_id)
-                if proc:
-                    proc.elaw_screenshot_reclamadas_path = screenshot_filename
-                    db.session.commit()
-                    log(f"[RECLAMADAS][RPA][SHOT] ✅ Caminho salvo no banco: {screenshot_filename}")
+            try:
+                from models import Process, db
+                with flask_app.app_context():
+                    proc = Process.query.get(process_id)
+                    if proc:
+                        proc.elaw_screenshot_reclamadas_path = screenshot_filename
+                        db.session.commit()
+                        saved_to_db = True
+                        log(f"[RECLAMADAS][RPA][SHOT] ✅ Caminho salvo no banco: {screenshot_filename}")
+                    else:
+                        log(f"[RECLAMADAS][RPA][SHOT][WARN] Processo {process_id} não encontrado no banco!")
+            except Exception as db_err:
+                log(f"[RECLAMADAS][RPA][SHOT][ERRO] Falha ao salvar no banco: {db_err}")
+        else:
+            log("[RECLAMADAS][RPA][SHOT][WARN] flask_app é None - screenshot não será salvo no banco!")
+        
+        if not saved_to_db:
+            log(f"[RECLAMADAS][RPA][SHOT][WARN] Screenshot capturado mas NÃO salvo no banco! Arquivo: {screenshot_filename}")
         
         send_screenshot_to_monitor(screenshot_path, region="RECLAMADAS_EXTRAS")
         
     except Exception as e:
         log(f"[RECLAMADAS][RPA][SHOT][ERRO] Falha ao capturar screenshot: {e}")
+        import traceback
+        log(f"[RECLAMADAS][RPA][SHOT][TRACEBACK] {traceback.format_exc()}")
 
 
 # =========================
@@ -8058,22 +8075,36 @@ async def _take_pedidos_screenshot(page, process_id: int, success_count: int = 1
         screenshot_path = screenshot_dir / screenshot_filename
         
         await page.screenshot(path=str(screenshot_path), full_page=True)
-        log(f"[PEDIDOS][RPA][SHOT] Screenshot salvo: {screenshot_path}")
+        log(f"[PEDIDOS][RPA][SHOT] Screenshot salvo em disco: {screenshot_path}")
         
         # Salvar no banco de dados
+        saved_to_db = False
         if flask_app:
-            from models import Process, db
-            with flask_app.app_context():
-                proc = Process.query.get(process_id)
-                if proc:
-                    proc.elaw_screenshot_pedidos_path = screenshot_filename
-                    db.session.commit()
-                    log(f"[PEDIDOS][RPA][SHOT] ✅ Caminho salvo no banco: {screenshot_filename}")
+            try:
+                from models import Process, db
+                with flask_app.app_context():
+                    proc = Process.query.get(process_id)
+                    if proc:
+                        proc.elaw_screenshot_pedidos_path = screenshot_filename
+                        db.session.commit()
+                        saved_to_db = True
+                        log(f"[PEDIDOS][RPA][SHOT] ✅ Caminho salvo no banco: {screenshot_filename}")
+                    else:
+                        log(f"[PEDIDOS][RPA][SHOT][WARN] Processo {process_id} não encontrado no banco!")
+            except Exception as db_err:
+                log(f"[PEDIDOS][RPA][SHOT][ERRO] Falha ao salvar no banco: {db_err}")
+        else:
+            log("[PEDIDOS][RPA][SHOT][WARN] flask_app é None - screenshot não será salvo no banco!")
+        
+        if not saved_to_db:
+            log(f"[PEDIDOS][RPA][SHOT][WARN] Screenshot capturado mas NÃO salvo no banco! Arquivo: {screenshot_filename}")
         
         send_screenshot_to_monitor(screenshot_path, region="PEDIDOS")
         
     except Exception as e:
         log(f"[PEDIDOS][RPA][SHOT][ERRO] Falha ao capturar screenshot: {e}")
+        import traceback
+        log(f"[PEDIDOS][RPA][SHOT][TRACEBACK] {traceback.format_exc()}")
 
 
 # =========================
