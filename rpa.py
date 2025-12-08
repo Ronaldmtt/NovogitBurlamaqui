@@ -577,7 +577,7 @@ async def short_sleep_ms(ms: int):
 
 async def navigate_to_tab_via_url(page, process_id: int, tab_hash: str) -> bool:
     """
-    Navega para uma aba específica via URL hash - MUITO mais confiável que clicar.
+    Navega para uma aba específica - tenta URL hash primeiro, depois clique.
     
     Args:
         page: Playwright page
@@ -588,10 +588,8 @@ async def navigate_to_tab_via_url(page, process_id: int, tab_hash: str) -> bool:
         bool: True se navegou com sucesso
     """
     try:
-        # Pegar URL atual e adicionar/substituir hash
+        # Pegar URL atual
         current_url = page.url
-        
-        # Remover hash existente
         base_url = current_url.split('#')[0]
         
         # Se não temos URL de detalhes, tentar buscar do banco
@@ -604,30 +602,81 @@ async def navigate_to_tab_via_url(page, process_id: int, tab_hash: str) -> bool:
                         base_url = proc.elaw_detail_url.split('#')[0]
                         log(f"[NAV_TAB] Usando URL do banco: {base_url[:60]}...")
         
-        # Construir URL com hash da aba
-        target_url = f"{base_url}#{tab_hash}"
-        log(f"[NAV_TAB] Navegando para: ...#{tab_hash}")
+        log(f"[NAV_TAB] Ativando aba #{tab_hash}...")
         
-        # Navegar diretamente
-        await page.goto(target_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
-        await short_sleep_ms(1500)
+        # MÉTODO 1: Clicar na aba via JavaScript (mais confiável para Bootstrap)
+        tab_activated = False
+        try:
+            # Tentar ativar via JavaScript - funciona em todos os Bootstrap
+            await page.evaluate(f"""() => {{
+                // Remover classes ativas de todas as abas
+                document.querySelectorAll('.nav-tabs li, .nav-tabs .nav-item').forEach(li => li.classList.remove('active'));
+                document.querySelectorAll('.nav-tabs a, .nav-tabs .nav-link').forEach(a => a.classList.remove('active'));
+                document.querySelectorAll('.tab-content .tab-pane').forEach(pane => {{
+                    pane.classList.remove('active', 'in', 'show');
+                    pane.style.display = 'none';
+                }});
+                
+                // Ativar a aba desejada
+                const tabLink = document.querySelector('a[href="#{tab_hash}"]');
+                if (tabLink) {{
+                    tabLink.classList.add('active');
+                    if (tabLink.parentElement) tabLink.parentElement.classList.add('active');
+                }}
+                
+                const tabPane = document.getElementById('{tab_hash}');
+                if (tabPane) {{
+                    tabPane.classList.add('active', 'in', 'show');
+                    tabPane.style.display = 'block';
+                }}
+            }}""")
+            await short_sleep_ms(500)
+            
+            # Verificar se aba ficou visível
+            tab_visible = await page.locator(f'#{tab_hash}').is_visible()
+            if tab_visible:
+                log(f"[NAV_TAB] ✅ Aba #{tab_hash} ativada via JavaScript")
+                tab_activated = True
+        except Exception as e:
+            log(f"[NAV_TAB] JavaScript falhou: {e}")
         
-        # Verificar se a aba está visível
-        tab_visible = False
-        for css_class in ['active', 'show', 'in', '']:
+        # MÉTODO 2: Se JavaScript falhou, tentar clique direto na aba
+        if not tab_activated:
             try:
-                selector = f'#{tab_hash}.{css_class}' if css_class else f'#{tab_hash}'
-                await page.wait_for_selector(selector, state='visible', timeout=2000)
-                log(f"[NAV_TAB] ✅ Aba #{tab_hash} confirmada visível")
-                tab_visible = True
-                break
-            except:
-                continue
+                tab_link = page.locator(f'a[href="#{tab_hash}"]').first
+                if await tab_link.count() > 0:
+                    await tab_link.click(timeout=3000)
+                    await short_sleep_ms(1000)
+                    
+                    tab_visible = await page.locator(f'#{tab_hash}').is_visible()
+                    if tab_visible:
+                        log(f"[NAV_TAB] ✅ Aba #{tab_hash} ativada via clique")
+                        tab_activated = True
+            except Exception as e:
+                log(f"[NAV_TAB] Clique na aba falhou: {e}")
         
-        return tab_visible
+        # MÉTODO 3: Navegação via URL hash (fallback)
+        if not tab_activated:
+            try:
+                target_url = f"{base_url}#{tab_hash}"
+                log(f"[NAV_TAB] Tentando navegação via URL: ...#{tab_hash}")
+                await page.goto(target_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
+                await short_sleep_ms(1500)
+                
+                tab_visible = await page.locator(f'#{tab_hash}').is_visible()
+                if tab_visible:
+                    log(f"[NAV_TAB] ✅ Aba #{tab_hash} ativada via URL")
+                    tab_activated = True
+            except Exception as e:
+                log(f"[NAV_TAB] Navegação URL falhou: {e}")
+        
+        if not tab_activated:
+            log(f"[NAV_TAB][WARN] Não foi possível ativar aba #{tab_hash} - tentando continuar...")
+        
+        return tab_activated
         
     except Exception as e:
-        log(f"[NAV_TAB][ERRO] Falha ao navegar para #{tab_hash}: {e}")
+        log(f"[NAV_TAB][ERRO] Falha geral ao navegar para #{tab_hash}: {e}")
         return False
 
 
