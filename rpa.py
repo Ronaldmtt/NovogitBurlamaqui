@@ -7358,7 +7358,8 @@ async def handle_novo_pedido(page, data: dict, process_id: int) -> bool:
                     pass
         
         if not tipos_pedidos:
-            log("[PEDIDOS][RPA][WARN] Nenhum tipo de pedido disponível - pulando")
+            log("[PEDIDOS][RPA][WARN] Nenhum tipo de pedido disponível - pulando (sem screenshot)")
+            update_status("pedidos_vazio", "Nenhum pedido para inserir", process_id=process_id)
             return False
         
         # ✅ CRÍTICO: Aplicar limite máximo de pedidos ANTES do loop
