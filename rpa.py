@@ -574,6 +574,63 @@ def _best_match(options: List[str], wanted: str, prefer_words: Optional[List[str
 async def short_sleep_ms(ms: int):
     await asyncio.sleep(ms / 1000.0)
 
+
+async def navigate_to_tab_via_url(page, process_id: int, tab_hash: str) -> bool:
+    """
+    Navega para uma aba específica via URL hash - MUITO mais confiável que clicar.
+    
+    Args:
+        page: Playwright page
+        process_id: ID do processo para buscar URL base do banco
+        tab_hash: Hash da aba (ex: 'box-dadosprincipais', 'box-pedidos', 'box-outraspartes')
+        
+    Returns:
+        bool: True se navegou com sucesso
+    """
+    try:
+        # Pegar URL atual e adicionar/substituir hash
+        current_url = page.url
+        
+        # Remover hash existente
+        base_url = current_url.split('#')[0]
+        
+        # Se não temos URL de detalhes, tentar buscar do banco
+        if 'detail' not in base_url.lower() and 'id=' not in base_url.lower():
+            if flask_app:
+                from models import Process, db
+                with flask_app.app_context():
+                    proc = Process.query.get(process_id)
+                    if proc and proc.elaw_detail_url:
+                        base_url = proc.elaw_detail_url.split('#')[0]
+                        log(f"[NAV_TAB] Usando URL do banco: {base_url[:60]}...")
+        
+        # Construir URL com hash da aba
+        target_url = f"{base_url}#{tab_hash}"
+        log(f"[NAV_TAB] Navegando para: ...#{tab_hash}")
+        
+        # Navegar diretamente
+        await page.goto(target_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
+        await short_sleep_ms(1500)
+        
+        # Verificar se a aba está visível
+        tab_visible = False
+        for css_class in ['active', 'show', 'in', '']:
+            try:
+                selector = f'#{tab_hash}.{css_class}' if css_class else f'#{tab_hash}'
+                await page.wait_for_selector(selector, state='visible', timeout=2000)
+                log(f"[NAV_TAB] ✅ Aba #{tab_hash} confirmada visível")
+                tab_visible = True
+                break
+            except:
+                continue
+        
+        return tab_visible
+        
+    except Exception as e:
+        log(f"[NAV_TAB][ERRO] Falha ao navegar para #{tab_hash}: {e}")
+        return False
+
+
 async def wait_network_quiet(page, timeout_ms: int):
     try:
         await page.wait_for_load_state("networkidle", timeout=timeout_ms)
@@ -6176,44 +6233,9 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             if pedidos:
                 log(f"[PEDIDOS] Detectados {len(pedidos)} pedidos para inserir")
                 
-                # ✅ 2025-12-08 FIX: Garantir que estamos na aba Geral antes de inserir pedidos
-                # Mesmo se estamos na URL de detalhes, pode estar em outra aba (ex: Partes e Advogados)
-                # 2025-12-08 FIX 3: Bootstrap pode usar .active, .show ou .in - aceitar qualquer um
-                try:
-                    log("[PEDIDOS] Garantindo que está na aba Geral (com verificação multi-seletor)...")
-                    geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
-                    if await geral_tab.count() > 0:
-                        await geral_tab.click()
-                        await short_sleep_ms(500)
-                        
-                        # CRÍTICO: Esperar aba ficar ativa - Bootstrap pode usar .active, .show ou .in
-                        tab_active = False
-                        for css_class in ['active', 'show', 'in']:
-                            try:
-                                await page.wait_for_selector(f'#box-dadosprincipais.{css_class}', state='visible', timeout=2000)
-                                log(f"[PEDIDOS] ✅ Aba Geral confirmada como ATIVA (.{css_class}) - prosseguindo")
-                                tab_active = True
-                                break
-                            except:
-                                continue
-                        
-                        if not tab_active:
-                            # Fallback: verificar se o conteúdo está visível
-                            try:
-                                await page.wait_for_selector('#box-dadosprincipais', state='visible', timeout=2000)
-                                log("[PEDIDOS] ✅ Aba Geral visível (sem classe específica) - prosseguindo")
-                                tab_active = True
-                            except:
-                                log("[PEDIDOS][WARN] Aba Geral pode não estar ativa - tentando continuar...")
-                        
-                        await short_sleep_ms(500)
-                    else:
-                        log("[PEDIDOS][WARN] Link da aba Geral não encontrado, tentando continuar...")
-                except Exception as e:
-                    log(f"[PEDIDOS][WARN] Erro ao clicar/confirmar aba Geral: {e}")
-                    # Fallback: esperar mais tempo
-                    await short_sleep_ms(2000)
-                    log("[PEDIDOS] Aguardou 2s extra como fallback antes dos pedidos")
+                # ✅ 2025-12-08 FIX 4: Navegar diretamente via URL hash - MUITO mais confiável
+                log("[PEDIDOS] Navegando para aba Geral via URL...")
+                await navigate_to_tab_via_url(page, process_id, "box-dadosprincipais")
                 
                 # Garantir que estamos na tela de detalhes antes de inserir pedidos
                 current_url = page.url
@@ -6982,47 +7004,9 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
             log(f"[RECLAMADAS][RPA][SHOT] Tirando screenshot (inseridas: {success_count}, puladas: {skipped_count})")
             await _take_reclamadas_screenshot(page, process_id)
         
-        # ✅ 2025-12-08 FIX: Voltar à aba Geral após inserir reclamadas
-        # Isso garante que o fluxo de pedidos encontre a página no estado correto
-        # 2025-12-08 FIX 3: Bootstrap pode usar .active, .show ou .in - aceitar qualquer um
-        try:
-            log("[RECLAMADAS][RPA] Voltando à aba Geral para continuar fluxo de pedidos...")
-            geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
-            if await geral_tab.count() > 0:
-                await geral_tab.click()
-                await short_sleep_ms(500)
-                
-                # CRÍTICO: Esperar aba ficar ativa - Bootstrap pode usar .active, .show ou .in
-                tab_active = False
-                for css_class in ['active', 'show', 'in']:
-                    try:
-                        await page.wait_for_selector(f'#box-dadosprincipais.{css_class}', state='visible', timeout=2000)
-                        log(f"[RECLAMADAS][RPA] ✅ Aba Geral confirmada como ATIVA (.{css_class})")
-                        tab_active = True
-                        break
-                    except:
-                        continue
-                
-                if not tab_active:
-                    # Fallback: verificar se o conteúdo está visível mesmo sem classe
-                    try:
-                        await page.wait_for_selector('#box-dadosprincipais', state='visible', timeout=2000)
-                        log("[RECLAMADAS][RPA] ✅ Aba Geral visível (sem classe específica)")
-                        tab_active = True
-                    except:
-                        log("[RECLAMADAS][RPA][WARN] Aba Geral pode não estar ativa!")
-                
-                await short_sleep_ms(500)
-            else:
-                log("[RECLAMADAS][RPA][WARN] Link da aba Geral não encontrado")
-        except Exception as e:
-            log(f"[RECLAMADAS][RPA][WARN] Erro ao voltar/confirmar aba Geral: {e}")
-            # Tentar fallback: aguardar mais tempo
-            try:
-                await short_sleep_ms(2000)
-                log("[RECLAMADAS][RPA] Aguardou 2s extra como fallback")
-            except:
-                pass
+        # ✅ 2025-12-08 FIX 4: Navegar diretamente via URL hash - MUITO mais confiável
+        log("[RECLAMADAS][RPA] Voltando à aba Geral via URL...")
+        await navigate_to_tab_via_url(page, process_id, "box-dadosprincipais")
         
         # ⚠️ NOTA: Marcações e pedidos agora são tratados FORA desta função
         # para permitir que processos sem reclamadas extras também tenham pedidos
@@ -7338,94 +7322,21 @@ async def handle_novo_pedido(page, data: dict, process_id: int) -> bool:
     update_status("pedidos_inicio", "Abrindo aba Pedidos...", process_id=process_id)
     
     try:
-        # 0. VERIFICAR SE ESTÁ NA TELA DE DETALHES
-        current_url = page.url
-        title = await page.title()
-        log(f"[PEDIDOS][RPA] Verificando página: url={current_url[:80]}..., title={title[:50]}")
+        # ✅ 2025-12-08 FIX 4: Navegar diretamente para aba Pedidos via URL hash
+        log("[PEDIDOS][RPA] Navegando para aba Pedidos via URL...")
+        nav_ok = await navigate_to_tab_via_url(page, process_id, "box-pedidos")
         
-        if 'detail' not in current_url.lower() and 'id=' not in current_url.lower() and 'Detalhes' not in title:
-            log("[PEDIDOS][RPA][WARN] Pode não estar na tela de detalhes!")
-            # Tentar navegar para tela de detalhes via banco
-            if flask_app:
-                from models import Process, db
-                with flask_app.app_context():
-                    proc = Process.query.get(process_id)
-                    if proc and proc.elaw_detail_url:
-                        log(f"[PEDIDOS][RPA] Navegando para URL de detalhes: {proc.elaw_detail_url}")
-                        await page.goto(proc.elaw_detail_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
-                        await short_sleep_ms(2000)
-        
-        # 1. Clicar na aba "Pedidos" na sidebar (OTIMIZADO - wait inteligente)
-        log("[PEDIDOS][RPA] Clicando na aba Pedidos...")
-        
-        # Tentar múltiplos seletores para a aba Pedidos
-        pedidos_tab_selectors = [
-            'a[href="#box-pedidos"][data-toggle="tab"]',
-            'a[href="#box-pedidos"]',
-            'a:has-text("Pedidos")',
-            '.nav-tabs a:has-text("Pedidos")',
-            '#tabs-processo a:has-text("Pedidos")',
-        ]
-        
-        pedidos_tab = None
-        for sel in pedidos_tab_selectors:
-            try:
-                tab = page.locator(sel).first
-                if await tab.count() > 0:
-                    pedidos_tab = tab
-                    log(f"[PEDIDOS][RPA] Encontrou aba com seletor: {sel}")
-                    break
-            except:
-                continue
-        
-        if not pedidos_tab:
-            log("[PEDIDOS][RPA][ERRO] Nenhum seletor de aba Pedidos funcionou!")
-            update_status("pedidos_skip", "Aba de Pedidos não encontrada na página", process_id=process_id)
+        if not nav_ok:
+            log("[PEDIDOS][RPA][SKIP] Navegação para aba Pedidos falhou")
+            update_status("pedidos_skip", "Não foi possível acessar aba de Pedidos", process_id=process_id)
             return False
         
+        # Verificar se dropdown de ações está visível
         try:
-            # Primeira tentativa: clique normal
-            await pedidos_tab.click(timeout=5000)
-            
-            # ✅ OTIMIZADO: Wait inteligente - esperar aba aparecer ao invés de sleep fixo
-            try:
-                await page.locator('#box-pedidos').wait_for(state='visible', timeout=3000)
-                log("[PEDIDOS][RPA] ✅ Aba Pedidos visível (wait inteligente)")
-            except:
-                # Fallback: usar JavaScript para ativar a aba Bootstrap
-                log("[PEDIDOS][RPA] Clique normal não ativou aba - tentando via JavaScript...")
-                await page.evaluate("""() => {
-                    document.querySelectorAll('.nav-tabs li').forEach(li => li.classList.remove('active'));
-                    document.querySelectorAll('.tab-content .tab-pane').forEach(pane => pane.classList.remove('active', 'in'));
-                    const pedidosLink = document.querySelector('a[href="#box-pedidos"]');
-                    if (pedidosLink) pedidosLink.parentElement.classList.add('active');
-                    const pedidosPane = document.querySelector('#box-pedidos');
-                    if (pedidosPane) pedidosPane.classList.add('active', 'in');
-                }""")
-                await page.locator('#box-pedidos').wait_for(state='visible', timeout=3000)
-            
-            # ✅ OTIMIZADO: Aguardar dropdown de ações ficar visível (wait inteligente)
-            try:
-                await page.locator('#box-pedidos .btn-group button.btn-acoes.dropdown-toggle').first.wait_for(state='visible', timeout=3000)
-                log("[PEDIDOS][RPA] ✅ Dropdown Ações visível")
-            except:
-                log("[PEDIDOS][RPA] Dropdown não visível - tentando via JavaScript...")
-                await page.evaluate("""() => {
-                    const tab = document.querySelector('a[href="#box-pedidos"]');
-                    if (tab) tab.click();
-                    document.querySelectorAll('.nav-tabs li').forEach(li => li.classList.remove('active'));
-                    document.querySelectorAll('.tab-content .tab-pane').forEach(pane => pane.classList.remove('active', 'in'));
-                    const pedidosTab = document.querySelector('a[href="#box-pedidos"]');
-                    if (pedidosTab && pedidosTab.parentElement) pedidosTab.parentElement.classList.add('active');
-                    const pedidosPane = document.querySelector('#box-pedidos');
-                    if (pedidosPane) { pedidosPane.classList.add('active', 'in'); pedidosPane.style.display = 'block'; }
-                }""")
-                await short_sleep_ms(PEDIDOS_MODAL_WAIT_MS)
-                
-        except Exception as e:
-            log(f"[PEDIDOS][RPA][SKIP] Aba Pedidos não disponível: {e}")
-            update_status("pedidos_skip", "Aba de Pedidos não disponível", process_id=process_id)
-            return False
+            await page.locator('#box-pedidos .btn-group button.btn-acoes.dropdown-toggle').first.wait_for(state='visible', timeout=3000)
+            log("[PEDIDOS][RPA] ✅ Dropdown Ações visível")
+        except:
+            log("[PEDIDOS][RPA][WARN] Dropdown Ações não visível - tentando continuar...")
         
         # Identificar tipos de pedidos a adicionar
         tipos_pedidos = data.get("tipos_pedidos", [])
