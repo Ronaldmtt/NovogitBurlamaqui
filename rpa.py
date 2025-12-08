@@ -6943,6 +6943,16 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
             log(f"[RECLAMADAS][RPA][SHOT] Tirando screenshot (inseridas: {success_count}, puladas: {skipped_count})")
             await _take_reclamadas_screenshot(page, process_id)
         
+        # ✅ 2025-12-08 FIX: Voltar à aba Geral após inserir reclamadas
+        # Isso garante que o fluxo de pedidos encontre a página no estado correto
+        try:
+            log("[RECLAMADAS][RPA] Voltando à aba Geral para continuar fluxo de pedidos...")
+            await page.click('a[href="#box-dadosprincipais"]')
+            await short_sleep_ms(500)
+            log("[RECLAMADAS][RPA] ✅ Voltou à aba Geral")
+        except Exception as e:
+            log(f"[RECLAMADAS][RPA][WARN] Não conseguiu voltar à aba Geral: {e}")
+        
         # ⚠️ NOTA: Marcações e pedidos agora são tratados FORA desta função
         # para permitir que processos sem reclamadas extras também tenham pedidos
         # Ver handle_marcacoes_e_pedidos_pos_save()
