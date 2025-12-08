@@ -6178,15 +6178,23 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 
                 # ✅ 2025-12-08 FIX: Garantir que estamos na aba Geral antes de inserir pedidos
                 # Mesmo se estamos na URL de detalhes, pode estar em outra aba (ex: Partes e Advogados)
+                # 2025-12-08 FIX 2: Adicionar wait explícito - CRÍTICO para produção com latência
                 try:
-                    log("[PEDIDOS] Garantindo que está na aba Geral...")
+                    log("[PEDIDOS] Garantindo que está na aba Geral (com verificação)...")
                     geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
                     if await geral_tab.count() > 0:
                         await geral_tab.click()
+                        # CRÍTICO: Esperar a aba ficar REALMENTE ativa antes de continuar
+                        await page.wait_for_selector('#box-dadosprincipais.active', state='visible', timeout=5000)
                         await short_sleep_ms(500)
-                        log("[PEDIDOS] ✅ Clicou na aba Geral")
+                        log("[PEDIDOS] ✅ Aba Geral confirmada como ATIVA - prosseguindo com pedidos")
+                    else:
+                        log("[PEDIDOS][WARN] Link da aba Geral não encontrado, tentando continuar...")
                 except Exception as e:
-                    log(f"[PEDIDOS][WARN] Erro ao clicar na aba Geral: {e}")
+                    log(f"[PEDIDOS][WARN] Erro ao clicar/confirmar aba Geral: {e}")
+                    # Fallback: esperar mais tempo
+                    await short_sleep_ms(2000)
+                    log("[PEDIDOS] Aguardou 2s extra como fallback antes dos pedidos")
                 
                 # Garantir que estamos na tela de detalhes antes de inserir pedidos
                 current_url = page.url
@@ -6957,13 +6965,26 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
         
         # ✅ 2025-12-08 FIX: Voltar à aba Geral após inserir reclamadas
         # Isso garante que o fluxo de pedidos encontre a página no estado correto
+        # 2025-12-08 FIX 2: Adicionar wait explícito para garantir que aba está ATIVA
         try:
             log("[RECLAMADAS][RPA] Voltando à aba Geral para continuar fluxo de pedidos...")
-            await page.click('a[href="#box-dadosprincipais"]')
-            await short_sleep_ms(500)
-            log("[RECLAMADAS][RPA] ✅ Voltou à aba Geral")
+            geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
+            if await geral_tab.count() > 0:
+                await geral_tab.click()
+                # CRÍTICO: Esperar a aba ficar visível/ativa antes de continuar
+                await page.wait_for_selector('#box-dadosprincipais.active', state='visible', timeout=5000)
+                await short_sleep_ms(500)
+                log("[RECLAMADAS][RPA] ✅ Aba Geral confirmada como ATIVA")
+            else:
+                log("[RECLAMADAS][RPA][WARN] Link da aba Geral não encontrado")
         except Exception as e:
-            log(f"[RECLAMADAS][RPA][WARN] Não conseguiu voltar à aba Geral: {e}")
+            log(f"[RECLAMADAS][RPA][WARN] Erro ao voltar/confirmar aba Geral: {e}")
+            # Tentar fallback: aguardar mais tempo
+            try:
+                await short_sleep_ms(2000)
+                log("[RECLAMADAS][RPA] Aguardou 2s extra como fallback")
+            except:
+                pass
         
         # ⚠️ NOTA: Marcações e pedidos agora são tratados FORA desta função
         # para permitir que processos sem reclamadas extras também tenham pedidos
