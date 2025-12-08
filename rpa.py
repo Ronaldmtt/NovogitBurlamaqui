@@ -6176,6 +6176,18 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             if pedidos:
                 log(f"[PEDIDOS] Detectados {len(pedidos)} pedidos para inserir")
                 
+                # ✅ 2025-12-08 FIX: Garantir que estamos na aba Geral antes de inserir pedidos
+                # Mesmo se estamos na URL de detalhes, pode estar em outra aba (ex: Partes e Advogados)
+                try:
+                    log("[PEDIDOS] Garantindo que está na aba Geral...")
+                    geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
+                    if await geral_tab.count() > 0:
+                        await geral_tab.click()
+                        await short_sleep_ms(500)
+                        log("[PEDIDOS] ✅ Clicou na aba Geral")
+                except Exception as e:
+                    log(f"[PEDIDOS][WARN] Erro ao clicar na aba Geral: {e}")
+                
                 # Garantir que estamos na tela de detalhes antes de inserir pedidos
                 current_url = page.url
                 if 'detail' not in current_url.lower() and 'id=' not in current_url.lower():
