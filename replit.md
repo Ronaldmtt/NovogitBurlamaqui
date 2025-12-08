@@ -36,7 +36,7 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
 ### System Design Choices
 
 *   **Modular Application Structure:** Uses Flask's Blueprint pattern for scalability and maintainability.
-*   **Database Design:** Uses SQLite for development and PostgreSQL for production, with a user model linked to a comprehensive process model in a one-to-many relationship, including cascade deletes and tracking of secondary interested parties.
+*   **Database Design:** Uses PostgreSQL (Neon) for both development and production, with a user model linked to a comprehensive process model in a one-to-many relationship, including cascade deletes and tracking of secondary interested parties.
 *   **Authentication & Authorization:** Implements role-based access control, secure password hashing, and protected routes.
 *   **File Management:** Supports secure PDF document uploads with increased size limits and configurable storage.
 *   **Configuration:** Environment-based configuration with sensible defaults.
@@ -48,7 +48,7 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
 *   **Authentication & Session Management:** Flask-Login, Werkzeug
 *   **Forms:** Flask-WTF, WTForms
 *   **Frontend Libraries:** Bootstrap, Font Awesome
-*   **Databases:** SQLite, PostgreSQL
+*   **Databases:** PostgreSQL (Neon)
 *   **RPA Browser Automation:** Playwright
 *   **RPA Monitoring:** rpa-monitor-client
 *   **External Legal Systems:** eLaw

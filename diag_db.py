@@ -1,10 +1,15 @@
-﻿from app import app, db
+from app import create_app, db
 from models import User, Process
-from sqlalchemy import text
+from sqlalchemy import inspect
+
+app = create_app()
 
 with app.app_context():
     print("DB URL:", db.engine.url)
-    rows = db.session.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
-    print("Tabelas:", [r[0] for r in rows])
+    
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+    print("Tabelas:", tables)
+    
     print("Users:", db.session.query(User).count())
     print("Process:", db.session.query(Process).count())
