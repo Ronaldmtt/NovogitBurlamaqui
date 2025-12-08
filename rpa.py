@@ -6178,16 +6178,35 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 
                 # ✅ 2025-12-08 FIX: Garantir que estamos na aba Geral antes de inserir pedidos
                 # Mesmo se estamos na URL de detalhes, pode estar em outra aba (ex: Partes e Advogados)
-                # 2025-12-08 FIX 2: Adicionar wait explícito - CRÍTICO para produção com latência
+                # 2025-12-08 FIX 3: Bootstrap pode usar .active, .show ou .in - aceitar qualquer um
                 try:
-                    log("[PEDIDOS] Garantindo que está na aba Geral (com verificação)...")
+                    log("[PEDIDOS] Garantindo que está na aba Geral (com verificação multi-seletor)...")
                     geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
                     if await geral_tab.count() > 0:
                         await geral_tab.click()
-                        # CRÍTICO: Esperar a aba ficar REALMENTE ativa antes de continuar
-                        await page.wait_for_selector('#box-dadosprincipais.active', state='visible', timeout=5000)
                         await short_sleep_ms(500)
-                        log("[PEDIDOS] ✅ Aba Geral confirmada como ATIVA - prosseguindo com pedidos")
+                        
+                        # CRÍTICO: Esperar aba ficar ativa - Bootstrap pode usar .active, .show ou .in
+                        tab_active = False
+                        for css_class in ['active', 'show', 'in']:
+                            try:
+                                await page.wait_for_selector(f'#box-dadosprincipais.{css_class}', state='visible', timeout=2000)
+                                log(f"[PEDIDOS] ✅ Aba Geral confirmada como ATIVA (.{css_class}) - prosseguindo")
+                                tab_active = True
+                                break
+                            except:
+                                continue
+                        
+                        if not tab_active:
+                            # Fallback: verificar se o conteúdo está visível
+                            try:
+                                await page.wait_for_selector('#box-dadosprincipais', state='visible', timeout=2000)
+                                log("[PEDIDOS] ✅ Aba Geral visível (sem classe específica) - prosseguindo")
+                                tab_active = True
+                            except:
+                                log("[PEDIDOS][WARN] Aba Geral pode não estar ativa - tentando continuar...")
+                        
+                        await short_sleep_ms(500)
                     else:
                         log("[PEDIDOS][WARN] Link da aba Geral não encontrado, tentando continuar...")
                 except Exception as e:
@@ -6965,16 +6984,35 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
         
         # ✅ 2025-12-08 FIX: Voltar à aba Geral após inserir reclamadas
         # Isso garante que o fluxo de pedidos encontre a página no estado correto
-        # 2025-12-08 FIX 2: Adicionar wait explícito para garantir que aba está ATIVA
+        # 2025-12-08 FIX 3: Bootstrap pode usar .active, .show ou .in - aceitar qualquer um
         try:
             log("[RECLAMADAS][RPA] Voltando à aba Geral para continuar fluxo de pedidos...")
             geral_tab = page.locator('a[href="#box-dadosprincipais"]').first
             if await geral_tab.count() > 0:
                 await geral_tab.click()
-                # CRÍTICO: Esperar a aba ficar visível/ativa antes de continuar
-                await page.wait_for_selector('#box-dadosprincipais.active', state='visible', timeout=5000)
                 await short_sleep_ms(500)
-                log("[RECLAMADAS][RPA] ✅ Aba Geral confirmada como ATIVA")
+                
+                # CRÍTICO: Esperar aba ficar ativa - Bootstrap pode usar .active, .show ou .in
+                tab_active = False
+                for css_class in ['active', 'show', 'in']:
+                    try:
+                        await page.wait_for_selector(f'#box-dadosprincipais.{css_class}', state='visible', timeout=2000)
+                        log(f"[RECLAMADAS][RPA] ✅ Aba Geral confirmada como ATIVA (.{css_class})")
+                        tab_active = True
+                        break
+                    except:
+                        continue
+                
+                if not tab_active:
+                    # Fallback: verificar se o conteúdo está visível mesmo sem classe
+                    try:
+                        await page.wait_for_selector('#box-dadosprincipais', state='visible', timeout=2000)
+                        log("[RECLAMADAS][RPA] ✅ Aba Geral visível (sem classe específica)")
+                        tab_active = True
+                    except:
+                        log("[RECLAMADAS][RPA][WARN] Aba Geral pode não estar ativa!")
+                
+                await short_sleep_ms(500)
             else:
                 log("[RECLAMADAS][RPA][WARN] Link da aba Geral não encontrado")
         except Exception as e:
@@ -7207,10 +7245,38 @@ async def handle_marcacoes(page, data: dict, process_id: int) -> bool:
                 except Exception as e:
                     log(f"[MARCACOES][RPA][WARN] Erro ao processar checkbox: {e}")
         
-        # 6. Clicar em Salvar (usar .first para evitar ambiguidade com "Salvar e Fechar")
+        # 6. Clicar em Salvar (usar múltiplos seletores para robustez)
         log("[MARCACOES][RPA] Clicando em Salvar...")
-        save_btn = page.locator('.modal button.btn-primary.salvar:not(.salvarfechar)').first
-        await save_btn.click()
+        save_selectors = [
+            '.modal button.btn-primary.salvar:not(.salvarfechar)',
+            '.modal button.salvar',
+            '.modal button.btn-primary:has-text("Salvar")',
+            '.modal-footer button.btn-primary',
+            '#dialog-modal button.btn-primary',
+            '.modal button[type="submit"]',
+        ]
+        
+        save_clicked = False
+        for sel in save_selectors:
+            try:
+                save_btn = page.locator(sel).first
+                if await save_btn.count() > 0 and await save_btn.is_visible(timeout=1000):
+                    await save_btn.click(timeout=3000)
+                    log(f"[MARCACOES][RPA] ✅ Salvar clicado com: {sel}")
+                    save_clicked = True
+                    break
+            except Exception as e:
+                log(f"[MARCACOES][RPA] Seletor {sel} não funcionou: {e}")
+                continue
+        
+        if not save_clicked:
+            log("[MARCACOES][RPA][WARN] Nenhum botão Salvar encontrado - tentando fechar modal")
+            # Tentar fechar modal de qualquer jeito
+            try:
+                await page.keyboard.press('Escape')
+            except:
+                pass
+        
         await short_sleep_ms(2000)
         
         # 7. Aguardar modal fechar
@@ -7272,9 +7338,50 @@ async def handle_novo_pedido(page, data: dict, process_id: int) -> bool:
     update_status("pedidos_inicio", "Abrindo aba Pedidos...", process_id=process_id)
     
     try:
+        # 0. VERIFICAR SE ESTÁ NA TELA DE DETALHES
+        current_url = page.url
+        title = await page.title()
+        log(f"[PEDIDOS][RPA] Verificando página: url={current_url[:80]}..., title={title[:50]}")
+        
+        if 'detail' not in current_url.lower() and 'id=' not in current_url.lower() and 'Detalhes' not in title:
+            log("[PEDIDOS][RPA][WARN] Pode não estar na tela de detalhes!")
+            # Tentar navegar para tela de detalhes via banco
+            if flask_app:
+                from models import Process, db
+                with flask_app.app_context():
+                    proc = Process.query.get(process_id)
+                    if proc and proc.elaw_detail_url:
+                        log(f"[PEDIDOS][RPA] Navegando para URL de detalhes: {proc.elaw_detail_url}")
+                        await page.goto(proc.elaw_detail_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
+                        await short_sleep_ms(2000)
+        
         # 1. Clicar na aba "Pedidos" na sidebar (OTIMIZADO - wait inteligente)
         log("[PEDIDOS][RPA] Clicando na aba Pedidos...")
-        pedidos_tab = page.locator('a[href="#box-pedidos"][data-toggle="tab"]')
+        
+        # Tentar múltiplos seletores para a aba Pedidos
+        pedidos_tab_selectors = [
+            'a[href="#box-pedidos"][data-toggle="tab"]',
+            'a[href="#box-pedidos"]',
+            'a:has-text("Pedidos")',
+            '.nav-tabs a:has-text("Pedidos")',
+            '#tabs-processo a:has-text("Pedidos")',
+        ]
+        
+        pedidos_tab = None
+        for sel in pedidos_tab_selectors:
+            try:
+                tab = page.locator(sel).first
+                if await tab.count() > 0:
+                    pedidos_tab = tab
+                    log(f"[PEDIDOS][RPA] Encontrou aba com seletor: {sel}")
+                    break
+            except:
+                continue
+        
+        if not pedidos_tab:
+            log("[PEDIDOS][RPA][ERRO] Nenhum seletor de aba Pedidos funcionou!")
+            update_status("pedidos_skip", "Aba de Pedidos não encontrada na página", process_id=process_id)
+            return False
         
         try:
             # Primeira tentativa: clique normal
