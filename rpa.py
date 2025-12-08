@@ -6919,15 +6919,17 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
         
         log(f"[RECLAMADAS][RPA] Inseridas {success_count}/{len(extras)} reclamadas extras (puladas: {skipped_count} duplicatas)")
         
-        # Screenshot da aba "Partes e Advogados" após inserir todas
-        if success_count > 0:
+        # ✅ 2025-12-08: SEMPRE tirar screenshot se havia reclamadas extras para processar
+        # Mesmo que todas foram puladas (duplicatas), o screenshot confirma que os dados estão lá
+        if len(extras) > 0:
+            log(f"[RECLAMADAS][RPA][SHOT] Tirando screenshot (inseridas: {success_count}, puladas: {skipped_count})")
             await _take_reclamadas_screenshot(page, process_id)
         
         # ⚠️ NOTA: Marcações e pedidos agora são tratados FORA desta função
         # para permitir que processos sem reclamadas extras também tenham pedidos
         # Ver handle_marcacoes_e_pedidos_pos_save()
         
-        return success_count == len(extras)
+        return success_count == len(extras) or (success_count + skipped_count) == len(extras)
         
     except Exception as e:
         log(f"[RECLAMADAS][RPA][ERRO] Erro geral no handle_extra_reclamadas: {e}")
@@ -7497,12 +7499,17 @@ async def handle_novo_pedido(page, data: dict, process_id: int) -> bool:
         elapsed = time.time() - start_time
         log(f"[PEDIDOS][RPA] ⚡ Adicionados {success_count}/{len(tipos_pedidos)} pedidos em {elapsed:.1f}s (pulados: {skipped_count} duplicatas)")
         
-        # 9. Capturar screenshot da aba Pedidos (com timeout dinâmico baseado na quantidade)
-        if success_count > 0:
+        # ✅ 2025-12-08: SEMPRE tirar screenshot se havia pedidos para processar
+        # Mesmo que todos foram pulados (duplicatas), o screenshot confirma que os dados estão lá
+        if len(tipos_pedidos) > 0:
+            log(f"[PEDIDOS][RPA][SHOT] Tirando screenshot (inseridos: {success_count}, pulados: {skipped_count})")
             await _take_pedidos_screenshot(page, process_id, success_count=success_count)
-            update_status("pedidos_ok", f"✅ {success_count} pedido(s) adicionado(s)", process_id=process_id)
+            if success_count > 0:
+                update_status("pedidos_ok", f"✅ {success_count} pedido(s) adicionado(s)", process_id=process_id)
+            else:
+                update_status("pedidos_ok", f"✅ {skipped_count} pedido(s) já existiam no eLaw", process_id=process_id)
         
-        return success_count > 0
+        return success_count > 0 or skipped_count > 0
             
     except Exception as e:
         log(f"[PEDIDOS][RPA][ERRO] Falha ao adicionar pedidos: {e}")
