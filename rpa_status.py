@@ -59,7 +59,8 @@ class RPAStatusManager:
             
             rpa_status.history_json = json.dumps(history, ensure_ascii=False)
             
-            # Commit no banco
+            # Flush + Commit imediato para status em tempo real
+            db.session.flush()
             db.session.commit()
             
             # Log no console

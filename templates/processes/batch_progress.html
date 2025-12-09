@@ -326,7 +326,7 @@
 
     <script>
         const batchId = {{ batch_id }};
-        const pollInterval = 3000; // 3 segundos (otimizado para reduzir carga)
+        const pollInterval = 1000; // 1 segundo - tempo real para acompanhar cada etapa
         let filesData = {};
 
         async function checkProgress() {

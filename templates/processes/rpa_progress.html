@@ -495,7 +495,7 @@
 
     <script>
         const processId = {{ process_id }};
-        const pollInterval = 3000; // 3 segundos (otimizado para reduzir carga)
+        const pollInterval = 1000; // 1 segundo - tempo real para acompanhar cada etapa
         const maxDuration = 600000; // 10 minutos timeout
         let startTime = Date.now();
         let currentProgress = 0;

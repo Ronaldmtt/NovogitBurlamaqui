@@ -332,7 +332,7 @@
 
 <script>
 let pollingInterval = null;
-const POLL_INTERVAL = 5000; // 5 segundos (otimizado para reduzir carga)
+const POLL_INTERVAL = 1000; // 1 segundo - tempo real para acompanhar cada etapa
 const batchId = {{ batch.id }};
 let completionToastShown = false; // Flag para evitar toasts repetidos
 const initialBatchStatus = '{{ batch.status }}'; // Status inicial ao carregar a página
