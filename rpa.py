@@ -171,6 +171,20 @@ _browser_launch_lock = threading.Lock()
 _current_process_id: Optional[int] = None
 _execute_rpa_lock = threading.Lock()  # LEGADO: Será substituído por semáforo
 
+# 🔧 FIX 2025-12-09: ContextVar para sinalizar que processo está "Encerrado"
+# Quando True, o fluxo RPA deve pular reclamadas/pedidos e concluir como sucesso
+_current_process_encerrado: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    '_current_process_encerrado', default=False
+)
+
+def is_process_encerrado() -> bool:
+    """Verifica se o processo atual está marcado como 'Encerrado' no eLaw."""
+    return _current_process_encerrado.get()
+
+def reset_process_encerrado() -> None:
+    """Reseta o flag de processo encerrado."""
+    _current_process_encerrado.set(False)
+
 try:
     from rpa_status import RPAStatusManager
 except Exception as e:
@@ -3974,7 +3988,8 @@ async def _check_success_signals(page, url_before: str) -> Dict[str, Any]:
                         # 🔧 FIX 2025-12-09: EXTRAIR URL de detalhes do modal ANTES de fechar
                         try:
                             # O modal geralmente contém um link para o processo existente
-                            detail_link = await modal_loc.locator("a[href*='detail'], a[href*='processo']").first
+                            # NOTE: .locator() retorna Locator síncrono, NÃO usar await
+                            detail_link = modal_loc.locator("a[href*='detail'], a[href*='processo']").first
                             if await detail_link.count() > 0:
                                 detail_href = await detail_link.get_attribute("href")
                                 if detail_href:
@@ -6658,17 +6673,24 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                                     break
                         
                         if fallback_ok:
-                            log("[RECLAMADAS][FALLBACK] ✅ URL encontrada - continuando com reclamadas extras")
-                            has_detail_url = True
+                            # 🔧 FIX 2025-12-09: Verificar se processo foi marcado como "Encerrado"
+                            if is_process_encerrado():
+                                log("[RECLAMADAS][ENCERRADO] Processo encerrado no eLaw - pulando reclamadas extras")
+                                has_detail_url = False  # Não precisa processar reclamadas
+                            else:
+                                log("[RECLAMADAS][FALLBACK] ✅ URL encontrada - continuando com reclamadas extras")
+                                has_detail_url = True
                         else:
                             log("[RECLAMADAS][FALLBACK] ❌ Falha ao obter URL de detalhes - pulando inserção de reclamadas extras")
                 
-                # Só tenta adicionar reclamadas extras se temos a URL de detalhes
-                if has_detail_url:
+                # Só tenta adicionar reclamadas extras se temos a URL de detalhes E processo NÃO está encerrado
+                if has_detail_url and not is_process_encerrado():
                     try:
                         await handle_extra_reclamadas(page, data, process_id)
                     except Exception as e:
                         log(f"[RECLAMADAS][WARN] Erro ao adicionar reclamadas extras (processo principal OK): {e}")
+                elif is_process_encerrado():
+                    log("[RECLAMADAS][SKIP] Processo ENCERRADO - reclamadas extras não serão adicionadas")
                 else:
                     log("[RECLAMADAS][SKIP] Sem URL de detalhes - reclamadas extras não serão adicionadas")
             else:
@@ -6718,6 +6740,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             # Fallback para data['pedidos'] se pedidos_json falhou
             if not pedidos and raw_pedidos:
                 pedidos = parse_pedidos_json(raw_pedidos) if isinstance(raw_pedidos, str) else (raw_pedidos if isinstance(raw_pedidos, list) else [])
+            
+            # 🔧 FIX 2025-12-09: Se processo está encerrado, pular inserção de pedidos
+            if is_process_encerrado():
+                log("[PEDIDOS][ENCERRADO] Processo já encerrado no eLaw - pulando inserção de pedidos")
+                pedidos = []  # Limpar para pular o fluxo de pedidos
             
             # 🔧 DEBUG 2025-12-03: Log detalhado para identificar por que pedidos não estão sendo inseridos
             log(f"[PEDIDOS][DEBUG] process_id={process_id}")
@@ -6774,6 +6801,10 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                         
                         if not fallback_ok:
                             log("[PEDIDOS][SKIP] Falha ao obter URL de detalhes - pulando pedidos")
+                            pedidos = []  # Limpar para pular o fluxo de pedidos
+                        elif is_process_encerrado():
+                            # 🔧 FIX 2025-12-09: Fallback detectou processo encerrado
+                            log("[PEDIDOS][ENCERRADO] Processo encerrado detectado no fallback - pulando pedidos")
                             pedidos = []  # Limpar para pular o fluxo de pedidos
                 
                 # Processar marcações e pedidos se estamos na tela de detalhes
@@ -6862,7 +6893,42 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
         if "Relatório" not in title and "Relatorio" not in title:
             log(f"[FALLBACK_URL][WARN] Título inesperado: {title}")
         
-        # 4. Preencher o filtro "Número Processo"
+        # 4. 🔧 FIX 2025-12-09: Selecionar "Todos" no dropdown de Status ANTES de buscar
+        # Por padrão o filtro vem com "Ativo", processos "Encerrado" não aparecem
+        log(f"[FALLBACK_URL][STATUS] Selecionando 'Todos' no filtro de status...")
+        try:
+            status_selectors = [
+                '#Filters_Status',
+                'select[name="Filters.Status"]',
+                '#Filters_Situacao',
+                'select[name="Filters.Situacao"]',
+            ]
+            status_selected = False
+            for sel in status_selectors:
+                try:
+                    status_dropdown = page.locator(sel).first
+                    if await status_dropdown.is_visible(timeout=1000):
+                        # Selecionar "Todos" - pode ser valor vazio ou "0" ou "Todos"
+                        for value in ['', '0', 'Todos', '-1']:
+                            try:
+                                await status_dropdown.select_option(value=value, timeout=500)
+                                log(f"[FALLBACK_URL][STATUS] ✅ Selecionado 'Todos' via {sel} (value={value})")
+                                status_selected = True
+                                break
+                            except Exception:
+                                continue
+                        if status_selected:
+                            break
+                except Exception:
+                    continue
+            if not status_selected:
+                log("[FALLBACK_URL][STATUS] ⚠️ Dropdown de status não encontrado - continuando com padrão")
+        except Exception as e:
+            log(f"[FALLBACK_URL][STATUS] ⚠️ Erro ao selecionar status: {e}")
+        
+        await short_sleep_ms(300)
+        
+        # 5. Preencher o filtro "Número Processo"
         log(f"[FALLBACK_URL][FILTER] Preenchendo filtro com: {numero_processo}")
         
         # Lista de seletores possíveis para o campo de número do processo
@@ -6948,6 +7014,54 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
                     log(f"[FALLBACK_URL][NENHUM_REGISTRO] Não encontrado com: {tentativa_numero}")
                     continue  # Tentar próximo formato
                 log("[FALLBACK_URL][TABELA_OK] Resultados encontrados")
+                
+                # 🔧 FIX 2025-12-09: Verificar se o processo está com status "Encerrado"
+                # Se estiver, tirar screenshot e retornar sucesso especial
+                if "Encerrado" in html:
+                    log(f"[FALLBACK_URL][ENCERRADO] Processo encontrado com status ENCERRADO")
+                    
+                    # Tirar screenshot da tela mostrando status Encerrado
+                    try:
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        screenshot_path = f"rpa_screenshots/process_{process_id}_encerrado_{timestamp}.png"
+                        
+                        # Criar diretório se não existir
+                        import os
+                        os.makedirs("rpa_screenshots", exist_ok=True)
+                        
+                        await page.screenshot(path=screenshot_path, full_page=False)
+                        log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva: {screenshot_path}")
+                        
+                        # Salvar screenshot no banco (na coluna reclamadas_extras_screenshot)
+                        if flask_app:
+                            with flask_app.app_context():
+                                proc = Process.query.get(process_id)
+                                if proc:
+                                    # Ler o conteúdo do arquivo
+                                    with open(screenshot_path, "rb") as f:
+                                        screenshot_data = f.read()
+                                    
+                                    # Salvar no campo reclamadas_extras_screenshot
+                                    proc.reclamadas_extras_screenshot = screenshot_data
+                                    proc.rpa_status = "success"
+                                    proc.rpa_completed = True
+                                    db.session.commit()
+                                    log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva no banco (reclamadas_extras)")
+                        
+                        update_status("processo_encerrado", "✅ Processo já encerrado no eLaw - concluído com sucesso!", process_id=process_id)
+                        
+                        # Retornar um valor especial que indica "encerrado"
+                        # Sinalizar através de contextvars que o processo está encerrado
+                        _current_process_encerrado.set(True)
+                        return True  # Sucesso! Não precisa inserir reclamadas/pedidos
+                        
+                    except Exception as e:
+                        log(f"[FALLBACK_URL][ENCERRADO] ⚠️ Erro ao tirar screenshot: {e}")
+                        # Mesmo com erro no screenshot, marcar como sucesso
+                        _current_process_encerrado.set(True)
+                        return True
+                
                 break  # Sucesso! Sair do loop
             except Exception as e:
                 log(f"[FALLBACK_URL][ERRO] Falha ao ler resultados: {e}")
@@ -7131,6 +7245,41 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
         await page.goto(list_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
         await short_sleep_ms(1500)
         
+        # 3.1 🔧 FIX 2025-12-09: Selecionar "Todos" no dropdown de Status ANTES de buscar
+        # Por padrão o filtro vem com "Ativo", processos "Encerrado" não aparecem
+        log(f"[FALLBACK_LIST][STATUS] Selecionando 'Todos' no filtro de status...")
+        try:
+            status_selectors = [
+                '#Filters_Status',
+                'select[name="Filters.Status"]',
+                '#Filters_Situacao',
+                'select[name="Filters.Situacao"]',
+            ]
+            status_selected = False
+            for sel in status_selectors:
+                try:
+                    status_dropdown = page.locator(sel).first
+                    if await status_dropdown.is_visible(timeout=1000):
+                        # Selecionar "Todos" - pode ser valor vazio ou "0" ou "Todos"
+                        for value in ['', '0', 'Todos', '-1']:
+                            try:
+                                await status_dropdown.select_option(value=value, timeout=500)
+                                log(f"[FALLBACK_LIST][STATUS] ✅ Selecionado 'Todos' via {sel} (value={value})")
+                                status_selected = True
+                                break
+                            except Exception:
+                                continue
+                        if status_selected:
+                            break
+                except Exception:
+                    continue
+            if not status_selected:
+                log("[FALLBACK_LIST][STATUS] ⚠️ Dropdown de status não encontrado - continuando com padrão")
+        except Exception as e:
+            log(f"[FALLBACK_LIST][STATUS] ⚠️ Erro ao selecionar status: {e}")
+        
+        await short_sleep_ms(300)
+        
         # 4. Preencher o filtro de número do processo
         filter_selectors = [
             '#Filters_Protocolo',
@@ -7186,6 +7335,57 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
         
         # 6. Aguardar resultados
         await short_sleep_ms(2000)
+        
+        # 6.1 🔧 FIX 2025-12-09: Verificar se o processo está com status "Encerrado"
+        try:
+            # Verificar texto da página/tabela para detectar status Encerrado
+            page_text = await page.inner_text('body')
+            if "Encerrado" in page_text and numero_processo in page_text:
+                log(f"[FALLBACK_LIST][ENCERRADO] Processo encontrado com status ENCERRADO")
+                
+                # Tirar screenshot da tela mostrando status Encerrado
+                try:
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    screenshot_path = f"rpa_screenshots/process_{process_id}_encerrado_{timestamp}.png"
+                    
+                    # Criar diretório se não existir
+                    import os
+                    os.makedirs("rpa_screenshots", exist_ok=True)
+                    
+                    await page.screenshot(path=screenshot_path, full_page=False)
+                    log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva: {screenshot_path}")
+                    
+                    # Salvar screenshot no banco (na coluna reclamadas_extras_screenshot)
+                    if flask_app:
+                        from models import Process, db
+                        with flask_app.app_context():
+                            proc = Process.query.get(process_id)
+                            if proc:
+                                # Ler o conteúdo do arquivo
+                                with open(screenshot_path, "rb") as f:
+                                    screenshot_data = f.read()
+                                
+                                # Salvar no campo reclamadas_extras_screenshot
+                                proc.reclamadas_extras_screenshot = screenshot_data
+                                proc.rpa_status = "success"
+                                proc.rpa_completed = True
+                                db.session.commit()
+                                log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva no banco (reclamadas_extras)")
+                    
+                    update_status("processo_encerrado", "✅ Processo já encerrado no eLaw - concluído com sucesso!", process_id=process_id)
+                    
+                    # Sinalizar através de contextvars que o processo está encerrado
+                    _current_process_encerrado.set(True)
+                    return True  # Sucesso! Não precisa inserir reclamadas/pedidos
+                    
+                except Exception as e:
+                    log(f"[FALLBACK_LIST][ENCERRADO] ⚠️ Erro ao tirar screenshot: {e}")
+                    # Mesmo com erro no screenshot, marcar como sucesso
+                    _current_process_encerrado.set(True)
+                    return True
+        except Exception as e:
+            log(f"[FALLBACK_LIST][ENCERRADO] ⚠️ Erro ao verificar status: {e}")
         
         # 7. Procurar link do processo na tabela
         numero_digits = re.sub(r'\D', '', numero_processo)
@@ -9042,6 +9242,10 @@ async def run_elaw_login_once(process_id: int):
     # asyncio.run() cria novo event loop, contextvars não propagam automaticamente
     ctx = RPAExecutionContext(process_id=process_id)
     ctx_token = set_rpa_context(ctx)
+    
+    # 🔧 FIX 2025-12-09: Resetar flag de processo encerrado
+    reset_process_encerrado()
+    
     log(f"[RPA][ASYNC] Contexto setado dentro de run_elaw_login_once para processo #{process_id}")
     
     try:
@@ -9312,6 +9516,9 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
     
     # Setar contexto na thread atual
     ctx_token = set_rpa_context(ctx)
+    
+    # 🔧 FIX 2025-12-09: Resetar flag de processo encerrado para evitar contaminação entre execuções
+    reset_process_encerrado()
     
     log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} iniciando processo #{process_id}")
     
