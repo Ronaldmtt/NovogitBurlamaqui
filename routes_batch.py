@@ -1762,6 +1762,7 @@ def batch_rerpa(id):
         for item in items_to_rerpa:
             item.status = 'ready'
             item.last_error = None
+            item.attempt_count = 0  # 🔧 FIX: Zerar tentativas
             
             if item.process_id:
                 process = Process.query.get(item.process_id)
@@ -1769,6 +1770,13 @@ def batch_rerpa(id):
                     process.elaw_status = 'pending'
                     process.elaw_error_message = None
                     process.elaw_filled_at = None
+                    # 🔧 FIX 2025-12-09: ZERAR screenshots para reprocessamento limpo
+                    process.elaw_screenshot_before_path = None
+                    process.elaw_screenshot_after_path = None
+                    process.elaw_screenshot_path = None
+                    process.elaw_screenshot_reclamadas_path = None
+                    process.elaw_screenshot_pedidos_path = None
+                    logger.info(f"[RERPA] Processo #{process.id} resetado (status + screenshots zerados)")
         
         batch.status = 'ready'
         db.session.commit()
