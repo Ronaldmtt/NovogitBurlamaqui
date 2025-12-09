@@ -4880,6 +4880,10 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         if cnj_flag_ok:
             log("[CNJ] ✅ Rádio CNJ forçado via JS direto")
     
+    # 🔧 FIX 2025-12-09: OBRIGATÓRIO - Sem rádio CNJ, campo de número não aparece
+    _must(cnj_flag_ok, "Rádio CNJ (Sim) - OBRIGATÓRIO para exibir campo de número do processo")
+    update_field_status("radio_cnj", "Rádio CNJ", "Sim")
+    
     # 🔧 FIX CRÍTICO: Aguardar campo CNJ aparecer no DOM após AJAX do tipo Eletrônico
     await _settle(page, "cnj_flag_settle")  # Espera adicional após marcar flag CNJ
     _must(await wait_for_cnj_container(page), "Campo CNJ não apareceu no DOM após AJAX")
