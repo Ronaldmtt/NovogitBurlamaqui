@@ -2127,49 +2127,94 @@ YES_VALUES = {"1", "true", "True", "on", "yes", "sim", "Sim", "S", "s"}
 
 async def set_yes_radio_guess(page, name: str) -> bool:
     """
-    🔧 FIX 2025-12-09: Usa APENAS cliques via JavaScript para evitar errar coordenadas.
-    scroll_into_view + click() estava causando cliques no menu Configuração.
+    🔧 FIX 2025-12-09: Usa clique REAL do Playwright para disparar eventos Bootstrap.
+    O formulário abre com "Não" por padrão - precisamos CLICAR no rádio "Sim".
     """
     try:
-        await page.wait_for_selector(f"input[type='radio'][name='{name}']", timeout=1000)
+        await page.wait_for_selector(f"input[type='radio'][name='{name}']", timeout=2000)
     except Exception:
         return False
     
-    # Usar JavaScript direto para marcar o rádio - EVITA problemas de coordenadas
-    log(f"[RADIO] Marcando rádio '{name}' = Sim via JavaScript (evitando clique de coordenada)...")
-    ok = await page.evaluate(
-        """(args) => {
-            const radios = document.querySelectorAll(`input[type='radio'][name='${args.name}']`);
+    log(f"[RADIO] Marcando rádio '{name}' = Sim via clique REAL do Playwright...")
+    
+    # 1) Tentar clicar no LABEL "Sim" (mais confiável para Bootstrap)
+    try:
+        # Buscar label com texto "Sim" que tenha um rádio com o nome correto
+        label_clicked = await page.evaluate("""(radioName) => {
+            const radios = document.querySelectorAll(`input[type='radio'][name='${radioName}']`);
             for (const r of radios) {
-                const val = (r.value || '').toLowerCase();
-                if (args.yesValues.includes(val) || args.yesValues.includes(r.value)) {
-                    r.checked = true;
-                    r.click();
-                    r.dispatchEvent(new Event('change', {bubbles: true}));
-                    r.dispatchEvent(new Event('input', {bubbles: true}));
-                    return true;
+                const label = document.querySelector(`label[for='${r.id}']`) || r.closest('label') || r.parentElement;
+                const text = (label?.textContent || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim();
+                if (text === 'sim' || text === 's') {
+                    // Retornar o ID do label ou do input para clicar
+                    if (label && label.tagName === 'LABEL') {
+                        return {type: 'label', forId: r.id, labelText: label.textContent.trim()};
+                    }
+                    return {type: 'input', id: r.id, name: r.name, value: r.value};
                 }
             }
-            // Fallback: procurar por label com "Sim"
-            for (const r of radios) {
-                const label = r.closest('label') || r.parentElement;
-                const text = (label?.textContent || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-                if (text.includes('sim')) {
-                    r.checked = true;
-                    r.click();
-                    r.dispatchEvent(new Event('change', {bubbles: true}));
-                    r.dispatchEvent(new Event('input', {bubbles: true}));
-                    return true;
-                }
-            }
-            return false;
-        }""",
-        {"name": name, "yesValues": list(YES_VALUES)}
-    )
-    if ok:
-        await short_sleep_ms(50)
-        log(f"[RADIO] ✅ Rádio '{name}' marcado via JS")
-        return True
+            return null;
+        }""", name)
+        
+        if label_clicked:
+            if label_clicked.get('type') == 'label':
+                # Clicar no label
+                label_selector = f"label[for='{label_clicked['forId']}']"
+                label = page.locator(label_selector).first
+                if await label.count() > 0:
+                    await label.scroll_into_view_if_needed()
+                    await label.click(force=True)
+                    log(f"[RADIO] ✅ Clicou no label 'Sim' para rádio '{name}'")
+                    await wait_network_quiet(page, timeout_ms=800)
+                    return True
+            else:
+                # Clicar no input diretamente
+                input_id = label_clicked.get('id')
+                if input_id:
+                    input_el = page.locator(f"#{input_id}").first
+                    await input_el.scroll_into_view_if_needed()
+                    await input_el.click(force=True)
+                    log(f"[RADIO] ✅ Clicou no input #{input_id} para rádio '{name}'")
+                    await wait_network_quiet(page, timeout_ms=800)
+                    return True
+    except Exception as e:
+        log(f"[RADIO][WARN] Erro ao clicar no label Sim: {e}")
+    
+    # 2) Fallback: clicar no primeiro rádio com valor "Sim" ou similar
+    try:
+        radios = page.locator(f"input[type='radio'][name='{name}']")
+        count = await radios.count()
+        
+        for i in range(count):
+            radio = radios.nth(i)
+            value = (await radio.get_attribute("value") or "").lower()
+            
+            # Verificar se é o valor "Sim"
+            if value in ["1", "true", "on", "yes", "sim", "s"]:
+                await radio.scroll_into_view_if_needed()
+                await radio.click(force=True)
+                log(f"[RADIO] ✅ Clicou no rádio '{name}' com value='{value}'")
+                await wait_network_quiet(page, timeout_ms=800)
+                return True
+        
+        # Se não achou por valor, tentar pelo label text
+        for i in range(count):
+            radio = radios.nth(i)
+            label_text = await radio.evaluate("""(el) => {
+                const label = document.querySelector(`label[for='${el.id}']`) || el.closest('label') || el.parentElement;
+                return (label?.textContent || '').trim();
+            }""")
+            
+            if label_text.lower() in ["sim", "s"]:
+                await radio.scroll_into_view_if_needed()
+                await radio.click(force=True)
+                log(f"[RADIO] ✅ Clicou no rádio '{name}' com label '{label_text}'")
+                await wait_network_quiet(page, timeout_ms=800)
+                return True
+                
+    except Exception as e:
+        log(f"[RADIO][WARN] Erro no fallback: {e}")
+    
     return False
 
 # =========================
@@ -2849,43 +2894,79 @@ RADIO_VIRTUAL_NAMES = ["IsProcessoVirtual", "ProcessoVirtual", "IsVirtual", "Pro
 
 async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
     """
-    🔧 FIX 2025-12-09: Usa APENAS cliques via JavaScript para evitar errar e clicar no menu Configuração.
-    O scroll_into_view + click(force=True) estava causando cliques em coordenadas erradas que acertavam o menu.
+    🔧 FIX 2025-12-09: Usa clique REAL do Playwright para disparar eventos Bootstrap corretamente.
+    O formulário abre com "Físico" por padrão - precisamos CLICAR no rádio Eletrônico.
     """
     try:
-        want_label = "eletronico" if want_virtual else "fisico"
-        # 1) Por label - USAR JAVASCRIPT DIRETO (sem scroll_into_view nem click de coordenada)
+        label_text = "Eletrônico" if want_virtual else "Físico"
+        log(f"[TIPO_PROCESSO] Selecionando '{label_text}' via clique REAL do Playwright...")
+        
+        # 1) Tentar clicar no LABEL que contém o texto (mais confiável para Bootstrap)
         try:
-            label_text = "Eletrônico" if want_virtual else "Físico"
-            log(f"[TIPO_PROCESSO] Selecionando '{label_text}' via JavaScript (evitando clique de coordenada)...")
-            # NÃO usar scroll_into_view nem click() - ir direto pelo JS para evitar errar o menu
-            changed = await page.evaluate(
-                """(labelTextNorm)=>{
-                const norm=(s)=> (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
-                const labs=[...document.querySelectorAll('label')];
-                for(const l of labs){
-                    if(norm(l.textContent||'').includes(labelTextNorm)){
-                        const input = l.control || l.querySelector('input[type="radio"]');
-                        if(input){
-                            try{
-                                input.checked = true;
-                                for(const ev of ['click','input','change']){
-                                    input.dispatchEvent(new Event(ev,{bubbles:true}));
-                                }
-                                return true;
-                            }catch(e){}
+            # Buscar label com texto "Eletrônico"
+            label_selector = f"label:has-text('{label_text}')"
+            label = page.locator(label_selector).first
+            
+            if await label.count() > 0:
+                # Garantir que está visível
+                await label.scroll_into_view_if_needed()
+                await page.wait_for_timeout(100)
+                
+                # Clique REAL no label (dispara eventos Bootstrap)
+                await label.click(force=True)
+                log(f"[TIPO_PROCESSO] ✅ Clicou no label '{label_text}'")
+                await wait_network_quiet(page, timeout_ms=1000)
+                
+                # Verificar se marcou corretamente
+                is_checked = await page.evaluate("""(labelText) => {
+                    const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+                    for (const label of document.querySelectorAll('label')) {
+                        if (norm(label.textContent).includes(norm(labelText))) {
+                            const input = label.control || label.querySelector('input[type="radio"]');
+                            if (input && input.checked) return true;
+                        }
+                    }
+                    return false;
+                }""", label_text)
+                
+                if is_checked:
+                    log(f"[TIPO_PROCESSO] ✅ Verificado: rádio '{label_text}' está marcado")
+                    return True
+                else:
+                    log(f"[TIPO_PROCESSO][WARN] Label clicado mas rádio não está checked - tentando input direto...")
+        except Exception as e:
+            log(f"[TIPO_PROCESSO][WARN] Erro ao clicar no label: {e}")
+        
+        # 2) Fallback: clicar diretamente no input do rádio
+        try:
+            radio_input = await page.evaluate("""(labelText) => {
+                const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+                for (const label of document.querySelectorAll('label')) {
+                    if (norm(label.textContent).includes(norm(labelText))) {
+                        const input = label.control || label.querySelector('input[type="radio"]');
+                        if (input) {
+                            // Retornar seletor único para o input
+                            return input.id ? `#${input.id}` : `input[name='${input.name}'][value='${input.value}']`;
                         }
                     }
                 }
-                return false;
-            }""",
-                want_label,
-            )
-            if changed:
-                await wait_network_quiet(page, timeout_ms=800)
-                return True
-        except Exception:
-            pass
+                return null;
+            }""", label_text)
+            
+            if radio_input:
+                log(f"[TIPO_PROCESSO] Tentando clique direto no input: {radio_input}")
+                input_el = page.locator(radio_input).first
+                await input_el.scroll_into_view_if_needed()
+                await input_el.click(force=True)
+                await wait_network_quiet(page, timeout_ms=1000)
+                
+                # Verificar novamente
+                is_checked = await input_el.is_checked()
+                if is_checked:
+                    log(f"[TIPO_PROCESSO] ✅ Input '{label_text}' marcado via clique direto")
+                    return True
+        except Exception as e:
+            log(f"[TIPO_PROCESSO][WARN] Erro no fallback input: {e}")
 
         # 2) Por name/value
         truthy_vals = ["1", "true", "on", "eletronico", "eletrônico", "e", "sim"]
