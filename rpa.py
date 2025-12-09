@@ -6622,15 +6622,27 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                         await short_sleep_ms(1000)
                         has_detail_url = True
                     else:
-                        # Caso 3: FALLBACK - Processo já existia mas não temos URL
-                        # Buscar via Relatório de Andamentos
+                        # Caso 3: FALLBACK - Processo já existia ou recém-criado mas não temos URL
+                        # Buscar via Relatório de Andamentos com RETRY (processo recém-criado pode demorar para indexar)
                         log("[RECLAMADAS][FALLBACK] URL de detalhes não disponível - acionando busca via Relatório")
-                        fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
+                        
+                        # 🔧 FIX 2025-12-09: Retry com delay para processos recém-criados
+                        fallback_ok = False
+                        for retry_attempt in range(3):  # Até 3 tentativas
+                            if retry_attempt > 0:
+                                delay_seconds = 3 * retry_attempt  # 3s, 6s
+                                log(f"[RECLAMADAS][FALLBACK] Tentativa {retry_attempt + 1}/3 - aguardando {delay_seconds}s para indexação...")
+                                await asyncio.sleep(delay_seconds)
+                            
+                            fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
+                            if fallback_ok:
+                                break
+                        
                         if fallback_ok:
                             log("[RECLAMADAS][FALLBACK] ✅ URL encontrada via relatório - continuando com reclamadas extras")
                             has_detail_url = True
                         else:
-                            log("[RECLAMADAS][FALLBACK] ❌ Falha ao obter URL de detalhes - pulando inserção de reclamadas extras")
+                            log("[RECLAMADAS][FALLBACK] ❌ Falha ao obter URL de detalhes após 3 tentativas - pulando inserção de reclamadas extras")
                 
                 # Só tenta adicionar reclamadas extras se temos a URL de detalhes
                 if has_detail_url:
@@ -6719,11 +6731,23 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                         await page.goto(detail_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
                         await short_sleep_ms(1000)
                     else:
-                        # Fallback: buscar via relatório
+                        # Fallback: buscar via relatório com RETRY (processo recém-criado pode demorar para indexar)
                         log("[PEDIDOS][FALLBACK] URL de detalhes não disponível - acionando busca via Relatório")
-                        fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
+                        
+                        # 🔧 FIX 2025-12-09: Retry com delay para processos recém-criados
+                        fallback_ok = False
+                        for retry_attempt in range(3):  # Até 3 tentativas
+                            if retry_attempt > 0:
+                                delay_seconds = 3 * retry_attempt  # 3s, 6s
+                                log(f"[PEDIDOS][FALLBACK] Tentativa {retry_attempt + 1}/3 - aguardando {delay_seconds}s para indexação...")
+                                await asyncio.sleep(delay_seconds)
+                            
+                            fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
+                            if fallback_ok:
+                                break
+                        
                         if not fallback_ok:
-                            log("[PEDIDOS][SKIP] Não foi possível obter URL de detalhes - pulando pedidos")
+                            log("[PEDIDOS][SKIP] Não foi possível obter URL de detalhes após 3 tentativas - pulando pedidos")
                             pedidos = []  # Limpar para pular o fluxo de pedidos
                 
                 # Processar marcações e pedidos se estamos na tela de detalhes
