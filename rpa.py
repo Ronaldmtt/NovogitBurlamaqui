@@ -4835,6 +4835,57 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     _must(tipo_ok, "Rádio Tipo do Processo (Eletrônico) - OBRIGATÓRIO para exibir Sistema Eletrônico")
     update_field_status("tipo_processo", "Tipo do Processo", "Eletrônico")
     
+    # 🔧 FIX 2025-12-09: AGUARDAR campo Sistema Eletrônico APARECER após marcar rádio Eletrônico
+    # O campo só aparece quando o rádio dispara o AJAX corretamente
+    log("[TIPO_PROCESSO] Aguardando campo Sistema Eletrônico aparecer no DOM...")
+    sistema_apareceu = False
+    for retry in range(3):
+        try:
+            # Verificar se o select SistemaEletronicoId existe e está visível
+            sistema_visible = await page.evaluate("""() => {
+                const sel = document.getElementById('SistemaEletronicoId');
+                if (!sel) return false;
+                // Verificar se o container do campo está visível
+                const container = sel.closest('.form-group') || sel.closest('div') || sel.parentElement;
+                if (!container) return sel.offsetParent !== null;
+                const style = getComputedStyle(container);
+                return style.display !== 'none' && style.visibility !== 'hidden' && sel.options && sel.options.length > 1;
+            }""")
+            
+            if sistema_visible:
+                log(f"[TIPO_PROCESSO] ✅ Campo Sistema Eletrônico apareceu (tentativa {retry+1})")
+                sistema_apareceu = True
+                break
+            else:
+                log(f"[TIPO_PROCESSO] Campo Sistema Eletrônico ainda não visível (tentativa {retry+1}/3)")
+                # Clicar novamente no rádio Eletrônico para garantir que o AJAX dispare
+                await page.evaluate("""() => {
+                    const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+                    for (const label of document.querySelectorAll('label')) {
+                        const txt = norm(label.textContent || '');
+                        if (txt.includes('eletronico') || txt.includes('virtual')) {
+                            const input = label.control || label.querySelector('input[type="radio"]');
+                            if (input) {
+                                // Forçar clique mesmo se já marcado
+                                input.focus();
+                                input.click();
+                                input.dispatchEvent(new Event('change', {bubbles: true}));
+                                input.dispatchEvent(new Event('input', {bubbles: true}));
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }""")
+                await wait_network_quiet(page, timeout_ms=1500)
+                await page.wait_for_timeout(800)
+        except Exception as e:
+            log(f"[TIPO_PROCESSO][WARN] Erro ao verificar Sistema Eletrônico: {e}")
+            await page.wait_for_timeout(500)
+    
+    if not sistema_apareceu:
+        log("[TIPO_PROCESSO][WARN] Campo Sistema Eletrônico não apareceu após 3 tentativas - continuando...")
+    
     # 2) CNJ
     update_status("preenchendo_cnj", f"Preenchendo número do processo (CNJ): {cnj}", process_id=process_id)
     log(f"[CNJ] ═══ INICIANDO PREENCHIMENTO CNJ PARA PROCESSO #{process_id} ═══")
