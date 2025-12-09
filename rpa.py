@@ -3963,13 +3963,48 @@ async def _check_success_signals(page, url_before: str) -> Dict[str, Any]:
                     
                     # CASO 1: Modal "Já existe processo cadastrado" - SUCESSO!
                     # ⚠️ IMPORTANTE: NÃO clicar em "Sim" pois cria duplicatas!
-                    # Devemos fechar o modal e usar fallback via ListRelatorio
+                    # Devemos EXTRAIR a URL de detalhes e fechar o modal
                     if re.search(r"já existe processo cadastrado", modal_text_clean, re.I):
                         signals['already_exists'] = True
                         signals['toast_ok'] = True
                         signals['toast_level'] = 'success'
                         signals['toast_text'] = modal_text_clean[:200]
                         log(f"[MODAL] ✅ Processo já existe - NÃO clicando em Sim (evita duplicatas)")
+                        
+                        # 🔧 FIX 2025-12-09: EXTRAIR URL de detalhes do modal ANTES de fechar
+                        try:
+                            # O modal geralmente contém um link para o processo existente
+                            detail_link = await modal_loc.locator("a[href*='detail'], a[href*='processo']").first
+                            if await detail_link.count() > 0:
+                                detail_href = await detail_link.get_attribute("href")
+                                if detail_href:
+                                    # Se é caminho relativo, adicionar base URL
+                                    if detail_href.startswith("/"):
+                                        detail_href = BASE_URL.rstrip("/") + detail_href
+                                    signals['detail_url'] = detail_href
+                                    log(f"[MODAL] ✅ URL de detalhes extraída do modal: {detail_href}")
+                            else:
+                                # Tentar extrair via JavaScript (procurar qualquer link no modal)
+                                detail_url_from_js = await page.evaluate("""() => {
+                                    const modal = document.querySelector('.modal.in, .bootbox.modal.in, .modal.show');
+                                    if (modal) {
+                                        const links = modal.querySelectorAll('a[href]');
+                                        for (const link of links) {
+                                            const href = link.href || link.getAttribute('href');
+                                            if (href && (href.includes('detail') || href.includes('processo') || href.includes('/id='))) {
+                                                return href;
+                                            }
+                                        }
+                                    }
+                                    return null;
+                                }""")
+                                if detail_url_from_js:
+                                    signals['detail_url'] = detail_url_from_js
+                                    log(f"[MODAL] ✅ URL de detalhes extraída via JS: {detail_url_from_js}")
+                                else:
+                                    log(f"[MODAL] ⚠️ Não foi possível extrair URL de detalhes do modal - usando fallback")
+                        except Exception as e:
+                            log(f"[MODAL] ⚠️ Erro ao extrair URL do modal: {e}")
                         
                         # Fechar o modal clicando em "Não" para NÃO criar duplicata
                         try:
@@ -3991,13 +4026,15 @@ async def _check_success_signals(page, url_before: str) -> Dict[str, Any]:
                             
                             await short_sleep_ms(500)
                             
-                            # Sinalizar que precisamos usar fallback via ListRelatorio
-                            signals['needs_relatorio_fallback'] = True
-                            log(f"[MODAL] ℹ️ Fallback via ListRelatorio será acionado para obter URL de detalhes")
+                            # Sinalizar que precisamos usar fallback via ListRelatorio SE não temos URL
+                            if not signals.get('detail_url'):
+                                signals['needs_relatorio_fallback'] = True
+                                log(f"[MODAL] ℹ️ Fallback via ListRelatorio será acionado para obter URL de detalhes")
                             
                         except Exception as e:
                             log(f"[MODAL] ⚠️ Erro ao fechar modal: {e}")
-                            signals['needs_relatorio_fallback'] = True
+                            if not signals.get('detail_url'):
+                                signals['needs_relatorio_fallback'] = True
                     
                     # CASO 2: Modal de "data processual próxima" - CONFIRMAR SALVAMENTO
                     elif re.search(r"data processual.*próxima.*data de hoje|deseja editar", modal_text_clean, re.I):
