@@ -1460,15 +1460,20 @@ def batch_reprocess(id):
             item.last_error = None
             item.attempt_count = 0  # Resetar contador de tentativas
             
-            # Resetar status RPA do processo associado
+            # Resetar status RPA do processo associado - ZERAR TUDO
             if item.process_id:
                 process = Process.query.get(item.process_id)
                 if process:
                     process.elaw_status = 'pending'
                     process.elaw_error_message = None
                     process.elaw_filled_at = None
-                    # Não apagar screenshots - manter histórico
-                    logger.info(f"[REPROCESS] Item {item.id}: {old_status} → pending (Processo #{process.id} resetado)")
+                    # 🔧 FIX 2025-12-09: ZERAR screenshots para reprocessamento limpo
+                    process.elaw_screenshot_before_path = None
+                    process.elaw_screenshot_after_path = None
+                    process.elaw_screenshot_path = None
+                    process.elaw_screenshot_reclamadas_path = None
+                    process.elaw_screenshot_pedidos_path = None
+                    logger.info(f"[REPROCESS] Item {item.id}: {old_status} → pending (Processo #{process.id} resetado + screenshots zerados)")
         
         # Atualizar status do batch
         batch.status = 'pending'
