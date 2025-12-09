@@ -6895,36 +6895,26 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
         
         # 4. 🔧 FIX 2025-12-09: Selecionar "Todos" no dropdown de Status ANTES de buscar
         # Por padrão o filtro vem com "Ativo", processos "Encerrado" não aparecem
+        # 🔧 FIX 2025-12-09 v2: Usar set_select_fuzzy_any para Bootstrap Select
         log(f"[FALLBACK_URL][STATUS] Selecionando 'Todos' no filtro de status...")
-        try:
-            status_selectors = [
-                '#Filters_Status',
-                'select[name="Filters.Status"]',
-                '#Filters_Situacao',
-                'select[name="Filters.Situacao"]',
-            ]
-            status_selected = False
-            for sel in status_selectors:
-                try:
-                    status_dropdown = page.locator(sel).first
-                    if await status_dropdown.is_visible(timeout=1000):
-                        # Selecionar "Todos" - pode ser valor vazio ou "0" ou "Todos"
-                        for value in ['', '0', 'Todos', '-1']:
-                            try:
-                                await status_dropdown.select_option(value=value, timeout=500)
-                                log(f"[FALLBACK_URL][STATUS] ✅ Selecionado 'Todos' via {sel} (value={value})")
-                                status_selected = True
-                                break
-                            except Exception:
-                                continue
-                        if status_selected:
-                            break
-                except Exception:
-                    continue
-            if not status_selected:
-                log("[FALLBACK_URL][STATUS] ⚠️ Dropdown de status não encontrado - continuando com padrão")
-        except Exception as e:
-            log(f"[FALLBACK_URL][STATUS] ⚠️ Erro ao selecionar status: {e}")
+        status_selected = False
+        status_select_ids = ['Filters_Status', 'Filters_Situacao']
+        for select_id in status_select_ids:
+            try:
+                ok = await set_select_fuzzy_any(
+                    page, select_id, "Todos",
+                    fallbacks=["TODOS", "Todas", "All", ""],
+                    prefer_words=["todos", "todas"]
+                )
+                if ok:
+                    log(f"[FALLBACK_URL][STATUS] ✅ Selecionado 'Todos' via #{select_id}")
+                    status_selected = True
+                    break
+            except Exception as e:
+                log(f"[FALLBACK_URL][STATUS] ⚠️ Erro ao selecionar #{select_id}: {e}")
+                continue
+        if not status_selected:
+            log("[FALLBACK_URL][STATUS] ⚠️ Dropdown de status não encontrado - continuando com padrão")
         
         await short_sleep_ms(300)
         
@@ -7247,36 +7237,26 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
         
         # 3.1 🔧 FIX 2025-12-09: Selecionar "Todos" no dropdown de Status ANTES de buscar
         # Por padrão o filtro vem com "Ativo", processos "Encerrado" não aparecem
+        # 🔧 FIX 2025-12-09 v2: Usar set_select_fuzzy_any para Bootstrap Select
         log(f"[FALLBACK_LIST][STATUS] Selecionando 'Todos' no filtro de status...")
-        try:
-            status_selectors = [
-                '#Filters_Status',
-                'select[name="Filters.Status"]',
-                '#Filters_Situacao',
-                'select[name="Filters.Situacao"]',
-            ]
-            status_selected = False
-            for sel in status_selectors:
-                try:
-                    status_dropdown = page.locator(sel).first
-                    if await status_dropdown.is_visible(timeout=1000):
-                        # Selecionar "Todos" - pode ser valor vazio ou "0" ou "Todos"
-                        for value in ['', '0', 'Todos', '-1']:
-                            try:
-                                await status_dropdown.select_option(value=value, timeout=500)
-                                log(f"[FALLBACK_LIST][STATUS] ✅ Selecionado 'Todos' via {sel} (value={value})")
-                                status_selected = True
-                                break
-                            except Exception:
-                                continue
-                        if status_selected:
-                            break
-                except Exception:
-                    continue
-            if not status_selected:
-                log("[FALLBACK_LIST][STATUS] ⚠️ Dropdown de status não encontrado - continuando com padrão")
-        except Exception as e:
-            log(f"[FALLBACK_LIST][STATUS] ⚠️ Erro ao selecionar status: {e}")
+        status_selected = False
+        status_select_ids = ['Filters_Status', 'Filters_Situacao']
+        for select_id in status_select_ids:
+            try:
+                ok = await set_select_fuzzy_any(
+                    page, select_id, "Todos",
+                    fallbacks=["TODOS", "Todas", "All", ""],
+                    prefer_words=["todos", "todas"]
+                )
+                if ok:
+                    log(f"[FALLBACK_LIST][STATUS] ✅ Selecionado 'Todos' via #{select_id}")
+                    status_selected = True
+                    break
+            except Exception as e:
+                log(f"[FALLBACK_LIST][STATUS] ⚠️ Erro ao selecionar #{select_id}: {e}")
+                continue
+        if not status_selected:
+            log("[FALLBACK_LIST][STATUS] ⚠️ Dropdown de status não encontrado - continuando com padrão")
         
         await short_sleep_ms(300)
         
