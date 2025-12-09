@@ -2102,10 +2102,10 @@ async def set_radio_by_name(page, name: str, target_value: str, human_label: str
     # Usar JavaScript direto para marcar o rádio - EVITA problemas de coordenadas
     log(f"[RADIO] Marcando rádio '{name}' = '{target_value}' via JavaScript...")
     ok = await page.evaluate(
-        """(name, targetValue) => {
-            const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+        """(args) => {
+            const radios = document.querySelectorAll(`input[type='radio'][name='${args.name}']`);
             for (const r of radios) {
-                if (String(r.value).trim() === String(targetValue).trim()) {
+                if (String(r.value).trim() === String(args.targetValue).trim()) {
                     r.checked = true;
                     r.click();
                     r.dispatchEvent(new Event('change', {bubbles: true}));
@@ -2115,8 +2115,7 @@ async def set_radio_by_name(page, name: str, target_value: str, human_label: str
             }
             return false;
         }""",
-        name,
-        target_value
+        {"name": name, "targetValue": target_value}
     )
     if ok:
         await short_sleep_ms(60)
@@ -2932,10 +2931,10 @@ async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
                         try:
                             # Buscar qualquer outro rádio do grupo (não-checked) e clicar via JS
                             await page.evaluate(
-                                """(name, currentValue) => {
-                                    const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+                                """(args) => {
+                                    const radios = document.querySelectorAll(`input[type='radio'][name='${args.name}']`);
                                     for (const r of radios) {
-                                        if (r.value !== currentValue && !r.checked) {
+                                        if (r.value !== args.currentValue && !r.checked) {
                                             r.checked = true;
                                             r.click();
                                             r.dispatchEvent(new Event('change', {bubbles: true}));
@@ -2944,8 +2943,7 @@ async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
                                     }
                                     return false;
                                 }""",
-                                nm,
-                                chosen_value
+                                {"name": nm, "currentValue": chosen_value}
                             )
                             log("[RADIO] Toggle via JS para desmarcar Eletrônico")
                             await wait_network_quiet(page, timeout_ms=800)
@@ -2957,8 +2955,8 @@ async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
                     log(f"[RADIO] Clicando no rádio '{nm}' = '{chosen_value}' via JavaScript...")
                     try:
                         await page.evaluate(
-                            """(nm, targetValue) => {
-                                const radio = document.querySelector(`input[type='radio'][name='${nm}'][value='${targetValue}']`);
+                            """(args) => {
+                                const radio = document.querySelector(`input[type='radio'][name='${args.nm}'][value='${args.targetValue}']`);
                                 if (radio) {
                                     radio.checked = true;
                                     radio.click();
@@ -2968,8 +2966,7 @@ async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
                                 }
                                 return false;
                             }""",
-                            nm,
-                            chosen_value
+                            {"nm": nm, "targetValue": chosen_value}
                         )
                         log(f"[RADIO] ✅ Rádio '{nm}' marcado via JS")
                     except Exception as e:
