@@ -7024,21 +7024,17 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
                         await page.screenshot(path=screenshot_path, full_page=False)
                         log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva: {screenshot_path}")
                         
-                        # Salvar screenshot no banco (na coluna reclamadas_extras_screenshot)
+                        # Salvar caminho do screenshot no banco
                         if flask_app:
                             with flask_app.app_context():
                                 proc = Process.query.get(process_id)
                                 if proc:
-                                    # Ler o conteúdo do arquivo
-                                    with open(screenshot_path, "rb") as f:
-                                        screenshot_data = f.read()
-                                    
-                                    # Salvar no campo reclamadas_extras_screenshot
-                                    proc.reclamadas_extras_screenshot = screenshot_data
-                                    proc.rpa_status = "success"
-                                    proc.rpa_completed = True
+                                    # Salvar apenas o nome do arquivo (não o caminho completo)
+                                    screenshot_filename = os.path.basename(screenshot_path)
+                                    proc.elaw_screenshot_reclamadas_path = screenshot_filename
+                                    proc.elaw_status = "Encerrado"
                                     db.session.commit()
-                                    log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva no banco (reclamadas_extras)")
+                                    log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva no banco: {screenshot_filename}")
                         
                         update_status("processo_encerrado", "✅ Processo já encerrado no eLaw - concluído com sucesso!", process_id=process_id)
                         
@@ -7337,22 +7333,18 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
                     await page.screenshot(path=screenshot_path, full_page=False)
                     log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva: {screenshot_path}")
                     
-                    # Salvar screenshot no banco (na coluna reclamadas_extras_screenshot)
+                    # Salvar caminho do screenshot no banco
                     if flask_app:
                         from models import Process, db
                         with flask_app.app_context():
                             proc = Process.query.get(process_id)
                             if proc:
-                                # Ler o conteúdo do arquivo
-                                with open(screenshot_path, "rb") as f:
-                                    screenshot_data = f.read()
-                                
-                                # Salvar no campo reclamadas_extras_screenshot
-                                proc.reclamadas_extras_screenshot = screenshot_data
-                                proc.rpa_status = "success"
-                                proc.rpa_completed = True
+                                # Salvar apenas o nome do arquivo (não o caminho completo)
+                                screenshot_filename = os.path.basename(screenshot_path)
+                                proc.elaw_screenshot_reclamadas_path = screenshot_filename
+                                proc.elaw_status = "Encerrado"
                                 db.session.commit()
-                                log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva no banco (reclamadas_extras)")
+                                log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva no banco: {screenshot_filename}")
                     
                     update_status("processo_encerrado", "✅ Processo já encerrado no eLaw - concluído com sucesso!", process_id=process_id)
                     
