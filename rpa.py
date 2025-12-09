@@ -4786,15 +4786,98 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             cnj = _cnj_normalize(RPA_EXPECT_CNJ)
     _must(bool(cnj), "numero_processo vazio")
 
-    # 1) Tipo do processo = Eletrônico
+    # 1) Tipo do processo = Eletrônico - COM VERIFICAÇÃO OBRIGATÓRIA
     update_status("tipo_processo", "Selecionando tipo: Eletrônico", process_id=process_id)
-    _ = await set_tipo_processo_virtual(page, want_virtual=True)
+    tipo_ok = await set_tipo_processo_virtual(page, want_virtual=True)
+    
+    # 🔧 FIX 2025-12-09: FORÇAR rádio Eletrônico se set_tipo_processo_virtual falhou
+    if not tipo_ok:
+        log("[RADIO][RETRY] set_tipo_processo_virtual falhou - forçando via JS direto...")
+        tipo_ok = await page.evaluate("""() => {
+            // Procurar por labels com "Eletrônico" ou "Eletronico"
+            const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+            
+            // 1) Tentar por label
+            for (const label of document.querySelectorAll('label')) {
+                const txt = norm(label.textContent || '');
+                if (txt.includes('eletronico') || txt.includes('virtual')) {
+                    const input = label.control || label.querySelector('input[type="radio"]');
+                    if (input) {
+                        input.checked = true;
+                        input.click();
+                        input.dispatchEvent(new Event('change', {bubbles: true}));
+                        return true;
+                    }
+                }
+            }
+            
+            // 2) Tentar por value
+            const radios = document.querySelectorAll('input[type="radio"]');
+            for (const r of radios) {
+                const val = norm(r.value || '');
+                const name = norm(r.name || '');
+                if (val.includes('eletronico') || val === 'true' || val === '1' || 
+                    name.includes('virtual') || name.includes('eletronico')) {
+                    r.checked = true;
+                    r.click();
+                    r.dispatchEvent(new Event('change', {bubbles: true}));
+                    return true;
+                }
+            }
+            return false;
+        }""")
+        if tipo_ok:
+            log("[RADIO] ✅ Rádio Eletrônico forçado via JS direto")
+        else:
+            log("[RADIO][WARN] Não conseguiu marcar rádio Eletrônico - continuando...")
+    
     await _settle(page, "radio:tipo")
+    update_field_status("tipo_processo", "Tipo do Processo", "Eletrônico" if tipo_ok else "FALHA")
     
     # 2) CNJ
-    update_status("preenchendo_cnj", f"Preenchendo número do processo (CNJ, process_id=process_id): {cnj}")
+    update_status("preenchendo_cnj", f"Preenchendo número do processo (CNJ): {cnj}", process_id=process_id)
     log(f"[CNJ] ═══ INICIANDO PREENCHIMENTO CNJ PARA PROCESSO #{process_id} ═══")
-    await ensure_cnj_flag_on(page)
+    
+    # 🔧 FIX 2025-12-09: Garantir que o rádio CNJ seja marcado COM VERIFICAÇÃO
+    cnj_flag_ok = await ensure_cnj_flag_on(page)
+    if not cnj_flag_ok:
+        log("[CNJ][RETRY] ensure_cnj_flag_on falhou - forçando via JS direto...")
+        cnj_flag_ok = await page.evaluate("""() => {
+            // Procurar checkboxes/radios com CNJ no nome ou label
+            const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+            
+            // 1) Tentar radios com name contendo CNJ, Judicial, etc
+            const radioNames = ['IsJudicial', 'IsCNJ', 'PossuiCNJ', 'HasCNJ', 'Cnj', 'PossuiNumeroCNJ'];
+            for (const name of radioNames) {
+                const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+                for (const r of radios) {
+                    const val = (r.value || '').toLowerCase();
+                    if (['1', 'true', 'sim', 'yes', 's'].includes(val)) {
+                        r.checked = true;
+                        r.click();
+                        r.dispatchEvent(new Event('change', {bubbles: true}));
+                        return true;
+                    }
+                }
+            }
+            
+            // 2) Tentar por label com "Sim"
+            for (const label of document.querySelectorAll('label')) {
+                const txt = norm(label.textContent || '');
+                if (txt === 'sim' || txt.includes('cnj') && txt.includes('sim')) {
+                    const input = label.control || label.querySelector('input');
+                    if (input && (input.type === 'radio' || input.type === 'checkbox')) {
+                        input.checked = true;
+                        input.click();
+                        input.dispatchEvent(new Event('change', {bubbles: true}));
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }""")
+        if cnj_flag_ok:
+            log("[CNJ] ✅ Rádio CNJ forçado via JS direto")
     
     # 🔧 FIX CRÍTICO: Aguardar campo CNJ aparecer no DOM após AJAX do tipo Eletrônico
     await _settle(page, "cnj_flag_settle")  # Espera adicional após marcar flag CNJ
