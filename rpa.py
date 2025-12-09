@@ -1396,8 +1396,58 @@ async def _open_bs_and_get_container(page, select_id: str):
     # 🔧 BATCH FIX: Aguardar que botão esteja attached E VISÍVEL (não apenas attached)
     log(f"[BS_DROPDOWN] Aguardando botão #{select_id} estar visível...")
     await btn.wait_for(state="attached", timeout=max(SHORT_TIMEOUT_MS, 2000))
-    await btn.wait_for(state="visible", timeout=max(SHORT_TIMEOUT_MS, 20000))  # 20s - tolerante a eLaw lento
-    log(f"[BS_DROPDOWN] Botão #{select_id} está visível, prosseguindo...")
+    
+    # 🔧 FIX 2025-12-09: Verificar se campo está hidden e tentar torná-lo visível
+    is_hidden = await btn.evaluate("el => el.offsetParent === null || getComputedStyle(el).display === 'none' || getComputedStyle(el).visibility === 'hidden'")
+    if is_hidden:
+        log(f"[BS_DROPDOWN] Campo #{select_id} está oculto - tentando forçar visibilidade via JS...")
+        try:
+            # Tentar mostrar o campo e seus containers pais
+            await page.evaluate("""(sid) => {
+                const btn = document.querySelector(`button[data-id='${sid}']`);
+                if (!btn) return;
+                
+                // Tornar visível
+                btn.style.display = 'block';
+                btn.style.visibility = 'visible';
+                btn.style.opacity = '1';
+                
+                // Mostrar containers pais (bootstrap-select, form-group, etc)
+                let parent = btn.parentElement;
+                for (let i = 0; i < 5 && parent; i++) {
+                    parent.style.display = parent.style.display === 'none' ? 'block' : parent.style.display;
+                    parent.style.visibility = 'visible';
+                    parent.style.opacity = '1';
+                    parent = parent.parentElement;
+                }
+                
+                // Também mostrar o select original
+                const sel = document.getElementById(sid);
+                if (sel && sel.closest) {
+                    const bsContainer = sel.closest('.bootstrap-select');
+                    if (bsContainer) {
+                        bsContainer.style.display = 'block';
+                        bsContainer.style.visibility = 'visible';
+                    }
+                }
+            }""", select_id)
+            await page.wait_for_timeout(300)
+            
+            # Verificar se agora está visível
+            is_still_hidden = await btn.evaluate("el => el.offsetParent === null")
+            if is_still_hidden:
+                log(f"[BS_DROPDOWN] Campo #{select_id} permanece oculto - possivelmente não existe neste formulário")
+                return btn, None
+        except Exception as e:
+            log(f"[BS_DROPDOWN] Erro ao tentar mostrar #{select_id}: {e}")
+            return btn, None
+    
+    try:
+        await btn.wait_for(state="visible", timeout=max(SHORT_TIMEOUT_MS, 10000))
+        log(f"[BS_DROPDOWN] Botão #{select_id} está visível, prosseguindo...")
+    except Exception as e:
+        log(f"[BS_DROPDOWN] Timeout aguardando #{select_id} visível: {e}")
+        return btn, None
     
     for _ in range(2):
         caret = btn.locator(".bs-caret, .filter-option").first
@@ -4745,28 +4795,107 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     update_status("aguardando_sistema_eletronico", "Aguardando dropdown Sistema Eletrônico ficar pronto...", process_id=process_id)
     await wait_for_select_ready(page, "SistemaEletronicoId", 1, 15000)  # Aumentado de 7s para 15s
     update_status("abrindo_sistema_eletronico", "Abrindo dropdown Sistema Eletrônico...", process_id=process_id)
-    btn, cont = await _open_bs_and_get_container(page, "SistemaEletronicoId")
-    sys_options = _clean_choices(await _collect_options_from_container(cont)) if cont else []
-    if btn:
-        try:
-            await btn.press("Escape")
-        except Exception:
-            pass
-    wanted_sys = (
-        _best_match(sys_options, resolve_sistema_eletronico(data), prefer_words=["pje", "juizo 100", "e-proc", "projudi"], threshold=10)
-        if sys_options
-        else resolve_sistema_eletronico(data)
-    )
-    _must(
-        await set_select_fuzzy_any(
+    
+    # 🔧 FIX 2025-12-09: Verificar se campo está oculto e usar JS direto se necessário
+    sistema_preenchido = False
+    wanted_sys = resolve_sistema_eletronico(data)
+    
+    # Primeiro, verificar se o campo está visível ou oculto
+    btn_visible = True
+    try:
+        btn_test = page.locator(f"button.btn.dropdown-toggle[data-id='SistemaEletronicoId']").first
+        await btn_test.wait_for(state="attached", timeout=3000)
+        btn_visible = await btn_test.evaluate("el => el.offsetParent !== null && getComputedStyle(el).display !== 'none'")
+    except Exception:
+        btn_visible = False
+    
+    if btn_visible:
+        # Campo visível - usar método padrão
+        log(f"[SISTEMA_ELETRONICO] Campo visível - usando método padrão")
+        btn, cont = await _open_bs_and_get_container(page, "SistemaEletronicoId")
+        sys_options = _clean_choices(await _collect_options_from_container(cont)) if cont else []
+        if btn:
+            try:
+                await btn.press("Escape")
+            except Exception:
+                pass
+        wanted_sys = (
+            _best_match(sys_options, resolve_sistema_eletronico(data), prefer_words=["pje", "juizo 100", "e-proc", "projudi"], threshold=10)
+            if sys_options
+            else resolve_sistema_eletronico(data)
+        )
+        sistema_preenchido = await set_select_fuzzy_any(
             page,
             "SistemaEletronicoId",
             wanted_sys,
             fallbacks=sys_options[:6] if sys_options else ["PJE", "Juízo 100% Digital - PJE", "E-PROC", "PROJUDI"],
             prefer_words=["pje", "juizo", "e-proc", "projudi"],
-        ),
-        "Sistema Eletrônico",
-    )
+        )
+    else:
+        # Campo OCULTO - usar JavaScript direto para FORÇAR preenchimento
+        log(f"[SISTEMA_ELETRONICO] Campo OCULTO - forçando preenchimento via JS direto...")
+        update_status("forcando_sistema_eletronico", "Campo oculto - forçando preenchimento via JS...", process_id=process_id)
+        
+        # Tentar com force_select_bootstrap_by_text primeiro
+        sistema_preenchido = await force_select_bootstrap_by_text(page, "SistemaEletronicoId", wanted_sys)
+        
+        if not sistema_preenchido:
+            # Fallback: tentar outras opções comuns
+            for fallback in ["PJE", "Juízo 100% Digital - PJE", "E-PROC", "PROJUDI", "PJe"]:
+                log(f"[SISTEMA_ELETRONICO] Tentando fallback: {fallback}")
+                if await force_select_bootstrap_by_text(page, "SistemaEletronicoId", fallback):
+                    wanted_sys = fallback
+                    sistema_preenchido = True
+                    break
+        
+        if not sistema_preenchido:
+            # Último recurso: setar valor direto via JavaScript
+            log(f"[SISTEMA_ELETRONICO] Usando último recurso: JS direto com primeiro valor disponível")
+            try:
+                js_result = await page.evaluate("""(sid) => {
+                    const el = document.getElementById(sid);
+                    if (!el || !el.options) return {success: false, error: 'Element not found'};
+                    
+                    // Encontrar primeira opção válida (não "SELECIONE")
+                    for (const opt of el.options) {
+                        const text = (opt.textContent || '').trim();
+                        if (!text || /selecion/i.test(text) || text === '--') continue;
+                        
+                        // Preferir PJE ou similar
+                        if (/pje|juizo|e-proc|projudi/i.test(text)) {
+                            el.value = opt.value;
+                            el.dispatchEvent(new Event('change', {bubbles: true}));
+                            try {
+                                const $ = window.jQuery || window.$;
+                                if ($ && $(el).selectpicker) {
+                                    $(el).selectpicker('val', opt.value);
+                                    $(el).selectpicker('refresh');
+                                }
+                            } catch(e) {}
+                            return {success: true, value: opt.value, text: text};
+                        }
+                    }
+                    
+                    // Se não encontrou PJE, usar primeira opção válida
+                    for (const opt of el.options) {
+                        const text = (opt.textContent || '').trim();
+                        if (!text || /selecion/i.test(text) || text === '--') continue;
+                        el.value = opt.value;
+                        el.dispatchEvent(new Event('change', {bubbles: true}));
+                        return {success: true, value: opt.value, text: text};
+                    }
+                    
+                    return {success: false, error: 'No valid option found'};
+                }""", "SistemaEletronicoId")
+                
+                if js_result and js_result.get("success"):
+                    wanted_sys = js_result.get("text", wanted_sys)
+                    sistema_preenchido = True
+                    log(f"[SISTEMA_ELETRONICO] ✅ JS direto OK: {wanted_sys}")
+            except Exception as e:
+                log(f"[SISTEMA_ELETRONICO] ❌ Erro JS direto: {e}")
+    
+    _must(sistema_preenchido, "Sistema Eletrônico")
     await _settle(page, "select:sistema")
     await ensure_cnj_still_present(page, cnj)
     update_field_status("sistema_eletronico", "Sistema Eletrônico", wanted_sys)
