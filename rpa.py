@@ -8428,6 +8428,56 @@ async def ensure_on_new_process_form(page, process_id: int = None):
         await page.wait_for_url(re.compile(form_url_pattern), timeout=60000)  # 60s - tolerante a redirecionamento lento
         log(f"[BATCH][DEBUG] URL do form confirmada, ajustando zoom...")
         await ensure_zoom_100(page, "form_batch")
+        
+        # 🔧 FIX 2025-12-09: Verificar se realmente estamos no formulário de Processo
+        # Produção tem layout diferente - pode ter navegado para página errada
+        for verify_attempt in range(3):
+            # Verificar se o formulário de CNJ existe (indicador que estamos na página certa)
+            cnj_exists = await page.locator("#CnjSim, #ProtocoloInicial, input[name='ProtocoloInicial']").count() > 0
+            dados_basicos_title = await page.locator("h4:has-text('Dados Básicos'), h3:has-text('Dados Básicos'), .card-header:has-text('Dados Básicos')").count() > 0
+            
+            # Verificar se NÃO estamos na página de Configuração (seção Pessoas/Adverso no topo)
+            # Na página de Configuração, "Pessoas" e "Adverso" aparecem como abas/seções no topo
+            config_header = await page.locator("h3:has-text('Configuração'), .page-title:has-text('Configuração')").count() > 0
+            pessoas_adverso_tabs = await page.locator("text=Adverso >> nth=0").count() > 0
+            is_config_page = config_header or (pessoas_adverso_tabs and not dados_basicos_title)
+            
+            log(f"[BATCH][VERIFY] Tentativa {verify_attempt+1}: CNJ={cnj_exists}, DadosBasicos={dados_basicos_title}, ConfigPage={is_config_page}")
+            
+            if cnj_exists and not is_config_page:
+                log(f"[BATCH][VERIFY] ✅ Confirmado: estamos no formulário de Novo Processo")
+                break
+            elif is_config_page or not cnj_exists:
+                log(f"[BATCH][VERIFY] ⚠️ Página incorreta detectada - tentando navegar via clique no menu")
+                # Tentar clicar diretamente no menu Processos usando texto
+                try:
+                    # Primeiro, clicar no menu Processos
+                    processos_link = page.locator("a:has-text('Processos'), nav a:text-is('Processos')").first
+                    if await processos_link.count() > 0:
+                        await processos_link.click(timeout=5000)
+                        await short_sleep_ms(500)
+                        
+                        # Depois, clicar em Novo Processo
+                        novo_processo_link = page.locator("a:has-text('Novo Processo'), a[href*='/Processo/form']").first
+                        if await novo_processo_link.count() > 0:
+                            await novo_processo_link.click(timeout=5000)
+                            await short_sleep_ms(1000)
+                            log(f"[BATCH][VERIFY] Clique no menu Processos > Novo Processo executado")
+                        else:
+                            # Fallback: ir direto pela URL
+                            await page.goto(target, wait_until="domcontentloaded", timeout=60000)
+                    else:
+                        # Fallback: ir direto pela URL
+                        await page.goto(target, wait_until="domcontentloaded", timeout=60000)
+                except Exception as nav_err:
+                    log(f"[BATCH][VERIFY] Erro na navegação corretiva: {nav_err}")
+                    # Último recurso: recarregar a URL
+                    await page.goto(target, wait_until="domcontentloaded", timeout=60000)
+                
+                await short_sleep_ms(1000)
+            else:
+                break  # Formulário parece correto
+        
         log("[BATCH] ✅ Formulário 'Novo Processo' aberto e limpo")
         if process_id:
             update_status("formulario_pronto", "Formulário pronto para preenchimento", process_id=process_id)
