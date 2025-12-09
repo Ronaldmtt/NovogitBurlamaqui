@@ -913,9 +913,28 @@ def batch_start(id):
         if batch.owner_id != current_user.id:
             return jsonify({'success': False, 'error': 'Permissão negada'}), 403
         
-        # Verificar se batch está pronto (permite reprocessar batches com erro que têm itens ready)
-        if batch.status not in ['ready', 'partial_ready', 'partial_completed', 'completed', 'error']:
+        # Verificar se batch está pronto (permite reprocessar batches com erro ou running travados)
+        allowed_statuses = ['ready', 'partial_ready', 'partial_completed', 'completed', 'error', 'running']
+        if batch.status not in allowed_statuses:
             return jsonify({'success': False, 'error': f'Batch não está pronto (status: {batch.status})'}), 400
+        
+        # 🔧 FIX 2025-12-09: Se batch está em 'running', resetar itens travados para permitir reinício
+        if batch.status == 'running':
+            logger.info(f"[BATCH START] Batch {id} em status 'running' - resetando itens travados")
+            # Resetar todos os itens 'running' para 'ready' (travados de execução anterior)
+            stuck_items = BatchItem.query.filter_by(batch_id=id, status='running').all()
+            for item in stuck_items:
+                item.status = 'ready'
+                item.last_error = None
+                item.updated_at = datetime.utcnow()
+                logger.info(f"[BATCH START] Item {item.id} resetado: running -> ready")
+            
+            # Resetar o batch para permitir novo início
+            batch.status = 'ready'
+            batch.lock_owner = None
+            batch.lock_time = None
+            db.session.commit()
+            logger.info(f"[BATCH START] Batch {id} resetado para 'ready' com {len(stuck_items)} itens destravados")
         
         # Se batch está em error, verificar se há itens prontos para processar
         if batch.status == 'error':
