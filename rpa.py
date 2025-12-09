@@ -2862,30 +2862,30 @@ async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
             log(f"[TIPO_PROCESSO] Selecionando '{label_text}' via JavaScript (evitando clique de coordenada)...")
             # NÃO usar scroll_into_view nem click() - ir direto pelo JS para evitar errar o menu
             changed = await page.evaluate(
-                    """(labelTextNorm)=>{
-                    const norm=(s)=> (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
-                    const labs=[...document.querySelectorAll('label')];
-                    for(const l of labs){
-                        if(norm(l.textContent||'').includes(labelTextNorm)){
-                            const input = l.control || l.querySelector('input[type="radio"]');
-                            if(input){
-                                try{
-                                    input.checked = true;
-                                    for(const ev of ['click','input','change']){
-                                        input.dispatchEvent(new Event(ev,{bubbles:true}));
-                                    }
-                                    return true;
-                                }catch(e){}
-                            }
+                """(labelTextNorm)=>{
+                const norm=(s)=> (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+                const labs=[...document.querySelectorAll('label')];
+                for(const l of labs){
+                    if(norm(l.textContent||'').includes(labelTextNorm)){
+                        const input = l.control || l.querySelector('input[type="radio"]');
+                        if(input){
+                            try{
+                                input.checked = true;
+                                for(const ev of ['click','input','change']){
+                                    input.dispatchEvent(new Event(ev,{bubbles:true}));
+                                }
+                                return true;
+                            }catch(e){}
                         }
                     }
-                    return false;
-                }""",
-                    want_label,
-                )
-                if changed:
-                    await wait_network_quiet(page, timeout_ms=800)
-                    return True
+                }
+                return false;
+            }""",
+                want_label,
+            )
+            if changed:
+                await wait_network_quiet(page, timeout_ms=800)
+                return True
         except Exception:
             pass
 
