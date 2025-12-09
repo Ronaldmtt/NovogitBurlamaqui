@@ -7014,14 +7014,16 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
                     # Tirar screenshot da tela mostrando status Encerrado
                     try:
                         from datetime import datetime
+                        from pathlib import Path
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        screenshot_path = f"rpa_screenshots/process_{process_id}_encerrado_{timestamp}.png"
+                        screenshot_filename = f"process_{process_id}_encerrado_{timestamp}.png"
                         
-                        # Criar diretório se não existir
-                        import os
-                        os.makedirs("rpa_screenshots", exist_ok=True)
+                        # Criar diretório correto (static/rpa_screenshots para ser servido pela rota)
+                        screenshot_dir = Path("static") / "rpa_screenshots"
+                        screenshot_dir.mkdir(parents=True, exist_ok=True)
+                        screenshot_path = screenshot_dir / screenshot_filename
                         
-                        await page.screenshot(path=screenshot_path, full_page=False)
+                        await page.screenshot(path=str(screenshot_path), full_page=False)
                         log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva: {screenshot_path}")
                         
                         # Salvar caminho do screenshot no banco
@@ -7029,8 +7031,6 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
                             with flask_app.app_context():
                                 proc = Process.query.get(process_id)
                                 if proc:
-                                    # Salvar apenas o nome do arquivo (não o caminho completo)
-                                    screenshot_filename = os.path.basename(screenshot_path)
                                     proc.elaw_screenshot_reclamadas_path = screenshot_filename
                                     proc.elaw_status = "success"  # Status de sucesso para sync com batch
                                     db.session.commit()
@@ -7323,14 +7323,16 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
                 # Tirar screenshot da tela mostrando status Encerrado
                 try:
                     from datetime import datetime
+                    from pathlib import Path
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    screenshot_path = f"rpa_screenshots/process_{process_id}_encerrado_{timestamp}.png"
+                    screenshot_filename = f"process_{process_id}_encerrado_{timestamp}.png"
                     
-                    # Criar diretório se não existir
-                    import os
-                    os.makedirs("rpa_screenshots", exist_ok=True)
+                    # Criar diretório correto (static/rpa_screenshots para ser servido pela rota)
+                    screenshot_dir = Path("static") / "rpa_screenshots"
+                    screenshot_dir.mkdir(parents=True, exist_ok=True)
+                    screenshot_path = screenshot_dir / screenshot_filename
                     
-                    await page.screenshot(path=screenshot_path, full_page=False)
+                    await page.screenshot(path=str(screenshot_path), full_page=False)
                     log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva: {screenshot_path}")
                     
                     # Salvar caminho do screenshot no banco
@@ -7339,8 +7341,6 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
                         with flask_app.app_context():
                             proc = Process.query.get(process_id)
                             if proc:
-                                # Salvar apenas o nome do arquivo (não o caminho completo)
-                                screenshot_filename = os.path.basename(screenshot_path)
                                 proc.elaw_screenshot_reclamadas_path = screenshot_filename
                                 proc.elaw_status = "success"  # Status de sucesso para sync com batch
                                 db.session.commit()
@@ -7920,6 +7920,24 @@ async def _take_reclamadas_screenshot(page, process_id: int):
     update_status("reclamadas_screenshot", "Capturando screenshot das reclamadas...", process_id=process_id)
     
     try:
+        # 🔧 FIX 2025-12-09: Fechar qualquer modal aberto ANTES de tirar screenshot
+        try:
+            # Fechar modais via JavaScript
+            await page.evaluate("""
+                document.querySelectorAll('.modal.in button.close, .modal.show button.close, #dialog-modal button.close, .bootbox.modal button.close').forEach(btn => btn.click());
+            """)
+            await short_sleep_ms(500)
+            
+            # Esperar que modais desapareçam
+            try:
+                await page.wait_for_selector('.modal.in, .modal.show, #dialog-modal.in', state='hidden', timeout=3000)
+            except Exception:
+                pass  # Pode não ter modal aberto
+            
+            log("[RECLAMADAS][RPA][SHOT] Modais fechados (se havia algum)")
+        except Exception as modal_err:
+            log(f"[RECLAMADAS][RPA][SHOT][WARN] Erro ao fechar modais: {modal_err}")
+        
         # Garantir que aba está visível
         try:
             await page.click('a[href="#box-outraspartes"]')
