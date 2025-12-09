@@ -4296,6 +4296,18 @@ async def click_salvar_and_wait(page, cnj_expected: str = "") -> Dict[str, Any]:
                 if signals['toast_ok'] and signals['toast_level'] == 'success':
                     log(f"[SALVAR][T{attempt}] ✅ CONFIRMADO: Toast verde - {signals['toast_text'][:50]}")
                     navigation_succeeded = True
+                    
+                    # 🔧 FIX 2025-12-09: Aguardar navegação para tela de detalhes após toast
+                    # O eLaw pode demorar alguns segundos para redirecionar após o toast
+                    log(f"[SALVAR][T{attempt}] Aguardando navegação para tela de detalhes...")
+                    for nav_wait in range(5):  # Até 5 segundos
+                        await short_sleep_ms(1000)
+                        current_url = page.url
+                        if 'detail' in current_url.lower() or 'id=' in current_url.lower():
+                            log(f"[SALVAR][T{attempt}] ✅ Navegação para detalhes confirmada: {current_url}")
+                            break
+                        log(f"[SALVAR][T{attempt}] Aguardando... ({nav_wait+1}/5) URL: {current_url}")
+                    
                     break
                 
                 # Erro confirmado: toast vermelho
@@ -6623,26 +6635,33 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                         has_detail_url = True
                     else:
                         # Caso 3: FALLBACK - Processo já existia ou recém-criado mas não temos URL
-                        # Buscar via Relatório de Andamentos com RETRY (processo recém-criado pode demorar para indexar)
-                        log("[RECLAMADAS][FALLBACK] URL de detalhes não disponível - acionando busca via Relatório")
+                        # 🔧 FIX 2025-12-09: Estratégia dupla - Lista (imediata) + Relatório (backup)
+                        log("[RECLAMADAS][FALLBACK] URL de detalhes não disponível - tentando fallbacks...")
                         
-                        # 🔧 FIX 2025-12-09: Retry com delay para processos recém-criados
                         fallback_ok = False
-                        for retry_attempt in range(3):  # Até 3 tentativas
-                            if retry_attempt > 0:
-                                delay_seconds = 3 * retry_attempt  # 3s, 6s
-                                log(f"[RECLAMADAS][FALLBACK] Tentativa {retry_attempt + 1}/3 - aguardando {delay_seconds}s para indexação...")
-                                await asyncio.sleep(delay_seconds)
-                            
-                            fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
-                            if fallback_ok:
-                                break
+                        
+                        # Tentativa 1: Lista de Processos (mais imediata, sem depender de indexação)
+                        log("[RECLAMADAS][FALLBACK] Estratégia 1: Lista de Processos...")
+                        fallback_ok = await ensure_elaw_detail_url_via_list(page, process_id, data)
+                        
+                        # Tentativa 2: Relatório de Andamentos (com retry e delay)
+                        if not fallback_ok:
+                            log("[RECLAMADAS][FALLBACK] Estratégia 2: Relatório de Andamentos com retry...")
+                            for retry_attempt in range(2):  # 2 tentativas com delay
+                                if retry_attempt > 0:
+                                    delay_seconds = 3
+                                    log(f"[RECLAMADAS][FALLBACK] Tentativa {retry_attempt + 1}/2 - aguardando {delay_seconds}s...")
+                                    await asyncio.sleep(delay_seconds)
+                                
+                                fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
+                                if fallback_ok:
+                                    break
                         
                         if fallback_ok:
-                            log("[RECLAMADAS][FALLBACK] ✅ URL encontrada via relatório - continuando com reclamadas extras")
+                            log("[RECLAMADAS][FALLBACK] ✅ URL encontrada - continuando com reclamadas extras")
                             has_detail_url = True
                         else:
-                            log("[RECLAMADAS][FALLBACK] ❌ Falha ao obter URL de detalhes após 3 tentativas - pulando inserção de reclamadas extras")
+                            log("[RECLAMADAS][FALLBACK] ❌ Falha ao obter URL de detalhes - pulando inserção de reclamadas extras")
                 
                 # Só tenta adicionar reclamadas extras se temos a URL de detalhes
                 if has_detail_url:
@@ -6731,23 +6750,30 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                         await page.goto(detail_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
                         await short_sleep_ms(1000)
                     else:
-                        # Fallback: buscar via relatório com RETRY (processo recém-criado pode demorar para indexar)
-                        log("[PEDIDOS][FALLBACK] URL de detalhes não disponível - acionando busca via Relatório")
+                        # 🔧 FIX 2025-12-09: Estratégia dupla - Lista (imediata) + Relatório (backup)
+                        log("[PEDIDOS][FALLBACK] URL de detalhes não disponível - tentando fallbacks...")
                         
-                        # 🔧 FIX 2025-12-09: Retry com delay para processos recém-criados
                         fallback_ok = False
-                        for retry_attempt in range(3):  # Até 3 tentativas
-                            if retry_attempt > 0:
-                                delay_seconds = 3 * retry_attempt  # 3s, 6s
-                                log(f"[PEDIDOS][FALLBACK] Tentativa {retry_attempt + 1}/3 - aguardando {delay_seconds}s para indexação...")
-                                await asyncio.sleep(delay_seconds)
-                            
-                            fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
-                            if fallback_ok:
-                                break
+                        
+                        # Tentativa 1: Lista de Processos (mais imediata, sem depender de indexação)
+                        log("[PEDIDOS][FALLBACK] Estratégia 1: Lista de Processos...")
+                        fallback_ok = await ensure_elaw_detail_url_via_list(page, process_id, data)
+                        
+                        # Tentativa 2: Relatório de Andamentos (com retry e delay)
+                        if not fallback_ok:
+                            log("[PEDIDOS][FALLBACK] Estratégia 2: Relatório de Andamentos com retry...")
+                            for retry_attempt in range(2):  # 2 tentativas com delay
+                                if retry_attempt > 0:
+                                    delay_seconds = 3
+                                    log(f"[PEDIDOS][FALLBACK] Tentativa {retry_attempt + 1}/2 - aguardando {delay_seconds}s...")
+                                    await asyncio.sleep(delay_seconds)
+                                
+                                fallback_ok = await ensure_elaw_detail_url_via_relatorio(page, process_id, data)
+                                if fallback_ok:
+                                    break
                         
                         if not fallback_ok:
-                            log("[PEDIDOS][SKIP] Não foi possível obter URL de detalhes após 3 tentativas - pulando pedidos")
+                            log("[PEDIDOS][SKIP] Falha ao obter URL de detalhes - pulando pedidos")
                             pedidos = []  # Limpar para pular o fluxo de pedidos
                 
                 # Processar marcações e pedidos se estamos na tela de detalhes
@@ -7055,6 +7081,165 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
         
     except Exception as e:
         log(f"[FALLBACK_URL][ERRO] Erro inesperado: {e}")
+        return False
+
+
+# ============================================================================
+# FALLBACK ALTERNATIVO: Buscar URL de detalhes via Lista de Processos
+# Mais imediato que Relatório de Andamentos (sem depender de indexação)
+# ============================================================================
+
+async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> bool:
+    """
+    Fallback alternativo para buscar a URL de detalhes via /Processo/List.
+    
+    Vantagem: A lista de processos é mais imediata que o relatório de andamentos,
+    pois não depende de indexação assíncrona.
+    
+    Args:
+        page: Playwright Page object já logado no eLaw
+        process_id: ID do processo no banco de dados
+        data: Dicionário com dados extraídos do PDF
+        
+    Returns:
+        bool: True se a URL foi encontrada e salva com sucesso
+    """
+    log(f"[FALLBACK_LIST][INICIO] process_id={process_id}")
+    
+    # 1. Verificar se já existe URL gravada
+    if flask_app:
+        from models import Process, db
+        with flask_app.app_context():
+            proc = Process.query.get(process_id)
+            if proc and proc.elaw_detail_url:
+                log(f"[FALLBACK_LIST][SKIP] URL já existe: {proc.elaw_detail_url}")
+                return True
+    
+    # 2. Determinar o número do processo a pesquisar
+    numero_processo = extract_cnj_from_anywhere(data)
+    if not numero_processo:
+        log("[FALLBACK_LIST][SEM_NUMERO] Número do processo não encontrado no data")
+        return False
+    
+    log(f"[FALLBACK_LIST][NUMERO] Buscando processo: {numero_processo}")
+    update_status("fallback_list", f"Buscando processo via Lista...", process_id=process_id)
+    
+    try:
+        # 3. Navegar para a Lista de Processos
+        list_url = BASE_URL.rstrip("/") + "/Processo/List?cache=false"
+        log(f"[FALLBACK_LIST][NAV] Navegando para: {list_url}")
+        await page.goto(list_url, wait_until="load", timeout=NAV_TIMEOUT_MS)
+        await short_sleep_ms(1500)
+        
+        # 4. Preencher o filtro de número do processo
+        filter_selectors = [
+            '#Filters_Protocolo',
+            '#Filters_NumeroProcesso',
+            '#Filters_Numero',
+            'input[name="Filters.Protocolo"]',
+            'input[name="Filters.NumeroProcesso"]',
+        ]
+        
+        filter_filled = False
+        for sel in filter_selectors:
+            try:
+                elem = page.locator(sel).first
+                if await elem.is_visible(timeout=1000):
+                    await elem.clear()
+                    await elem.fill(numero_processo)
+                    await short_sleep_ms(300)
+                    filter_filled = True
+                    log(f"[FALLBACK_LIST][FILTER] Preenchido via: {sel}")
+                    break
+            except Exception:
+                continue
+        
+        if not filter_filled:
+            log("[FALLBACK_LIST][ERRO] Não encontrou campo de filtro")
+            return False
+        
+        # 5. Clicar no botão de busca
+        button_selectors = [
+            '#buttonSubmit',
+            '#btnSearch',
+            'button[type="submit"]',
+            'button:has-text("Localizar")',
+            'button:has-text("Pesquisar")',
+            'button:has-text("Buscar")',
+        ]
+        
+        button_clicked = False
+        for sel in button_selectors:
+            try:
+                btn = page.locator(sel).first
+                if await btn.is_visible(timeout=1000):
+                    await btn.click()
+                    button_clicked = True
+                    log(f"[FALLBACK_LIST][CLICK] Clicado via: {sel}")
+                    break
+            except Exception:
+                continue
+        
+        if not button_clicked:
+            log("[FALLBACK_LIST][ERRO] Não encontrou botão de busca")
+            return False
+        
+        # 6. Aguardar resultados
+        await short_sleep_ms(2000)
+        
+        # 7. Procurar link do processo na tabela
+        numero_digits = re.sub(r'\D', '', numero_processo)
+        
+        # Tentar encontrar na tabela de processos
+        table_selectors = ['#processoList', '#processoGrid', '.k-grid', 'table tbody']
+        
+        for table_sel in table_selectors:
+            try:
+                links = page.locator(f'{table_sel} a')
+                links_count = await links.count()
+                
+                if links_count == 0:
+                    continue
+                
+                log(f"[FALLBACK_LIST] Verificando {links_count} links em {table_sel}")
+                
+                for i in range(min(links_count, 30)):
+                    link = links.nth(i)
+                    text = await link.text_content()
+                    if text:
+                        text_digits = re.sub(r'\D', '', text)
+                        if text_digits == numero_digits:
+                            log(f"[FALLBACK_LIST] ✅ Match encontrado: '{text}'")
+                            await link.click()
+                            await short_sleep_ms(2000)
+                            await page.wait_for_load_state('load', timeout=15000)
+                            
+                            # Verificar se chegou na tela de detalhes
+                            current_url = page.url
+                            if 'detail' in current_url.lower() or 'id=' in current_url.lower():
+                                log(f"[FALLBACK_LIST] ✅ Navegou para detalhes: {current_url}")
+                                
+                                # Gravar URL no banco
+                                if flask_app:
+                                    with flask_app.app_context():
+                                        proc = Process.query.get(process_id)
+                                        if proc:
+                                            proc.elaw_detail_url = current_url
+                                            db.session.commit()
+                                            log(f"[FALLBACK_LIST][SUCESSO] URL salva: {current_url}")
+                                            return True
+                                return True
+                            else:
+                                log(f"[FALLBACK_LIST][WARN] URL não parece ser de detalhes: {current_url}")
+            except Exception as e:
+                log(f"[FALLBACK_LIST][WARN] Erro em {table_sel}: {e}")
+                continue
+        
+        log("[FALLBACK_LIST][ERRO] Processo não encontrado na lista")
+        return False
+        
+    except Exception as e:
+        log(f"[FALLBACK_LIST][ERRO] Erro inesperado: {e}")
         return False
 
 
