@@ -2108,35 +2108,51 @@ async def set_radio_by_name(page, name: str, target_value: str, human_label: str
 YES_VALUES = {"1", "true", "True", "on", "yes", "sim", "Sim", "S", "s"}
 
 async def set_yes_radio_guess(page, name: str) -> bool:
+    """
+    🔧 FIX 2025-12-09: Usa APENAS cliques via JavaScript para evitar errar coordenadas.
+    scroll_into_view + click() estava causando cliques no menu Configuração.
+    """
     try:
         await page.wait_for_selector(f"input[type='radio'][name='{name}']", timeout=1000)
     except Exception:
         return False
-    radios = page.locator(f"input[type='radio'][name='{name}']")
-    count = await radios.count()
-    for i in range(count):
-        r = radios.nth(i)
-        val = (await r.get_attribute("value")) or ""
-        if val in YES_VALUES:
-            try:
-                await _scroll_into_view(r)
-                await r.click(force=True)
-                await short_sleep_ms(50)
-                return True
-            except Exception:
-                pass
-    for i in range(count):
-        r = radios.nth(i)
-        ok = await r.evaluate(
-            """(el)=>{
-            const t=((el.closest('label')?.textContent||'')+(el.parentElement?.textContent||'')); 
-            const n=(t||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase(); 
-            if(n.includes('sim')){ el.click(); return true; } return false;
-        }"""
-        )
-        if ok:
-            await short_sleep_ms(50)
-            return True
+    
+    # Usar JavaScript direto para marcar o rádio - EVITA problemas de coordenadas
+    log(f"[RADIO] Marcando rádio '{name}' = Sim via JavaScript (evitando clique de coordenada)...")
+    ok = await page.evaluate(
+        """(name, yesValues) => {
+            const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+            for (const r of radios) {
+                const val = (r.value || '').toLowerCase();
+                if (yesValues.includes(val) || yesValues.includes(r.value)) {
+                    r.checked = true;
+                    r.click();
+                    r.dispatchEvent(new Event('change', {bubbles: true}));
+                    r.dispatchEvent(new Event('input', {bubbles: true}));
+                    return true;
+                }
+            }
+            // Fallback: procurar por label com "Sim"
+            for (const r of radios) {
+                const label = r.closest('label') || r.parentElement;
+                const text = (label?.textContent || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+                if (text.includes('sim')) {
+                    r.checked = true;
+                    r.click();
+                    r.dispatchEvent(new Event('change', {bubbles: true}));
+                    r.dispatchEvent(new Event('input', {bubbles: true}));
+                    return true;
+                }
+            }
+            return false;
+        }""",
+        name,
+        list(YES_VALUES)
+    )
+    if ok:
+        await short_sleep_ms(50)
+        log(f"[RADIO] ✅ Rádio '{name}' marcado via JS")
+        return True
     return False
 
 # =========================
@@ -2815,19 +2831,18 @@ def decide_celula_from_sources(data: Dict[str, Any], pdf_text: str, options: Lis
 RADIO_VIRTUAL_NAMES = ["IsProcessoVirtual", "ProcessoVirtual", "IsVirtual", "ProcessoEletronico", "IsEletronico"]
 
 async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
+    """
+    🔧 FIX 2025-12-09: Usa APENAS cliques via JavaScript para evitar errar e clicar no menu Configuração.
+    O scroll_into_view + click(force=True) estava causando cliques em coordenadas erradas que acertavam o menu.
+    """
     try:
         want_label = "eletronico" if want_virtual else "fisico"
-        # 1) Por label
+        # 1) Por label - USAR JAVASCRIPT DIRETO (sem scroll_into_view nem click de coordenada)
         try:
             label_text = "Eletrônico" if want_virtual else "Físico"
-            lab = page.locator(f"label:has-text('{label_text}')").first
-            if await lab.count():
-                await _scroll_into_view(lab)
-                try:
-                    await lab.click(force=True)
-                except Exception:
-                    pass
-                changed = await page.evaluate(
+            log(f"[TIPO_PROCESSO] Selecionando '{label_text}' via JavaScript (evitando clique de coordenada)...")
+            # NÃO usar scroll_into_view nem click() - ir direto pelo JS para evitar errar o menu
+            changed = await page.evaluate(
                     """(labelTextNorm)=>{
                     const norm=(s)=> (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
                     const labs=[...document.querySelectorAll('label')];
