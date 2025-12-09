@@ -47,7 +47,7 @@ localPort = 37081
 externalPort = 3001
 
 [[ports]]
-localPort = 44997
+localPort = 42221
 externalPort = 4200
 
 [[ports]]
@@ -55,7 +55,7 @@ localPort = 46681
 externalPort = 3000
 
 [agent]
-integrations = ["styling_replit==1.0.0", "python_database==1.0.0", "python_openai==1.0.0"]
+integrations = ["styling_replit:1.0.0", "python_database:1.0.0", "python_openai:1.0.0"]
 expertMode = true
 
 [userenv]

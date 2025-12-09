@@ -1808,19 +1808,27 @@ def batch_rerpa(id):
                                 batch_item.status = 'running'
                                 db.session.commit()
                             
-                            success = rpa.fill_elaw_from_process(process_id)
+                            # Limpar sessão antes de chamar RPA
+                            db.session.remove()
                             
-                            if success:
+                            # Executar RPA paralelo
+                            rpa_result = rpa.execute_rpa_parallel(process_id, worker_id=0)
+                            
+                            # Recarregar batch_item após RPA
+                            batch_item = BatchItem.query.filter_by(process_id=process_id).first()
+                            
+                            if rpa_result.get('status') == 'success':
                                 success_count += 1
                                 if batch_item:
                                     batch_item.status = 'success'
+                                    batch_item.last_error = None
                                 logger.info(f"[RERPA] ✅ Processo #{process_id} preenchido com sucesso")
                             else:
                                 error_count += 1
                                 if batch_item:
                                     batch_item.status = 'error'
-                                    batch_item.last_error = 'Falha no RPA'
-                                logger.warning(f"[RERPA] ❌ Processo #{process_id} falhou")
+                                    batch_item.last_error = rpa_result.get('error', rpa_result.get('message', 'Falha no RPA'))[:500]
+                                logger.warning(f"[RERPA] ❌ Processo #{process_id} falhou: {rpa_result.get('error', 'desconhecido')}")
                             
                             db.session.commit()
                             
