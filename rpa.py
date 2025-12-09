@@ -7032,7 +7032,7 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
                                     # Salvar apenas o nome do arquivo (não o caminho completo)
                                     screenshot_filename = os.path.basename(screenshot_path)
                                     proc.elaw_screenshot_reclamadas_path = screenshot_filename
-                                    proc.elaw_status = "Encerrado"
+                                    proc.elaw_status = "success"  # Status de sucesso para sync com batch
                                     db.session.commit()
                                     log(f"[FALLBACK_URL][ENCERRADO] ✅ Screenshot salva no banco: {screenshot_filename}")
                         
@@ -7342,7 +7342,7 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
                                 # Salvar apenas o nome do arquivo (não o caminho completo)
                                 screenshot_filename = os.path.basename(screenshot_path)
                                 proc.elaw_screenshot_reclamadas_path = screenshot_filename
-                                proc.elaw_status = "Encerrado"
+                                proc.elaw_status = "success"  # Status de sucesso para sync com batch
                                 db.session.commit()
                                 log(f"[FALLBACK_LIST][ENCERRADO] ✅ Screenshot salva no banco: {screenshot_filename}")
                     
