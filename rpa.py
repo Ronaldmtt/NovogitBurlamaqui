@@ -1369,11 +1369,25 @@ async def _scroll_into_view(locator):
         pass
 
 async def robust_click(desc: str, locator, timeout_ms: int = 1800) -> bool:
+    """
+    🔧 FIX 2025-12-09: Prioriza clique via JavaScript para evitar problemas de coordenadas.
+    O scroll_into_view + click() pode errar e clicar no menu Configuração.
+    """
     try:
         await locator.wait_for(state="attached", timeout=timeout_ms)
     except Exception as e:
         log(f"{desc}: não anexado ({e})")
         return False
+    
+    # 🔧 FIX: Tentar clique via JavaScript PRIMEIRO para evitar problemas de coordenadas
+    try:
+        await locator.evaluate("el => { el.click(); el.dispatchEvent(new Event('click', {bubbles: true})); }")
+        log(f"{desc}: OK (via JS)")
+        return True
+    except Exception:
+        pass
+    
+    # Fallback: scroll + click tradicional (só se JS falhar)
     await _scroll_into_view(locator)
     for kw in ({"force": False}, {"force": True}):
         try:
@@ -1382,13 +1396,9 @@ async def robust_click(desc: str, locator, timeout_ms: int = 1800) -> bool:
             return True
         except Exception:
             continue
-    try:
-        await locator.evaluate("el=>el.click()")
-        log(f"{desc}: evaluate OK")
-        return True
-    except Exception as e:
-        log(f"{desc}: falhou ({e})")
-        return False
+    
+    log(f"{desc}: falhou em todos os métodos")
+    return False
 
 async def _open_bs_and_get_container(page, select_id: str):
     btn = page.locator(f"button.btn.dropdown-toggle[data-id='{select_id}']").first
@@ -1449,11 +1459,19 @@ async def _open_bs_and_get_container(page, select_id: str):
         log(f"[BS_DROPDOWN] Timeout aguardando #{select_id} visível: {e}")
         return btn, None
     
-    for _ in range(2):
+    for attempt in range(2):
         caret = btn.locator(".bs-caret, .filter-option").first
         target = caret if (await caret.count()) > 0 else btn
-        await _scroll_into_view(target)
-        await target.click()
+        
+        # 🔧 FIX 2025-12-09: Usar clique via JavaScript primeiro para evitar problemas de coordenadas
+        try:
+            await target.evaluate("el => { el.click(); el.dispatchEvent(new Event('click', {bubbles: true})); }")
+            log(f"[BS_DROPDOWN] Clique no dropdown #{select_id} via JS (tentativa {attempt+1})")
+        except Exception:
+            # Fallback para clique tradicional
+            await _scroll_into_view(target)
+            await target.click()
+        
         await short_sleep_ms(max(CLICK_AFTER_OPEN_MS, 60))
         container = btn.locator("xpath=ancestor::*[contains(@class,'bootstrap-select')][1]")
         if await container.count() > 0:
@@ -2073,36 +2091,37 @@ async def set_select_by_label_contains(
     return await set_select_fuzzy_any(page, sid, wanted, fallbacks=fallbacks, prefer_words=prefer_words)
 
 async def set_radio_by_name(page, name: str, target_value: str, human_label: str = "") -> bool:
+    """
+    🔧 FIX 2025-12-09: Usa JavaScript direto para evitar cliques em coordenadas erradas.
+    """
     try:
         await page.wait_for_selector(f"input[type='radio'][name='{name}']", timeout=5000)
     except Exception:
         return False
-    radios = page.locator(f"input[type='radio'][name='{name}']")
-    count = await radios.count()
-    for i in range(count):
-        r = radios.nth(i)
-        v = (await r.get_attribute("value")) or ""
-        if str(v).strip() != str(target_value).strip():
-            continue
-        await _scroll_into_view(r)
-        try:
-            await r.click(force=True)
-        except Exception:
-            try:
-                parent = r.locator("xpath=ancestor::*[contains(@class,'iradio_')][1]").first
-                helper = parent.locator("ins.iCheck-helper").first
-                if await helper.count() > 0:
-                    await helper.click()
-            except Exception:
-                pass
+    
+    # Usar JavaScript direto para marcar o rádio - EVITA problemas de coordenadas
+    log(f"[RADIO] Marcando rádio '{name}' = '{target_value}' via JavaScript...")
+    ok = await page.evaluate(
+        """(name, targetValue) => {
+            const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+            for (const r of radios) {
+                if (String(r.value).trim() === String(targetValue).trim()) {
+                    r.checked = true;
+                    r.click();
+                    r.dispatchEvent(new Event('change', {bubbles: true}));
+                    r.dispatchEvent(new Event('input', {bubbles: true}));
+                    return true;
+                }
+            }
+            return false;
+        }""",
+        name,
+        target_value
+    )
+    if ok:
         await short_sleep_ms(60)
-        cur = await page.evaluate(
-            """(nm)=>{ const el=document.querySelector("input[type='radio'][name='"+nm+"']:checked"); return el ? String(el.value||'') : ''; }""",
-            name,
-        )
-        if str(cur) == str(target_value):
-            log(f"[RADIO] {human_label or name}: '{target_value}' marcado")
-            return True
+        log(f"[RADIO] ✅ {human_label or name}: '{target_value}' marcado via JS")
+        return True
     return False
 
 YES_VALUES = {"1", "true", "True", "on", "yes", "sim", "Sim", "S", "s"}
@@ -2902,63 +2921,60 @@ async def set_tipo_processo_virtual(page, want_virtual: bool = True) -> bool:
                             chosen = r
                             break
                 if chosen:
-                    await _scroll_into_view(chosen)
+                    # 🔧 FIX 2025-12-09: Usar SOMENTE JavaScript para evitar cliques em coordenadas erradas
+                    # O scroll_into_view + click(force=True) estava causando cliques no menu Configuração
+                    chosen_value = await chosen.get_attribute("value") or ""
                     
-                    # 🔧 BATCH FIX: Se já estiver marcado, forçar toggle via CLICK para disparar AJAX do CNJ
+                    # 🔧 BATCH FIX: Se já estiver marcado, forçar toggle via JS para disparar AJAX do CNJ
                     is_checked = await chosen.is_checked()
                     if is_checked and want_virtual:
-                        # Se queremos Eletrônico e JÁ ESTÁ Eletrônico, o AJAX pode não ter rodado se a página foi cacheada.
-                        # Tática: Clicar em Físico via DOM interaction e voltar para Eletrônico para forçar eventos change/input
-                        log("[RADIO] Já está Eletrônico - Forçando toggle via CLICK para disparar AJAX do CNJ...")
+                        log("[RADIO] Já está Eletrônico - Forçando toggle via JS para disparar AJAX do CNJ...")
                         try:
-                            # Buscar qualquer outro rádio do grupo (não-checked) e clicar
-                            other_radio = await page.evaluate(
+                            # Buscar qualquer outro rádio do grupo (não-checked) e clicar via JS
+                            await page.evaluate(
                                 """(name, currentValue) => {
                                     const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
                                     for (const r of radios) {
                                         if (r.value !== currentValue && !r.checked) {
-                                            r.click();  // Dispara evento change no rádio perdedor
+                                            r.checked = true;
+                                            r.click();
+                                            r.dispatchEvent(new Event('change', {bubbles: true}));
                                             return true;
                                         }
                                     }
                                     return false;
                                 }""",
                                 nm,
-                                await chosen.get_attribute("value") or ""
+                                chosen_value
                             )
-                            if other_radio:
-                                log("[RADIO] Clicou em outro rádio para desmarcar Eletrônico")
-                                # Aguardar AJAX do Físico completar antes de voltar ao Eletrônico
-                                await wait_network_quiet(page, timeout_ms=800)
-                                await short_sleep_ms(150)
+                            log("[RADIO] Toggle via JS para desmarcar Eletrônico")
+                            await wait_network_quiet(page, timeout_ms=800)
+                            await short_sleep_ms(150)
                         except Exception as e:
-                            log(f"[RADIO][WARN] Erro ao clicar em outro rádio: {e}")
+                            log(f"[RADIO][WARN] Erro ao fazer toggle: {e}")
                     
-                    # Clicar no rádio desejado (Eletrônico) - sempre dispara eventos
-                    try:
-                        await chosen.click(force=True)
-                    except Exception:
-                        try:
-                            parent = chosen.locator("xpath=ancestor::*[contains(@class,'iradio_')][1]").first
-                            helper = parent.locator("ins.iCheck-helper").first
-                            if await helper.count() > 0:
-                                await helper.click()
-                        except Exception:
-                            pass
+                    # Clicar no rádio desejado via JavaScript - EVITA problemas de coordenadas
+                    log(f"[RADIO] Clicando no rádio '{nm}' = '{chosen_value}' via JavaScript...")
                     try:
                         await page.evaluate(
-                            """(nm)=>{
-                            const el=document.querySelector(`input[type='radio'][name='${nm}']:checked`);
-                            if(el){
-                                for(const ev of ['click','input','change']){
-                                    try{ el.dispatchEvent(new Event(ev,{bubbles:true})) }catch(e){}
+                            """(nm, targetValue) => {
+                                const radio = document.querySelector(`input[type='radio'][name='${nm}'][value='${targetValue}']`);
+                                if (radio) {
+                                    radio.checked = true;
+                                    radio.click();
+                                    radio.dispatchEvent(new Event('change', {bubbles: true}));
+                                    radio.dispatchEvent(new Event('input', {bubbles: true}));
+                                    return true;
                                 }
-                            }
-                        }""",
+                                return false;
+                            }""",
                             nm,
+                            chosen_value
                         )
-                    except Exception:
-                        pass
+                        log(f"[RADIO] ✅ Rádio '{nm}' marcado via JS")
+                    except Exception as e:
+                        log(f"[RADIO][WARN] Erro ao clicar via JS: {e}")
+                    
                     await wait_network_quiet(page, timeout_ms=700)
                     return True
             except Exception:
