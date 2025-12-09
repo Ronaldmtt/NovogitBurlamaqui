@@ -2138,11 +2138,11 @@ async def set_yes_radio_guess(page, name: str) -> bool:
     # Usar JavaScript direto para marcar o rádio - EVITA problemas de coordenadas
     log(f"[RADIO] Marcando rádio '{name}' = Sim via JavaScript (evitando clique de coordenada)...")
     ok = await page.evaluate(
-        """(name, yesValues) => {
-            const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+        """(args) => {
+            const radios = document.querySelectorAll(`input[type='radio'][name='${args.name}']`);
             for (const r of radios) {
                 const val = (r.value || '').toLowerCase();
-                if (yesValues.includes(val) || yesValues.includes(r.value)) {
+                if (args.yesValues.includes(val) || args.yesValues.includes(r.value)) {
                     r.checked = true;
                     r.click();
                     r.dispatchEvent(new Event('change', {bubbles: true}));
@@ -2164,8 +2164,7 @@ async def set_yes_radio_guess(page, name: str) -> bool:
             }
             return false;
         }""",
-        name,
-        list(YES_VALUES)
+        {"name": name, "yesValues": list(YES_VALUES)}
     )
     if ok:
         await short_sleep_ms(50)
