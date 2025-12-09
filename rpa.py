@@ -318,6 +318,7 @@ _monitor_initialized = False
 
 # --- LOG ---
 LOG = logging.getLogger("rpa")
+LOG.propagate = False  # 🔧 FIX: Evitar duplicação de log para logger raiz
 if not LOG.handlers:
     LOG.setLevel(logging.INFO)
     fmt = logging.Formatter("[rpa] %(asctime)s %(message)s", "%Y-%m-%dT%H:%M:%S")
