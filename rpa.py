@@ -6899,12 +6899,12 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
         # 🔧 FIX 2025-12-09 v2: Usar set_select_fuzzy_any para Bootstrap Select
         log(f"[FALLBACK_URL][STATUS] Selecionando 'Todos' no filtro de status...")
         status_selected = False
-        status_select_ids = ['Filters_Status', 'Filters_Situacao']
+        status_select_ids = ['Filters_StatusId', 'Filters_Status', 'Filters_Situacao']
         for select_id in status_select_ids:
             try:
                 ok = await set_select_fuzzy_any(
                     page, select_id, "Todos",
-                    fallbacks=["TODOS", "Todas", "All", ""],
+                    fallbacks=["TODOS", "Todas", "All", "-1"],
                     prefer_words=["todos", "todas"]
                 )
                 if ok:
@@ -7241,12 +7241,12 @@ async def ensure_elaw_detail_url_via_list(page, process_id: int, data: dict) -> 
         # 🔧 FIX 2025-12-09 v2: Usar set_select_fuzzy_any para Bootstrap Select
         log(f"[FALLBACK_LIST][STATUS] Selecionando 'Todos' no filtro de status...")
         status_selected = False
-        status_select_ids = ['Filters_Status', 'Filters_Situacao']
+        status_select_ids = ['Filters_StatusId', 'Filters_Status', 'Filters_Situacao']
         for select_id in status_select_ids:
             try:
                 ok = await set_select_fuzzy_any(
                     page, select_id, "Todos",
-                    fallbacks=["TODOS", "Todas", "All", ""],
+                    fallbacks=["TODOS", "Todas", "All", "-1"],
                     prefer_words=["todos", "todas"]
                 )
                 if ok:
