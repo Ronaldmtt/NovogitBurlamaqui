@@ -4828,11 +4828,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         }""")
         if tipo_ok:
             log("[RADIO] ✅ Rádio Eletrônico forçado via JS direto")
-        else:
-            log("[RADIO][WARN] Não conseguiu marcar rádio Eletrônico - continuando...")
     
     await _settle(page, "radio:tipo")
-    update_field_status("tipo_processo", "Tipo do Processo", "Eletrônico" if tipo_ok else "FALHA")
+    
+    # 🔧 FIX 2025-12-09: OBRIGATÓRIO - Sem rádio Eletrônico, dropdown Sistema Eletrônico não aparece
+    _must(tipo_ok, "Rádio Tipo do Processo (Eletrônico) - OBRIGATÓRIO para exibir Sistema Eletrônico")
+    update_field_status("tipo_processo", "Tipo do Processo", "Eletrônico")
     
     # 2) CNJ
     update_status("preenchendo_cnj", f"Preenchendo número do processo (CNJ): {cnj}", process_id=process_id)
