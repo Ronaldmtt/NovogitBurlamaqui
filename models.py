@@ -313,10 +313,16 @@ class Process(db.Model):
 # Utilitário opcional para “seed” do admin no primeiro run
 # ---------------------------------------------------------------------
 def ensure_admin_user():
-    """Cria um admin padrão usando credenciais dos secrets."""
+    """Cria um admin padrão usando credenciais dos secrets (ADMIN_USERNAME e ADMIN_PASSWORD)."""
     import os
-    admin_username = os.environ.get("ADMIN_USERNAME", "admin")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    admin_username = os.environ.get("ADMIN_USERNAME")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    
+    # Só cria admin se as credenciais estiverem configuradas nos secrets
+    if not admin_username or not admin_password:
+        import logging
+        logging.warning("⚠️ ADMIN_USERNAME e/ou ADMIN_PASSWORD não configurados nos secrets. Admin não será criado automaticamente.")
+        return
     
     if not User.query.filter_by(username=admin_username).first():
         u = User(username=admin_username, email=f"{admin_username}@local", is_admin=True)
