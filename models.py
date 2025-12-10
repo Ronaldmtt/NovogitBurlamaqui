@@ -313,10 +313,14 @@ class Process(db.Model):
 # Utilitário opcional para “seed” do admin no primeiro run
 # ---------------------------------------------------------------------
 def ensure_admin_user():
-    """Cria um admin padrão (admin / admin123) caso não exista."""
-    if not User.query.filter_by(username="admin").first():
-        u = User(username="admin", email="admin@local", is_admin=True)
-        u.set_password("admin123")
+    """Cria um admin padrão usando credenciais dos secrets."""
+    import os
+    admin_username = os.environ.get("ADMIN_USERNAME", "admin")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    
+    if not User.query.filter_by(username=admin_username).first():
+        u = User(username=admin_username, email=f"{admin_username}@local", is_admin=True)
+        u.set_password(admin_password)
         db.session.add(u)
         db.session.commit()
 
