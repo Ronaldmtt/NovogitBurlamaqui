@@ -2320,3 +2320,177 @@ def queue_ocr_batch():
     except Exception as e:
         logger.error(f"[OCR-BATCH] Erro: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+
+# =============================================================================
+# FILA GLOBAL DE BATCHES - Rotas para gerenciar fila de múltiplos batches
+# =============================================================================
+
+@batch_bp.route("/queue")
+@login_required
+def queue_list():
+    """Página da fila global de batches."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    batches = BatchUpload.query.filter_by(owner_id=current_user.id).order_by(
+        BatchUpload.queue_position.asc().nullslast(),
+        BatchUpload.created_at.desc()
+    ).all()
+    
+    queued_batches = [b for b in batches if b.queue_position is not None]
+    available_batches = [b for b in batches if b.queue_position is None and b.status in ('ready', 'partial_completed', 'error')]
+    
+    queue_status = global_queue_runner.get_status()
+    
+    return render_template(
+        "processes/batch_queue.html",
+        queued_batches=queued_batches,
+        available_batches=available_batches,
+        queue_status=queue_status
+    )
+
+
+@batch_bp.route("/queue/add/<int:batch_id>", methods=["POST"])
+@login_required
+def queue_add(batch_id):
+    """Adiciona um batch à fila global."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    batch = BatchUpload.query.get(batch_id)
+    if not batch:
+        return jsonify({'success': False, 'error': 'Batch não encontrado'}), 404
+    
+    if batch.owner_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Permissão negada'}), 403
+    
+    result = global_queue_runner.add_to_queue(batch_id, current_user.id)
+    
+    if result['success']:
+        log_event("QUEUE_ADD", f"Batch adicionado à fila", 
+                 batch_id=batch_id, user_id=current_user.id)
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@batch_bp.route("/queue/remove/<int:batch_id>", methods=["POST"])
+@login_required
+def queue_remove(batch_id):
+    """Remove um batch da fila global."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    batch = BatchUpload.query.get(batch_id)
+    if not batch:
+        return jsonify({'success': False, 'error': 'Batch não encontrado'}), 404
+    
+    if batch.owner_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Permissão negada'}), 403
+    
+    result = global_queue_runner.remove_from_queue(batch_id)
+    
+    if result['success']:
+        log_event("QUEUE_REMOVE", f"Batch removido da fila", 
+                 batch_id=batch_id, user_id=current_user.id)
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@batch_bp.route("/queue/start", methods=["POST"])
+@login_required
+def queue_start():
+    """Inicia o processamento da fila global."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    log_start("QUEUE_START", f"Iniciando fila global", user_id=current_user.id)
+    
+    result = global_queue_runner.start_queue_processing(current_user.id)
+    
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@batch_bp.route("/queue/stop", methods=["POST"])
+@login_required
+def queue_stop():
+    """Para o processamento da fila global."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    log_event("QUEUE_STOP", f"Parando fila global", user_id=current_user.id)
+    
+    result = global_queue_runner.stop_queue_processing()
+    
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
+
+
+@batch_bp.route("/queue/status")
+@login_required
+def queue_status():
+    """Retorna status atual da fila global (JSON para polling)."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    status = global_queue_runner.get_status()
+    
+    return jsonify(status)
+
+
+@batch_bp.route("/queue/add-all", methods=["POST"])
+@login_required
+def queue_add_all():
+    """Adiciona todos os batches prontos à fila global."""
+    from batch_queue_runner import global_queue_runner
+    from main import app
+    
+    global_queue_runner.set_flask_app(app)
+    
+    available_batches = BatchUpload.query.filter(
+        BatchUpload.owner_id == current_user.id,
+        BatchUpload.queue_position.is_(None),
+        BatchUpload.status.in_(['ready', 'partial_completed'])
+    ).all()
+    
+    added = 0
+    errors = []
+    
+    for batch in available_batches:
+        ready_items = BatchItem.query.filter_by(batch_id=batch.id, status='ready').count()
+        if ready_items > 0:
+            result = global_queue_runner.add_to_queue(batch.id, current_user.id)
+            if result['success']:
+                added += 1
+            else:
+                errors.append(f"Batch {batch.id}: {result.get('error')}")
+    
+    if added > 0:
+        log_event("QUEUE_ADD_ALL", f"Múltiplos batches adicionados à fila", 
+                 count=added, user_id=current_user.id)
+    
+    return jsonify({
+        'success': True,
+        'message': f'{added} batches adicionados à fila',
+        'added': added,
+        'errors': errors
+    })

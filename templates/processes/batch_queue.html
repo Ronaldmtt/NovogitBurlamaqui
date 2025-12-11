@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Fila Global de RPA - Sistema Jurídico{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-lg">
+            <div class="card-header bg-gradient text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-list-ol me-2"></i>
+                    Fila Global de RPA
+                </h4>
+                <div>
+                    <a href="{{ url_for('batch.batch_list') }}" class="btn btn-light btn-sm me-2">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="queueStatusContainer" class="alert alert-info mb-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <i class="fas fa-info-circle me-2"></i>
+                            <span id="queueStatusText">Carregando status...</span>
+                        </div>
+                        <div id="queueControls">
+                            <button id="startQueueBtn" class="btn btn-success btn-sm me-2" onclick="startQueue()" disabled>
+                                <i class="fas fa-play me-1"></i>Iniciar Fila
+                            </button>
+                            <button id="stopQueueBtn" class="btn btn-warning btn-sm" onclick="stopQueue()" style="display: none;">
+                                <i class="fas fa-stop me-1"></i>Parar Fila
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h2 id="totalQueued" class="mb-0">0</h2>
+                                <small>Batches na Fila</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h2 id="totalPending" class="mb-0">0</h2>
+                                <small>Processos Pendentes</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h2 id="completedCount" class="mb-0">0</h2>
+                                <small>Processos Concluídos</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body text-center">
+                                <h2 id="errorCount" class="mb-0">0</h2>
+                                <small>Erros</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-7">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-list-ol me-2"></i>Batches na Fila</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="queuedBatchesList">
+                                    {% if queued_batches %}
+                                        <div class="list-group">
+                                            {% for batch in queued_batches %}
+                                            <div class="list-group-item d-flex justify-content-between align-items-center batch-queue-item" data-batch-id="{{ batch.id }}">
+                                                <div>
+                                                    <span class="badge bg-secondary me-2">#{{ batch.queue_position }}</span>
+                                                    <strong>Batch #{{ batch.id }}</strong>
+                                                    <span class="text-muted ms-2">({{ batch.total_count }} processos)</span>
+                                                    {% if batch.status == 'running' %}
+                                                        <span class="badge bg-primary ms-2"><i class="fas fa-spinner fa-spin"></i> Em execução</span>
+                                                    {% elif batch.status == 'queued' %}
+                                                        <span class="badge bg-info ms-2">Aguardando</span>
+                                                    {% endif %}
+                                                </div>
+                                                <button class="btn btn-outline-danger btn-sm" onclick="removeFromQueue({{ batch.id }})" 
+                                                        {% if batch.status == 'running' %}disabled{% endif %}>
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center text-muted py-4" id="emptyQueueMsg">
+                                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                                            <p>Nenhum batch na fila</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-folder-open me-2"></i>Batches Disponíveis</h5>
+                                <button class="btn btn-primary btn-sm" onclick="addAllToQueue()" id="addAllBtn">
+                                    <i class="fas fa-plus-circle me-1"></i>Adicionar Todos
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="availableBatchesList">
+                                    {% if available_batches %}
+                                        <div class="list-group">
+                                            {% for batch in available_batches %}
+                                            <div class="list-group-item d-flex justify-content-between align-items-center available-batch-item" data-batch-id="{{ batch.id }}">
+                                                <div>
+                                                    <strong>Batch #{{ batch.id }}</strong>
+                                                    <span class="text-muted ms-2">({{ batch.total_count }} processos)</span>
+                                                    {% if batch.status == 'ready' %}
+                                                        <span class="badge bg-success ms-2">Pronto</span>
+                                                    {% elif batch.status == 'partial_completed' %}
+                                                        <span class="badge bg-warning ms-2">Parcial</span>
+                                                    {% elif batch.status == 'error' %}
+                                                        <span class="badge bg-danger ms-2">Erro</span>
+                                                    {% endif %}
+                                                </div>
+                                                <button class="btn btn-outline-primary btn-sm" onclick="addToQueue({{ batch.id }})">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center text-muted py-4">
+                                            <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                            <p>Todos os batches estão na fila ou já foram processados</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4" id="currentBatchProgress" style="display: none;">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-cog fa-spin me-2"></i>Batch Atual em Execução</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Batch <strong id="currentBatchId">#?</strong></span>
+                            <span id="currentBatchPercent">0%</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div id="currentBatchProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="mt-2 text-muted">
+                            <small><i class="fas fa-check text-success me-1"></i>Concluídos: <span id="batchCompleted">0</span></small>
+                            <small class="ms-3"><i class="fas fa-times text-danger me-1"></i>Erros: <span id="batchErrors">0</span></small>
+                            <small class="ms-3"><i class="fas fa-clock text-info me-1"></i>Pendentes: <span id="batchPending">0</span></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let pollInterval = null;
+let isRunning = false;
+
+function updateQueueStatus() {
+    fetch('{{ url_for("batch.queue_status") }}')
+        .then(response => response.json())
+        .then(data => {
+            isRunning = data.running;
+            
+            document.getElementById('totalQueued').textContent = data.total_queued || 0;
+            document.getElementById('totalPending').textContent = data.total_pending_items || 0;
+            document.getElementById('completedCount').textContent = data.stats?.processes_completed || 0;
+            document.getElementById('errorCount').textContent = data.stats?.processes_failed || 0;
+            
+            const statusContainer = document.getElementById('queueStatusContainer');
+            const statusText = document.getElementById('queueStatusText');
+            const startBtn = document.getElementById('startQueueBtn');
+            const stopBtn = document.getElementById('stopQueueBtn');
+            
+            if (data.running) {
+                statusContainer.className = 'alert alert-success mb-4';
+                if (data.stop_requested) {
+                    statusText.innerHTML = '<i class="fas fa-hourglass-half me-2"></i>Parando após o batch atual...';
+                } else {
+                    statusText.innerHTML = '<i class="fas fa-cog fa-spin me-2"></i>Fila em execução - processando batches automaticamente';
+                }
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                stopBtn.disabled = data.stop_requested;
+            } else {
+                statusContainer.className = 'alert alert-info mb-4';
+                if (data.total_queued > 0) {
+                    statusText.innerHTML = '<i class="fas fa-pause-circle me-2"></i>Fila pausada - ' + data.total_queued + ' batches aguardando';
+                    startBtn.disabled = false;
+                } else {
+                    statusText.innerHTML = '<i class="fas fa-info-circle me-2"></i>Adicione batches à fila para iniciar o processamento';
+                    startBtn.disabled = true;
+                }
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+            }
+            
+            const progressCard = document.getElementById('currentBatchProgress');
+            if (data.running && data.current_batch_id) {
+                progressCard.style.display = 'block';
+                document.getElementById('currentBatchId').textContent = '#' + data.current_batch_id;
+                
+                const currentBatch = data.queued_batches?.find(b => b.id === data.current_batch_id);
+                if (currentBatch) {
+                    const total = currentBatch.total;
+                    const completed = currentBatch.completed;
+                    const errors = currentBatch.error;
+                    const pending = currentBatch.ready + currentBatch.running;
+                    const percent = total > 0 ? Math.round((completed + errors) / total * 100) : 0;
+                    
+                    document.getElementById('currentBatchPercent').textContent = percent + '%';
+                    document.getElementById('currentBatchProgressBar').style.width = percent + '%';
+                    document.getElementById('batchCompleted').textContent = completed;
+                    document.getElementById('batchErrors').textContent = errors;
+                    document.getElementById('batchPending').textContent = pending;
+                }
+            } else {
+                progressCard.style.display = 'none';
+            }
+        })
+        .catch(err => console.error('Erro ao atualizar status:', err));
+}
+
+function startQueue() {
+    fetch('{{ url_for("batch.queue_start") }}', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Fila iniciada! ' + data.message, 'success');
+                updateQueueStatus();
+            } else {
+                showToast('Erro: ' + data.error, 'danger');
+            }
+        });
+}
+
+function stopQueue() {
+    fetch('{{ url_for("batch.queue_stop") }}', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'warning');
+                updateQueueStatus();
+            } else {
+                showToast('Erro: ' + data.error, 'danger');
+            }
+        });
+}
+
+function addToQueue(batchId) {
+    fetch('{{ url_for("batch.queue_add", batch_id=0) }}'.replace('0', batchId), { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                location.reload();
+            } else {
+                showToast('Erro: ' + data.error, 'danger');
+            }
+        });
+}
+
+function removeFromQueue(batchId) {
+    fetch('{{ url_for("batch.queue_remove", batch_id=0) }}'.replace('0', batchId), { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                location.reload();
+            } else {
+                showToast('Erro: ' + data.error, 'danger');
+            }
+        });
+}
+
+function addAllToQueue() {
+    fetch('{{ url_for("batch.queue_add_all") }}', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                location.reload();
+            } else {
+                showToast('Erro: ' + (data.error || 'Erro desconhecido'), 'danger');
+            }
+        });
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-' + type + ' alert-dismissible fade show position-fixed';
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    toast.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateQueueStatus();
+    pollInterval = setInterval(updateQueueStatus, 3000);
+});
+</script>
+{% endblock %}

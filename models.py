@@ -399,7 +399,7 @@ class BatchUpload(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     
-    # Status: pending, extracting, ready, running, completed, partial_completed, error
+    # Status: pending, extracting, ready, running, completed, partial_completed, error, queued
     status = db.Column(db.String(20), nullable=False, default="pending", index=True)
     
     # Contadores
@@ -408,6 +408,12 @@ class BatchUpload(db.Model):
     
     # Lock para processamento (task ID do Celery)
     lock_owner = db.Column(db.String(100), nullable=True)
+    lock_time = db.Column(db.DateTime, nullable=True)
+    
+    # ✅ FILA GLOBAL DE BATCHES - Campos para ordenar execução de múltiplos batches
+    queue_position = db.Column(db.Integer, nullable=True, index=True)  # Posição na fila (1, 2, 3...)
+    queued_at = db.Column(db.DateTime, nullable=True)                   # Quando foi enfileirado
+    queued_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Quem enfileirou
     
     # Timestamps
     created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
@@ -416,6 +422,7 @@ class BatchUpload(db.Model):
     
     # Relacionamentos
     owner = db.relationship("User", foreign_keys=[owner_id])
+    queued_by_user = db.relationship("User", foreign_keys=[queued_by])
     items = db.relationship("BatchItem", back_populates="batch", cascade="all, delete-orphan", lazy="dynamic")
     
     def __repr__(self) -> str:
