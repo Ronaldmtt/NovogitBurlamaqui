@@ -82,7 +82,7 @@
                                         <div class="list-group">
                                             {% for batch in queued_batches %}
                                             <div class="list-group-item d-flex justify-content-between align-items-center batch-queue-item p-0" data-batch-id="{{ batch.id }}">
-                                                <a href="{{ url_for('batch.batch_detail', batch_id=batch.id) }}" class="list-group-item-action d-flex align-items-center flex-grow-1 p-3 text-decoration-none">
+                                                <a href="{{ url_for('batch.batch_detail', id=batch.id) }}" class="list-group-item-action d-flex align-items-center flex-grow-1 p-3 text-decoration-none">
                                                     <span class="badge bg-secondary me-2">#{{ batch.queue_position }}</span>
                                                     <strong class="text-dark">Batch #{{ batch.id }}</strong>
                                                     <span class="text-muted ms-2">({{ batch.total_count }} processos)</span>
@@ -124,7 +124,7 @@
                                         <div class="list-group">
                                             {% for batch in available_batches %}
                                             <div class="list-group-item d-flex justify-content-between align-items-center available-batch-item p-0" data-batch-id="{{ batch.id }}">
-                                                <a href="{{ url_for('batch.batch_detail', batch_id=batch.id) }}" class="list-group-item-action d-flex align-items-center flex-grow-1 p-3 text-decoration-none">
+                                                <a href="{{ url_for('batch.batch_detail', id=batch.id) }}" class="list-group-item-action d-flex align-items-center flex-grow-1 p-3 text-decoration-none">
                                                     <strong class="text-dark">Batch #{{ batch.id }}</strong>
                                                     <span class="text-muted ms-2">({{ batch.total_count }} processos)</span>
                                                     {% if batch.status == 'ready' %}
