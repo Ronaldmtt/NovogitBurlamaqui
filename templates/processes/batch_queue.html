@@ -87,11 +87,7 @@
                                                         <div class="d-flex align-items-center">
                                                             <span class="badge bg-secondary me-2">#{{ batch.queue_position }}</span>
                                                             <strong class="text-dark">Batch #{{ batch.id }}</strong>
-                                                            {% if batch.status == 'running' %}
-                                                                <span class="badge bg-primary ms-2"><i class="fas fa-spinner fa-spin"></i> Em execução</span>
-                                                            {% elif batch.status == 'queued' %}
-                                                                <span class="badge bg-info ms-2">Aguardando</span>
-                                                            {% endif %}
+                                                            <span class="status-badge badge bg-secondary ms-2">Aguardando</span>
                                                         </div>
                                                     </a>
                                                     <button class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation(); removeFromQueue({{ batch.id }})" 
@@ -248,16 +244,20 @@ function updateQueueStatus() {
                     const total = batch.total || 0;
                     const completed = batch.completed || 0;
                     const errors = batch.error || 0;
+                    const running = batch.running || 0;
                     const percent = total > 0 ? Math.round((completed + errors) / total * 100) : 0;
                     
                     const progressBar = document.querySelector('.batch-progress-' + batch.id);
                     const statsEl = document.querySelector('.batch-stats-' + batch.id);
                     const errorsEl = document.querySelector('.batch-errors-' + batch.id);
+                    const batchItem = document.querySelector('.batch-queue-item[data-batch-id="' + batch.id + '"]');
                     
                     if (progressBar) {
                         progressBar.style.width = percent + '%';
                         if (errors > 0) {
                             progressBar.className = 'progress-bar bg-warning batch-progress-' + batch.id;
+                        } else if (running > 0 || percent > 0) {
+                            progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-primary batch-progress-' + batch.id;
                         } else {
                             progressBar.className = 'progress-bar bg-success batch-progress-' + batch.id;
                         }
@@ -265,8 +265,42 @@ function updateQueueStatus() {
                     if (statsEl) {
                         statsEl.textContent = completed + '/' + total + ' concluídos';
                     }
-                    if (errorsEl && errors > 0) {
-                        errorsEl.innerHTML = '<span class="text-danger">' + errors + ' erro(s)</span>';
+                    if (errorsEl) {
+                        if (errors > 0) {
+                            errorsEl.innerHTML = '<span class="text-danger">' + errors + ' erro(s)</span>';
+                        } else {
+                            errorsEl.innerHTML = '';
+                        }
+                    }
+                    
+                    // Atualizar badge de status do batch
+                    if (batchItem) {
+                        const badgeContainer = batchItem.querySelector('.d-flex.align-items-center');
+                        if (badgeContainer) {
+                            let statusBadge = badgeContainer.querySelector('.status-badge');
+                            if (!statusBadge) {
+                                statusBadge = document.createElement('span');
+                                statusBadge.className = 'status-badge badge ms-2';
+                                badgeContainer.appendChild(statusBadge);
+                            }
+                            
+                            if (batch.is_current && running > 0) {
+                                statusBadge.className = 'status-badge badge bg-primary ms-2';
+                                statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando';
+                            } else if (batch.is_current) {
+                                statusBadge.className = 'status-badge badge bg-success ms-2';
+                                statusBadge.innerHTML = '<i class="fas fa-play me-1"></i>Em execução';
+                            } else if (percent === 100) {
+                                statusBadge.className = 'status-badge badge bg-success ms-2';
+                                statusBadge.innerHTML = '<i class="fas fa-check me-1"></i>Concluído';
+                            } else if (percent > 0) {
+                                statusBadge.className = 'status-badge badge bg-info ms-2';
+                                statusBadge.innerHTML = percent + '% concluído';
+                            } else {
+                                statusBadge.className = 'status-badge badge bg-secondary ms-2';
+                                statusBadge.textContent = 'Aguardando';
+                            }
+                        }
                     }
                 });
             }

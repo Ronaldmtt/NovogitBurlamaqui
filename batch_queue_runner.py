@@ -174,14 +174,14 @@ class GlobalBatchQueueRunner:
                             status='running'
                         ).count()
                         
-                        completed_items = BatchItem.query.filter_by(
-                            batch_id=batch.id, 
-                            status='completed'
+                        completed_items = BatchItem.query.filter(
+                            BatchItem.batch_id == batch.id,
+                            BatchItem.status.in_(['completed', 'success'])
                         ).count()
                         
-                        error_items = BatchItem.query.filter_by(
-                            batch_id=batch.id, 
-                            status='error'
+                        error_items = BatchItem.query.filter(
+                            BatchItem.batch_id == batch.id,
+                            BatchItem.status.in_(['error', 'failed'])
                         ).count()
                         
                         batches_info.append({
