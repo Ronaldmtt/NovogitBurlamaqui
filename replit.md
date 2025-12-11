@@ -25,6 +25,7 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     *   **Intelligent Multiple Defendant Handling:** Detects registered clients among extra defendants for correct selection in eLaw.
     *   **Data Isolation Fix:** Corrected "data bleeding" during parallel RPA execution using contextvars.
     *   **Production Optimizations:** Fixed parallel worker counts, increased timeouts, and added browser launch retries for stability.
+    *   **Global Batch Queue System (NEW):** Sequential batch processing queue that allows multiple batches to be queued and processed automatically one after another. Uses PostgreSQL advisory locks to ensure only one runner executes across all Gunicorn workers. Features: batch queue management (add/remove/reorder), automatic transition to next batch upon completion, real-time progress tracking via polling, 5 parallel workers per batch, start/stop controls. Accessible via `/processos/batch/queue` route.
 *   **Intelligent Request Prioritization System:** Uses 5 priority categories (P5-P1) to ensure essential severance payments (notice, vacation, FGTS, 13th salary) are inserted first, followed by basic wages, additional, indemnification, and accessory claims. Configurable limit of 30 requests with detailed omission logging.
 *   **Parallel PDF Extraction:** Processes multiple PDFs concurrently using a ThreadPoolExecutor, ensuring isolated database sessions and robust error handling.
     *   **Size-based Ordering:** Smaller PDFs are processed first in batch extractions for faster visual progress.
