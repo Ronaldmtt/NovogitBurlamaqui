@@ -281,8 +281,14 @@ def serve_rpa_screenshot(filename):
             as_attachment=False
         )
     
-    # Arquivo não encontrado em nenhum diretório
-    abort(404)
+    # Arquivo não encontrado - retornar imagem placeholder SVG
+    svg_placeholder = '''<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+      <rect fill="#f8f9fa" width="400" height="300"/>
+      <text x="200" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#6c757d">Screenshot não disponível</text>
+      <text x="200" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#adb5bd">Arquivo foi processado em outro ambiente</text>
+    </svg>'''
+    from flask import Response
+    return Response(svg_placeholder, mimetype='image/svg+xml')
 
 
 @bp.route("/processos/<int:id>/update-field", methods=["POST"])
