@@ -81,18 +81,18 @@
                                     {% if queued_batches %}
                                         <div class="list-group">
                                             {% for batch in queued_batches %}
-                                            <div class="list-group-item d-flex justify-content-between align-items-center batch-queue-item" data-batch-id="{{ batch.id }}">
-                                                <div>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center batch-queue-item p-0" data-batch-id="{{ batch.id }}">
+                                                <a href="{{ url_for('batch.batch_detail', batch_id=batch.id) }}" class="list-group-item-action d-flex align-items-center flex-grow-1 p-3 text-decoration-none">
                                                     <span class="badge bg-secondary me-2">#{{ batch.queue_position }}</span>
-                                                    <strong>Batch #{{ batch.id }}</strong>
+                                                    <strong class="text-dark">Batch #{{ batch.id }}</strong>
                                                     <span class="text-muted ms-2">({{ batch.total_count }} processos)</span>
                                                     {% if batch.status == 'running' %}
                                                         <span class="badge bg-primary ms-2"><i class="fas fa-spinner fa-spin"></i> Em execução</span>
                                                     {% elif batch.status == 'queued' %}
                                                         <span class="badge bg-info ms-2">Aguardando</span>
                                                     {% endif %}
-                                                </div>
-                                                <button class="btn btn-outline-danger btn-sm" onclick="removeFromQueue({{ batch.id }})" 
+                                                </a>
+                                                <button class="btn btn-outline-danger btn-sm me-2" onclick="event.stopPropagation(); removeFromQueue({{ batch.id }})" 
                                                         {% if batch.status == 'running' %}disabled{% endif %}>
                                                     <i class="fas fa-times"></i>
                                                 </button>
@@ -123,9 +123,9 @@
                                     {% if available_batches %}
                                         <div class="list-group">
                                             {% for batch in available_batches %}
-                                            <div class="list-group-item d-flex justify-content-between align-items-center available-batch-item" data-batch-id="{{ batch.id }}">
-                                                <div>
-                                                    <strong>Batch #{{ batch.id }}</strong>
+                                            <div class="list-group-item d-flex justify-content-between align-items-center available-batch-item p-0" data-batch-id="{{ batch.id }}">
+                                                <a href="{{ url_for('batch.batch_detail', batch_id=batch.id) }}" class="list-group-item-action d-flex align-items-center flex-grow-1 p-3 text-decoration-none">
+                                                    <strong class="text-dark">Batch #{{ batch.id }}</strong>
                                                     <span class="text-muted ms-2">({{ batch.total_count }} processos)</span>
                                                     {% if batch.status == 'ready' %}
                                                         <span class="badge bg-success ms-2">Pronto</span>
@@ -134,8 +134,8 @@
                                                     {% elif batch.status == 'error' %}
                                                         <span class="badge bg-danger ms-2">Erro</span>
                                                     {% endif %}
-                                                </div>
-                                                <button class="btn btn-outline-primary btn-sm" onclick="addToQueue({{ batch.id }})">
+                                                </a>
+                                                <button class="btn btn-outline-primary btn-sm me-2" onclick="event.stopPropagation(); addToQueue({{ batch.id }})">
                                                     <i class="fas fa-plus"></i>
                                                 </button>
                                             </div>
