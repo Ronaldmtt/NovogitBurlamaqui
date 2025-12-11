@@ -33,10 +33,10 @@
                     </div>
                     <div class="col-md-4 text-end">
                         <div id="batch-action-buttons">
-                            {% if batch.status in ['ready', 'partial_ready'] %}
+                            {% if batch.status in ['ready', 'partial_ready', 'queued'] %}
                             <button id="btn-start" class="btn btn-success btn-lg" onclick="startBatch()">
                                 <i class="fas fa-play me-2"></i>
-                                Iniciar Processamento RPA
+                                Iniciar RPA (Este Batch)
                             </button>
                             {% elif batch.status == 'running' %}
                             <button id="btn-start" class="btn btn-primary btn-lg" disabled>
