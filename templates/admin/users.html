@@ -1,21 +1,11 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}Gerenciar Usuários - Sistema Jurídico Inteligente{% endblock %}
+{% block title %}Gerenciar UsuÃ¡rios - Sistema de Processos JurÃ­dicos{% endblock %}
 
 {% block extra_styles %}
 <style>
     h2, h3, h4, h5, h6 {
         color: white !important;
-    }
-    .table-actions .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-    .badge-active {
-        background-color: #198754;
-    }
-    .badge-inactive {
-        background-color: #dc3545;
     }
 </style>
 {% endblock %}
@@ -24,9 +14,9 @@
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="fas fa-users-cog me-2"></i>Gerenciar Usuários</h2>
-            <a href="{{ url_for('admin.user_create') }}" class="btn btn-primary">
-                <i class="fas fa-user-plus me-1"></i>Novo Usuário
+            <h2><i class="fas fa-users me-2"></i>Gerenciar UsuÃ¡rios</h2>
+            <a href="{{ url_for('admin_create_user') }}" class="btn btn-primary">
+                <i class="fas fa-user-plus me-1"></i>Novo UsuÃ¡rio
             </a>
         </div>
     </div>
@@ -37,17 +27,15 @@
         <div class="card">
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                    <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Usuário</th>
+                                <th>UsuÃ¡rio</th>
                                 <th>Email</th>
-                                <th class="text-center">Admin?</th>
-                                <th class="text-center">Ativo?</th>
-                                <th class="text-center">Max Workers</th>
+                                <th>Tipo</th>
+                                <th>Processos</th>
                                 <th>Criado em</th>
-                                <th class="text-center">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -58,54 +46,17 @@
                                     <i class="fas fa-user me-2"></i>{{ user.username }}
                                 </td>
                                 <td>{{ user.email }}</td>
-                                <td class="text-center">
+                                <td>
                                     {% if user.is_admin %}
-                                        <span class="badge bg-danger"><i class="fas fa-shield-alt me-1"></i>Admin</span>
+                                        <span class="badge bg-danger">Admin</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">Usuário</span>
+                                        <span class="badge bg-secondary">UsuÃ¡rio</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-center">
-                                    {% if user.is_active %}
-                                        <span class="badge badge-active"><i class="fas fa-check me-1"></i>Ativo</span>
-                                    {% else %}
-                                        <span class="badge badge-inactive"><i class="fas fa-times me-1"></i>Inativo</span>
-                                    {% endif %}
+                                <td>
+                                    <span class="badge bg-info">{{ user.processes|length }}</span>
                                 </td>
-                                <td class="text-center">
-                                    <span class="badge bg-info">{{ user.max_workers }}</span>
-                                </td>
-                                <td>{{ user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else '-' }}</td>
-                                <td class="text-center table-actions">
-                                    <div class="btn-group" role="group">
-                                        <a href="{{ url_for('admin.user_edit', user_id=user.id) }}" 
-                                           class="btn btn-sm btn-outline-primary" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        
-                                        {% if user.id != current_user.id %}
-                                        <form action="{{ url_for('admin.user_toggle', user_id=user.id) }}" 
-                                              method="POST" style="display: inline;">
-                                            <button type="submit" 
-                                                    class="btn btn-sm {{ 'btn-outline-danger' if user.is_active else 'btn-outline-success' }}"
-                                                    title="{{ 'Desativar' if user.is_active else 'Ativar' }}"
-                                                    onclick="return confirm('{{ 'Desativar' if user.is_active else 'Ativar' }} usuário {{ user.username }}?')">
-                                                <i class="fas {{ 'fa-user-slash' if user.is_active else 'fa-user-check' }}"></i>
-                                            </button>
-                                        </form>
-                                        {% endif %}
-                                        
-                                        <form action="{{ url_for('admin.user_reset_password', user_id=user.id) }}" 
-                                              method="POST" style="display: inline;">
-                                            <button type="submit" 
-                                                    class="btn btn-sm btn-outline-warning"
-                                                    title="Resetar Senha"
-                                                    onclick="return confirm('Resetar a senha do usuário {{ user.username }}? Uma nova senha será gerada.')">
-                                                <i class="fas fa-key"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
+                                <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -115,19 +66,11 @@
                 {% if not users %}
                 <div class="text-center py-4">
                     <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                    <p class="text-muted">Nenhum usuário encontrado.</p>
+                    <p class="text-muted">Nenhum usuÃ¡rio encontrado.</p>
                 </div>
                 {% endif %}
             </div>
         </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-12">
-        <a href="{{ url_for('core.dashboard') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left me-1"></i>Voltar ao Dashboard
-        </a>
     </div>
 </div>
 {% endblock %}

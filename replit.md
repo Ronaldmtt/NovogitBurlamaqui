@@ -25,12 +25,6 @@ The system is built on the Flask web framework, utilizing SQLAlchemy for ORM and
     *   **Intelligent Multiple Defendant Handling:** Detects registered clients among extra defendants for correct selection in eLaw.
     *   **Data Isolation Fix:** Corrected "data bleeding" during parallel RPA execution using contextvars.
     *   **Production Optimizations:** Fixed parallel worker counts, increased timeouts, and added browser launch retries for stability.
-    *   **Multi-Tenant RPA Quotas (2025-12-11):** Per-user worker semaphores (default 5 workers each) + global limit (200 max) for server capacity. Users cannot exceed their allocated quota, and the server is protected from overload.
-*   **Multi-Tenant Architecture (2025-12-11):**
-    *   **User Management:** Admin panel for creating/editing/deactivating users with configurable max_workers.
-    *   **Data Isolation:** Users only see their own processes and batches (owner_id filtering).
-    *   **Admin Bypass:** Admins (is_admin=True) can view and manage all data across tenants.
-    *   **Permission Checks:** check_process_permission() and check_batch_permission() helpers in routes.
 *   **Intelligent Request Prioritization System:** Uses 5 priority categories (P5-P1) to ensure essential severance payments (notice, vacation, FGTS, 13th salary) are inserted first, followed by basic wages, additional, indemnification, and accessory claims. Configurable limit of 30 requests with detailed omission logging.
 *   **Parallel PDF Extraction:** Processes multiple PDFs concurrently using a ThreadPoolExecutor, ensuring isolated database sessions and robust error handling.
     *   **Size-based Ordering:** Smaller PDFs are processed first in batch extractions for faster visual progress.

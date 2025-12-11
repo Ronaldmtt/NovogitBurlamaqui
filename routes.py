@@ -47,19 +47,6 @@ from extractors.cadastro import parse_pdf_text
 bp = Blueprint("core", __name__)
 
 
-def check_process_permission(proc):
-    """
-    Verifica se o usuário atual tem permissão para acessar o processo.
-    Admins podem acessar qualquer processo.
-    
-    Returns:
-        bool: True se tem permissão, False caso contrário
-    """
-    if current_user.is_admin:
-        return True
-    return proc.owner_id == current_user.id
-
-
 def _reset_process_sequence_if_empty():
     """
     Reseta a sequência de IDs da tabela process se ela estiver vazia.
@@ -172,15 +159,9 @@ def uploaded_file(filename):
 @bp.route("/dashboard")
 @login_required
 def dashboard():
-    # Admin vê estatísticas globais, usuários veem apenas seus dados
-    if current_user.is_admin:
-        total_processes = Process.query.count()
-        recent_processes = Process.query.order_by(Process.created_at.desc()).limit(10).all()
-    else:
-        total_processes = Process.query.filter_by(owner_id=current_user.id).count()
-        recent_processes = Process.query.filter_by(owner_id=current_user.id).order_by(Process.created_at.desc()).limit(10).all()
-    
+    total_processes = Process.query.count()
     user_processes = Process.query.filter_by(owner_id=current_user.id).count()
+    recent_processes = Process.query.order_by(Process.created_at.desc()).limit(10).all()
     return render_template(
         "dashboard.html",
         total_processes=total_processes,
@@ -198,12 +179,7 @@ def process_list():
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '', type=str)
     
-    # Multi-tenant: Usuários comuns só veem seus processos, admins veem todos
-    if current_user.is_admin:
-        query = Process.query
-    else:
-        query = Process.query.filter_by(owner_id=current_user.id)
-    
+    query = Process.query
     if search:
         query = query.filter(
             (Process.cnj.ilike(f'%{search}%')) |
@@ -222,12 +198,6 @@ def process_list():
 @login_required
 def process_view(id: int):
     proc = Process.query.get_or_404(id)
-    
-    # Multi-tenant: Verificar permissão de acesso
-    if not check_process_permission(proc):
-        flash("Acesso negado.", "danger")
-        return redirect(url_for('core.dashboard'))
-    
     batch_id = request.args.get('batch_id', type=int)
     return render_template("processes/view.html", process=proc, batch_id=batch_id)
 
@@ -238,8 +208,8 @@ def process_screenshot(id: int):
     """Serve o screenshot PNG do formulário eLaw preenchido (DEPRECATED - usar /screenshot/before ou /screenshot/after)"""
     proc = Process.query.get_or_404(id)
     
-    # Multi-tenant: Verificar permissão de acesso
-    if not check_process_permission(proc):
+    # Verificar ownership
+    if proc.owner_id != current_user.id:
         abort(403)
     
     # Verificar se screenshot existe
@@ -297,10 +267,6 @@ def process_update_field(id: int):
     """Atualiza um campo individual do processo via AJAX (para edição inline)."""
     proc = Process.query.get_or_404(id)
     
-    # Multi-tenant: Verificar permissão de acesso
-    if not check_process_permission(proc):
-        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
-    
     try:
         data = request.get_json()
         if not data:
@@ -349,12 +315,6 @@ def process_update_field(id: int):
 @login_required
 def process_edit(id: int):
     proc = Process.query.get_or_404(id)
-    
-    # Multi-tenant: Verificar permissão de acesso
-    if not check_process_permission(proc):
-        flash("Acesso negado.", "danger")
-        return redirect(url_for('core.dashboard'))
-    
     batch_id = request.args.get('batch_id', type=int)
     
     if request.method == "POST":
@@ -499,12 +459,6 @@ def process_fill_elaw(id: int):
     from main import app as main_app
     
     proc = Process.query.get_or_404(id)
-    
-    # Multi-tenant: Verificar permissão de acesso
-    if not check_process_permission(proc):
-        flash("Acesso negado.", "danger")
-        return redirect(url_for('core.dashboard'))
-    
     batch_id = request.args.get('batch_id', type=int)
     
     # ✅ CRITICAL: Configurar flask_app globalmente ANTES de lançar thread

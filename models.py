@@ -18,14 +18,6 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(255), unique=True, index=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # Multi-tenant: Status e configurações do usuário
-    is_active = db.Column(db.Boolean, default=True, nullable=False)  # Usuário ativo/desativado
-    max_workers = db.Column(db.Integer, default=5, nullable=False)   # Limite de workers RPA simultâneos
-    
-    # Credenciais eLaw opcionais (se None, usa as globais do sistema)
-    elaw_username = db.Column(db.String(120), nullable=True)
-    elaw_password = db.Column(db.String(255), nullable=True)  # Armazenado com hash ou criptografado
 
     created_at = db.Column(db.DateTime, server_default=func.now(), nullable=False)
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
