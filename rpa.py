@@ -225,7 +225,7 @@ UPLOADS_DIR = Path(os.getenv("RPA_UPLOADS_DIR", "./uploads")).resolve()
 
 HEADLESS = os.getenv("RPA_HEADLESS", "true").strip().lower() in {"1", "true", "yes"}  # Default TRUE para VM sem X server
 SLOWMO_MS = int(os.getenv("RPA_SLOWMO_MS", "0"))
-DEFAULT_TIMEOUT_MS = int(os.getenv("RPA_DEFAULT_TIMEOUT_MS", "30000"))  # 30s (seguro para operações gerais)
+DEFAULT_TIMEOUT_MS = int(os.getenv("RPA_DEFAULT_TIMEOUT_MS", "60000"))  # 60s (aumentado para produção lenta)
 NAV_TIMEOUT_MS = int(os.getenv("RPA_NAV_TIMEOUT_MS", "180000"))  # 180s (3 min - aumentado para produção Replit)
 BROWSER_LAUNCH_TIMEOUT_MS = int(os.getenv("RPA_BROWSER_LAUNCH_TIMEOUT_MS", "180000"))  # 180s (3 min - aumentado para produção Replit)
 SHORT_TIMEOUT_MS = int(os.getenv("RPA_SHORT_TIMEOUT_MS", "1500"))
@@ -1176,7 +1176,7 @@ async def login_elaw(page, user: str, password: str, url: str) -> bool:
             email_loc = page.locator("input[type='email'], input#Email, input[name='Email']").first
             pwd_loc = page.locator("input[type='password'], input#Password, input[name='Password']").first
             
-            await email_loc.wait_for(state="attached", timeout=20000)  # 20s - tolerante a eLaw lento
+            await email_loc.wait_for(state="attached", timeout=60000)  # 60s - tolerante a eLaw lento em produção
             log("[LOGIN] Formulário de login detectado")
         except Exception as e:
             log(f"[LOGIN] ⚠️ Formulário não encontrado: {e}")
@@ -1251,8 +1251,8 @@ async def login_elaw(page, user: str, password: str, url: str) -> bool:
         # eLaw mudou: agora mostra toast + overlay antes de redirecionar!
         await short_sleep_ms(2000)
         
-        # Race: success vs failure (aumentado de 30s para 45s)
-        for check_attempt in range(45):  # 45s de espera para redirect
+        # Race: success vs failure (aumentado para 90s para produção lenta)
+        for check_attempt in range(90):  # 90s de espera para redirect
             if await _check_login_success(page):
                 log(f"[LOGIN] ✅ Login bem-sucedido! (tentativa {attempt})")
                 return True
