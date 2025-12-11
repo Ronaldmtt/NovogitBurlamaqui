@@ -4,6 +4,11 @@ This project is a Flask-based legal process management system designed to stream
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 Deploy workflow: Sempre limpar arquivos pesados do Git (.venv/, attached_assets/, *.backup.db, bundle.txt) antes de preparar para republish, para garantir deploys rápidos (2-3 min ao invés de 6-10 min).
+Database migrations: SEMPRE atualizar os DOIS bancos (desenvolvimento e produção) quando houver qualquer alteração de tabela/coluna.
+
+## Database Configuration
+- **Desenvolvimento (Replit):** ep-rough-frog-aet7l8az.c-2.us-east-2.aws.neon.tech (banco integrado)
+- **Produção (Google Cloud):** ep-odd-river-ah3ax0po.c-3.us-east-1.aws.neon.tech (banco separado)
 
 ## System Architecture
 
