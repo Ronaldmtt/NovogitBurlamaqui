@@ -14,6 +14,36 @@ from models import BatchUpload, BatchItem, Process
 
 logger = logging.getLogger(__name__)
 
+# Sistema de Logging Centralizado
+try:
+    from logging_config import (
+        log_event, log_start, log_end, log_success, log_error as log_err,
+        log_warning, log_debug, batch as batch_log, ui, timed_operation
+    )
+    LOGGING_AVAILABLE = True
+except ImportError:
+    LOGGING_AVAILABLE = False
+    def log_event(*args, **kwargs): pass
+    def log_start(*args, **kwargs): pass
+    def log_end(*args, **kwargs): pass
+    def log_success(*args, **kwargs): pass
+    def log_err(*args, **kwargs): pass
+    def log_warning(*args, **kwargs): pass
+    def log_debug(*args, **kwargs): pass
+    class batch_log:
+        @staticmethod
+        def batch_start(*args, **kwargs): pass
+        @staticmethod
+        def batch_end(*args, **kwargs): pass
+        @staticmethod
+        def item_start(*args, **kwargs): pass
+        @staticmethod
+        def item_end(*args, **kwargs): pass
+        @staticmethod
+        def thread_start(*args, **kwargs): pass
+        @staticmethod
+        def thread_end(*args, **kwargs): pass
+
 # Integração com monitor remoto
 try:
     from monitor_integration import log_info, log_error
@@ -812,6 +842,13 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
     """
     from main import app
     import rpa
+    import time
+    start_time = time.time()
+    
+    # Log de início do item
+    batch_log.item_start(batch_id=0, item_id=item_id, process_id=process_id)
+    log_start("RPA_SINGLE", f"Iniciando RPA Worker-{worker_id}", 
+              item_id=item_id, process_id=process_id, worker_id=worker_id)
     
     # ✅ CRÍTICO: Garantir que flask_app está disponível para verificação de status
     if not rpa.flask_app:
@@ -827,6 +864,8 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
     
     try:
         logger.info(f"[RPA][WORKER-{worker_id}] Iniciando RPA para item {item_id}, processo {process_id}")
+        log_event("RPA_WORKER", f"Worker-{worker_id} processando item", 
+                  item_id=item_id, process_id=process_id)
         
         # ✅ CRÍTICO: Cada thread precisa de seu próprio app_context para sessão DB isolada
         with app.app_context():
@@ -846,6 +885,7 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
             db.session.remove()
         
         # 🆕 Executar RPA PARALELO (fora do app_context, usa seu próprio contexto interno)
+        log_event("RPA_EXECUTE", f"Chamando execute_rpa_parallel", process_id=process_id, worker_id=worker_id)
         logger.info(f"[RPA][WORKER-{worker_id}] Executando execute_rpa_parallel({process_id}, worker_id={worker_id})")
         rpa_result = rpa.execute_rpa_parallel(process_id, worker_id=worker_id)
         logger.info(f"[RPA][WORKER-{worker_id}] execute_rpa_parallel retornou: {rpa_result}")
@@ -854,19 +894,28 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
         with app.app_context():
             item = BatchItem.query.get(item_id)
             if item:
+                duration_ms = (time.time() - start_time) * 1000
                 if rpa_result.get('status') == 'success':
                     item.status = 'success'
                     item.last_error = None
                     result['success'] = True
+                    log_success("RPA_SINGLE", f"Item processado com sucesso", 
+                                item_id=item_id, process_id=process_id, worker_id=worker_id)
+                    batch_log.item_end(batch_id=0, item_id=item_id, status='success', process_id=process_id)
                     logger.info(f"[RPA][WORKER-{worker_id}] ✅ Item {item_id} processado com sucesso!")
                 else:
                     item.status = 'error'
                     item.last_error = rpa_result.get('error', rpa_result.get('message', 'Erro desconhecido'))[:500]
                     result['error'] = item.last_error
+                    log_err("RPA_SINGLE", f"Item falhou", error=item.last_error,
+                            item_id=item_id, process_id=process_id, worker_id=worker_id)
+                    batch_log.item_end(batch_id=0, item_id=item_id, status='error', process_id=process_id)
                     logger.warning(f"[RPA][WORKER-{worker_id}] ❌ Item {item_id} com erro: {item.last_error}")
                 
                 item.updated_at = datetime.utcnow()
                 db.session.commit()
+                log_end("RPA_SINGLE", f"Finalizando RPA Worker-{worker_id}", 
+                        duration_ms=duration_ms, item_id=item_id, process_id=process_id)
             
             # ✅ CRÍTICO: Limpar sessão após uso
             db.session.remove()
@@ -874,8 +923,11 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
     except Exception as ex:
         import traceback
         tb = traceback.format_exc()
+        duration_ms = (time.time() - start_time) * 1000
         logger.error(f"[RPA][WORKER-{worker_id}] ❌ Exceção ao processar item {item_id}: {ex}")
         logger.error(f"[RPA][WORKER-{worker_id}][TRACEBACK] {tb}")
+        log_err("RPA_SINGLE", f"Exceção no Worker-{worker_id}", error=str(ex),
+                item_id=item_id, process_id=process_id, include_traceback=True)
         
         result['error'] = str(ex)[:500]
         
@@ -891,6 +943,9 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
                 db.session.remove()
         except Exception as db_ex:
             logger.error(f"[RPA][WORKER-{worker_id}] Erro ao atualizar status do item {item_id}: {db_ex}")
+        
+        log_end("RPA_SINGLE", f"Finalizando RPA Worker-{worker_id} com erro", 
+                duration_ms=duration_ms, item_id=item_id, process_id=process_id)
     
     return result
 
@@ -899,10 +954,14 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
 @login_required
 def batch_start(id):
     """Inicia processamento RPA do batch com execução PARALELA"""
+    log_start("BATCH_RPA_START", f"Iniciando processamento RPA do batch", batch_id=id)
+    ui.button_click("Processar RPA")
+    
     try:
         # 🔧 Limpeza automática de processos travados antes de iniciar
         cleaned = cleanup_stuck_processes()
         if cleaned > 0:
+            log_event("BATCH_CLEANUP", f"Limpou {cleaned} processos travados", batch_id=id)
             logger.info(f"[BATCH START] Limpou {cleaned} processos travados antes de iniciar")
         
         batch = BatchUpload.query.get(id)
@@ -964,6 +1023,10 @@ def batch_start(id):
         
         def execute_batch_rpa_parallel():
             """Executa RPA batch em PARALELO com ThreadPoolExecutor"""
+            import time as time_module
+            batch_start_time = time_module.time()
+            batch_log.thread_start(thread_id=0, batch_id=id)
+            log_start("BATCH_PARALLEL_THREAD", f"Thread principal de batch paralelo iniciada", batch_id=id)
             logger.info(f"[BATCH RPA][PARALLEL] Thread principal iniciada para batch {id}")
             
             try:
@@ -1052,6 +1115,9 @@ def batch_start(id):
                             return
                         
                         # ✅ Processar em paralelo usando ThreadPoolExecutor
+                        batch_log.batch_start(batch_id=id, total_items=len(items_data))
+                        log_event("BATCH_EXECUTOR", f"Iniciando ThreadPoolExecutor", 
+                                 batch_id=id, workers=MAX_RPA_WORKERS, items=len(items_data))
                         logger.info(f"[BATCH RPA] Iniciando ThreadPoolExecutor com {MAX_RPA_WORKERS} workers para {len(items_data)} itens")
                         
                         with ThreadPoolExecutor(max_workers=MAX_RPA_WORKERS) as executor:
@@ -1067,6 +1133,8 @@ def batch_start(id):
                                 )
                                 future_to_item[future] = {**item_data, 'worker_id': worker_id}
                             
+                            log_event("BATCH_SUBMIT", f"Tarefas submetidas ao executor", 
+                                     batch_id=id, tasks_submitted=len(future_to_item))
                             logger.info(f"[BATCH RPA] {len(future_to_item)} tarefas RPA submetidas ao executor")
                             
                             # Processar resultados à medida que ficam prontos
@@ -1099,6 +1167,11 @@ def batch_start(id):
                         batch_reload.finished_at = datetime.utcnow()
                         db.session.commit()
                         
+                        batch_duration_ms = (time_module.time() - batch_start_time) * 1000
+                        batch_log.batch_end(batch_id=id, total=total_items, success=success_count, 
+                                           errors=error_count, duration_ms=batch_duration_ms)
+                        log_success("BATCH_RPA", f"Batch finalizado com sucesso", 
+                                   batch_id=id, total=total_items, success=success_count, errors=error_count)
                         logger.info(f"[BATCH RPA] ✅ Batch {id} finalizado: {success_count} sucesso(s), {error_count} erro(s) em {total_items} itens")
                         
                     except Exception as e:
@@ -1106,6 +1179,8 @@ def batch_start(id):
                         tb = traceback.format_exc()
                         logger.error(f"[BATCH RPA] ❌ Erro fatal ao processar batch {id}: {e}")
                         logger.error(f"[BATCH RPA][TRACEBACK] {tb}")
+                        log_err("BATCH_RPA", f"Erro fatal ao processar batch", error=str(e), 
+                               batch_id=id, include_traceback=True)
                         try:
                             batch_reload = BatchUpload.query.get(id)
                             if batch_reload:
@@ -1120,8 +1195,14 @@ def batch_start(id):
                 tb = traceback.format_exc()
                 logger.error(f"[BATCH RPA][PARALLEL] ❌ Exceção FORA do app_context: {outer_ex}")
                 logger.error(f"[BATCH RPA][PARALLEL][TRACEBACK] {tb}")
+                log_err("BATCH_PARALLEL_THREAD", f"Exceção fora do app_context", 
+                       error=str(outer_ex), batch_id=id, include_traceback=True)
             
             finally:
+                batch_log.thread_end(thread_id=0, batch_id=id)
+                batch_duration_ms = (time_module.time() - batch_start_time) * 1000
+                log_end("BATCH_PARALLEL_THREAD", f"Thread principal finalizada", 
+                       batch_id=id, duration_ms=batch_duration_ms)
                 logger.info(f"[BATCH RPA][PARALLEL] Thread principal finalizada para batch {id}")
             
         # Iniciar thread principal

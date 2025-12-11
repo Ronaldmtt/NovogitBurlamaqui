@@ -15,6 +15,23 @@ from collections import Counter
 
 logger = logging.getLogger(__name__)
 
+# Sistema de Logging Centralizado
+try:
+    from logging_config import (
+        log_event, log_start, log_end, log_success, log_error as log_err,
+        log_warning, log_debug, auth, ui, extraction, timed_operation
+    )
+    LOGGING_AVAILABLE = True
+except ImportError:
+    LOGGING_AVAILABLE = False
+    def log_event(*args, **kwargs): pass
+    def log_start(*args, **kwargs): pass
+    def log_end(*args, **kwargs): pass
+    def log_success(*args, **kwargs): pass
+    def log_err(*args, **kwargs): pass
+    def log_warning(*args, **kwargs): pass
+    def log_debug(*args, **kwargs): pass
+
 # Integração com monitor remoto
 try:
     from monitor_integration import log_info, log_error
@@ -83,63 +100,70 @@ def index():
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
+        log_debug("LOGIN", "Usuário já autenticado, redirecionando para dashboard")
         return redirect(url_for("core.dashboard"))
 
     next_url = request.args.get("next") or url_for("core.dashboard")
     form = LoginForm()
 
     if request.method == "POST":
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"[LOGIN] POST recebido")
-        logger.info(f"[LOGIN] Form valid: {form.validate_on_submit()}")
-        logger.info(f"[LOGIN] Form errors: {form.errors}")
+        log_start("LOGIN", "Processando tentativa de login")
         
         if form.validate_on_submit():
             username_or_email = (form.username.data or "").strip()
             password = form.password.data or ""
             
-            logger.info(f"[LOGIN] Username/email: {username_or_email}")
-            logger.info(f"[LOGIN] Password length: {len(password)}")
+            auth.login_attempt(username_or_email)
+            log_debug("LOGIN", f"Buscando usuário no banco", username=username_or_email)
 
             user = (
                 User.query.filter_by(username=username_or_email).first()
                 or User.query.filter_by(email=username_or_email).first()
             )
             
-            logger.info(f"[LOGIN] User found: {user is not None}")
+            log_debug("LOGIN", f"Usuário encontrado: {user is not None}", username=username_or_email)
 
             ok = False
             if user:
-                # tenta métodos comuns; se não houver, usa hash simples
                 if hasattr(user, "check_password"):
                     ok = user.check_password(password)
-                    logger.info(f"[LOGIN] check_password result: {ok}")
                 elif hasattr(user, "verify_password"):
                     ok = user.verify_password(password)
-                    logger.info(f"[LOGIN] verify_password result: {ok}")
                 else:
                     ok = check_password_hash(getattr(user, "password_hash", ""), password)
-                    logger.info(f"[LOGIN] check_password_hash result: {ok}")
+                
+                log_debug("LOGIN", f"Verificação de senha: {'OK' if ok else 'FALHOU'}", username=username_or_email)
 
             if not user or not ok:
-                logger.warning(f"[LOGIN] Login failed - user: {user is not None}, ok: {ok}")
+                auth.login_failed(username_or_email, reason="Credenciais inválidas")
+                log_end("LOGIN", "Login falhou - credenciais inválidas", username=username_or_email)
                 flash("Credenciais inválidas.", "danger")
-                # mantém o form para exibir erros/CSRF corretamente
                 return render_template("login.html", form=form, next_url=next_url)
 
             login_user(user)
-            logger.info(f"[LOGIN] Login successful for user: {user.username}")
+            auth.login_success(username_or_email, user_id=user.id)
+            log_success("LOGIN", f"Login realizado com sucesso", username=user.username, user_id=user.id)
+            log_end("LOGIN", "Processo de login concluído com sucesso")
             flash("Login efetuado com sucesso.", "success")
             return redirect(next_url)
+        else:
+            log_warning("LOGIN", f"Formulário inválido", errors=str(form.errors))
+            log_end("LOGIN", "Login falhou - formulário inválido")
 
+    ui.page_view("login")
     return render_template("login.html", form=form, next_url=next_url)
 
 
 @bp.route("/logout")
 @login_required
 def logout():
+    username = current_user.username if current_user else "unknown"
+    user_id = current_user.id if current_user else None
+    log_start("LOGOUT", f"Usuário {username} saindo do sistema")
+    auth.logout(username, user_id=user_id)
     logout_user()
+    log_success("LOGOUT", f"Logout realizado com sucesso")
+    log_end("LOGOUT", "Sessão encerrada")
     flash("Você saiu da sessão.", "success")
     return redirect(url_for("core.login"))
 

@@ -142,6 +142,16 @@ def create_app():
             return str(dt)
 
     # ==============================
+    # Sistema de Logging Centralizado
+    # ==============================
+    try:
+        from logging_config import init_flask_logging
+        init_flask_logging(app)
+        logger.info("✅ Sistema de logging centralizado inicializado")
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao inicializar logging centralizado: {e}")
+
+    # ==============================
     # Blueprints / Rotas
     # ==============================
     # Importa DEPOIS de init_app para evitar import cíclico
