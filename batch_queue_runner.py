@@ -10,6 +10,9 @@ Funcionalidades:
 - Quando um batch terminar, ir automaticamente para o próximo
 - Manter 5 workers paralelos processando os itens de cada batch
 - Status em tempo real da fila global
+
+IMPORTANTE: Usa PostgreSQL advisory locks para garantir que apenas 
+um runner execute por vez, mesmo com múltiplos workers Gunicorn.
 """
 
 import threading
@@ -20,6 +23,8 @@ from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+
+QUEUE_RUNNER_LOCK_ID = 999999
 
 try:
     from logging_config import log_start, log_end, log_success, log_err, log_event
@@ -77,6 +82,56 @@ class GlobalBatchQueueRunner:
     def set_flask_app(self, app):
         """Define o Flask app para usar no contexto de banco de dados."""
         self._flask_app = app
+    
+    def _acquire_db_lock(self) -> bool:
+        """
+        Tenta adquirir um advisory lock no PostgreSQL.
+        Garante que apenas um runner execute por vez, mesmo com múltiplos workers.
+        
+        Returns:
+            True se o lock foi adquirido, False se outro processo já tem o lock.
+        """
+        if not self._flask_app:
+            return False
+        
+        try:
+            with self._flask_app.app_context():
+                from extensions import db
+                from sqlalchemy import text
+                
+                result = db.session.execute(
+                    text(f"SELECT pg_try_advisory_lock({QUEUE_RUNNER_LOCK_ID})")
+                ).scalar()
+                
+                if result:
+                    logger.info("[QUEUE_RUNNER] Advisory lock adquirido com sucesso")
+                else:
+                    logger.warning("[QUEUE_RUNNER] Outro processo já possui o advisory lock")
+                
+                return bool(result)
+                
+        except Exception as e:
+            logger.error(f"[QUEUE_RUNNER] Erro ao adquirir advisory lock: {e}")
+            return False
+    
+    def _release_db_lock(self):
+        """Libera o advisory lock no PostgreSQL."""
+        if not self._flask_app:
+            return
+        
+        try:
+            with self._flask_app.app_context():
+                from extensions import db
+                from sqlalchemy import text
+                
+                db.session.execute(
+                    text(f"SELECT pg_advisory_unlock({QUEUE_RUNNER_LOCK_ID})")
+                )
+                db.session.commit()
+                logger.info("[QUEUE_RUNNER] Advisory lock liberado")
+                
+        except Exception as e:
+            logger.error(f"[QUEUE_RUNNER] Erro ao liberar advisory lock: {e}")
     
     @property
     def is_running(self) -> bool:
@@ -267,6 +322,9 @@ class GlobalBatchQueueRunner:
         """
         Inicia o processamento da fila global.
         
+        Usa PostgreSQL advisory lock para garantir que apenas um runner
+        execute por vez, mesmo com múltiplos workers Gunicorn.
+        
         Args:
             user_id: ID do usuário que está iniciando
             
@@ -274,10 +332,16 @@ class GlobalBatchQueueRunner:
             Dict com status da operação
         """
         if self._running:
-            return {'success': False, 'error': 'Fila já está em execução'}
+            return {'success': False, 'error': 'Fila já está em execução neste worker'}
         
         if not self._flask_app:
             return {'success': False, 'error': 'Flask app não configurado'}
+        
+        if not self._acquire_db_lock():
+            return {
+                'success': False, 
+                'error': 'Fila já está sendo executada por outro worker. Aguarde ou tente novamente.'
+            }
         
         try:
             with self._flask_app.app_context():
@@ -289,6 +353,7 @@ class GlobalBatchQueueRunner:
                 ).count()
                 
                 if queued_count == 0:
+                    self._release_db_lock()
                     return {'success': False, 'error': 'Nenhum batch na fila para processar'}
                 
                 db.session.remove()
@@ -320,6 +385,7 @@ class GlobalBatchQueueRunner:
             
         except Exception as e:
             self._running = False
+            self._release_db_lock()
             logger.error(f"[QUEUE_RUNNER] Erro ao iniciar fila: {e}")
             return {'success': False, 'error': str(e)}
     
@@ -401,6 +467,8 @@ class GlobalBatchQueueRunner:
             self._running = False
             self._current_batch_id = None
             self._stop_requested = False
+            
+            self._release_db_lock()
             
             log_end("QUEUE_LOOP", f"Loop da fila encerrado",
                    batches_completed=self._stats['batches_completed'],
