@@ -104,6 +104,14 @@ def create_app():
     login_manager.login_view = "core.login"
     login_manager.login_message = "Por favor, faça login para acessar esta página."
 
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        """Retorna JSON para requisições AJAX, redireciona para login caso contrário."""
+        from flask import request, jsonify, redirect, url_for
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Não autenticado', 'redirect': '/login'}), 401
+        return redirect(url_for('core.login', next=request.url))
+
     @login_manager.user_loader
     def load_user(user_id):
         try:
