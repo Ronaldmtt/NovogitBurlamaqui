@@ -150,17 +150,53 @@ def reset_rpa_context(token: contextvars.Token) -> None:
     _rpa_context.reset(token)
 
 # =============================================================================
-# LOCKS E SEMÁFOROS PARA PARALELISMO CONTROLADO
+# LOCKS E SEMÁFOROS PARA PARALELISMO CONTROLADO (MULTI-TENANT)
 # =============================================================================
 
 # Configuração de paralelismo
-# 2025-12-03: 5 workers fixos para RPA paralelo (Google Cloud tem recursos suficientes)
-# Pode ser sobrescrito via variável de ambiente MAX_RPA_WORKERS
-MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", "5"))  # Máximo de RPAs paralelos
+# 2025-12-03: Limite por usuário padrão (pode ser sobrescrito no User.max_workers)
+MAX_RPA_WORKERS_PER_USER = int(os.getenv("MAX_RPA_WORKERS", "5"))  # Workers por usuário
 
-# Semáforo para controlar número máximo de execuções RPA simultâneas
-# Substitui o antigo _execute_rpa_lock (mutex) por semáforo (permite N simultâneos)
-_execute_rpa_semaphore = threading.Semaphore(MAX_RPA_WORKERS)
+# 2025-12-11: Limite GLOBAL para não sobrecarregar o servidor
+# Com 128GB RAM, podemos ter ~200 browsers (500MB cada)
+MAX_RPA_WORKERS_GLOBAL = int(os.getenv("MAX_RPA_WORKERS_GLOBAL", "200"))
+
+# Semáforo GLOBAL para limitar total de workers no servidor
+_global_rpa_semaphore = threading.Semaphore(MAX_RPA_WORKERS_GLOBAL)
+
+# Dicionário de semáforos por usuário (user_id -> Semaphore)
+_user_semaphores: dict[int, threading.Semaphore] = {}
+_user_semaphores_lock = threading.Lock()  # Lock para criar semáforos thread-safe
+
+def get_user_semaphore(user_id: int, max_workers: int = None) -> threading.Semaphore:
+    """
+    Retorna o semáforo específico para um usuário.
+    Cria um novo se não existir, com limite baseado em User.max_workers.
+    """
+    with _user_semaphores_lock:
+        if user_id not in _user_semaphores:
+            # Usar max_workers passado ou padrão
+            limit = max_workers if max_workers is not None else MAX_RPA_WORKERS_PER_USER
+            _user_semaphores[user_id] = threading.Semaphore(limit)
+            log(f"[RPA_QUOTA] Criado semáforo para user_id={user_id} com limite={limit}")
+        return _user_semaphores[user_id]
+
+def get_user_max_workers(user_id: int) -> int:
+    """Busca o max_workers do usuário no banco de dados."""
+    if flask_app:
+        try:
+            from models import User
+            with flask_app.app_context():
+                user = User.query.get(user_id)
+                if user and user.max_workers:
+                    return user.max_workers
+        except Exception as e:
+            log(f"[RPA_QUOTA] Erro ao buscar max_workers do user {user_id}: {e}")
+    return MAX_RPA_WORKERS_PER_USER
+
+# LEGADO: Mantido para compatibilidade com código antigo
+MAX_RPA_WORKERS = MAX_RPA_WORKERS_PER_USER
+_execute_rpa_semaphore = threading.Semaphore(MAX_RPA_WORKERS_PER_USER)
 
 # Lock para serializar lançamentos do browser (evita picos de CPU/memória)
 # Mantido como Lock para garantir que apenas 1 browser inicia por vez
@@ -9474,13 +9510,14 @@ def execute_rpa(process_id: int) -> dict:
             log(f"[EXECUTE_RPA] Finalizado para processo #{process_id}, _current_process_id limpo")
 
 
-def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> dict:
+def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None, user_id: Optional[int] = None) -> dict:
     """
     🆕 2025-11-27: Função para execução PARALELA de RPA.
+    🔧 2025-12-11: Sistema de quotas por usuário (multi-tenant)
     
     Diferente de execute_rpa(), esta função:
     1. Usa contextvars (thread-local) em vez de globals
-    2. Usa semáforo em vez de mutex (permite N execuções simultâneas)
+    2. Usa semáforo POR USUÁRIO + semáforo GLOBAL
     3. Cada worker tem seu próprio browser isolado
     4. Screenshots usam prefixo único por worker
     
@@ -9489,6 +9526,7 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
     Args:
         process_id: ID do processo no banco de dados
         worker_id: ID opcional do worker (para logs e screenshots)
+        user_id: ID do usuário dono do processo (para quotas)
         
     Returns:
         dict com {
@@ -9511,22 +9549,61 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
     # 🔧 FIX 2025-12-09: Resetar flag de processo encerrado para evitar contaminação entre execuções
     reset_process_encerrado()
     
-    log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} iniciando processo #{process_id}")
+    log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} iniciando processo #{process_id} (user_id={user_id})")
     
-    # 🔒 SEMÁFORO: Permite até MAX_RPA_WORKERS execuções simultâneas
-    acquired = _execute_rpa_semaphore.acquire(blocking=True, timeout=300)  # 5 min timeout
-    if not acquired:
-        log(f"[EXECUTE_RPA_PARALLEL] Timeout ao aguardar semáforo para processo #{process_id}")
+    # 🔧 2025-12-11: Buscar user_id do processo se não foi passado
+    if user_id is None and flask_app:
+        try:
+            from models import Process
+            with flask_app.app_context():
+                proc = Process.query.get(process_id)
+                if proc:
+                    user_id = proc.owner_id
+                    log(f"[EXECUTE_RPA_PARALLEL] user_id={user_id} obtido do processo #{process_id}")
+        except Exception as e:
+            log(f"[EXECUTE_RPA_PARALLEL] Erro ao buscar owner_id: {e}")
+    
+    # Fallback para user_id=0 se não conseguir identificar (quota compartilhada)
+    if user_id is None:
+        user_id = 0
+        log(f"[EXECUTE_RPA_PARALLEL] Usando user_id=0 (fallback) para processo #{process_id}")
+    
+    # Obter limite de workers do usuário
+    user_max_workers = get_user_max_workers(user_id) if user_id else MAX_RPA_WORKERS_PER_USER
+    
+    # Obter semáforo do usuário
+    user_semaphore = get_user_semaphore(user_id, user_max_workers)
+    
+    # 🔒 SEMÁFORO DO USUÁRIO: Limita workers por usuário
+    user_acquired = user_semaphore.acquire(blocking=True, timeout=300)  # 5 min timeout
+    if not user_acquired:
+        log(f"[EXECUTE_RPA_PARALLEL] Timeout no semáforo do USUÁRIO {user_id} para processo #{process_id}")
         reset_rpa_context(ctx_token)
         return {
             'status': 'error',
             'process_id': process_id,
             'worker_id': worker_id,
-            'message': 'Timeout aguardando slot disponível para RPA',
-            'error': 'Semaphore timeout'
+            'message': f'Limite de {user_max_workers} workers simultâneos por usuário atingido',
+            'error': 'User semaphore timeout'
         }
     
-    log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} adquiriu semáforo para processo #{process_id}")
+    log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} adquiriu semáforo do usuário {user_id}")
+    
+    # 🔒 SEMÁFORO GLOBAL: Limita total de workers no servidor
+    global_acquired = _global_rpa_semaphore.acquire(blocking=True, timeout=300)  # 5 min timeout
+    if not global_acquired:
+        user_semaphore.release()  # Liberar semáforo do usuário
+        log(f"[EXECUTE_RPA_PARALLEL] Timeout no semáforo GLOBAL para processo #{process_id}")
+        reset_rpa_context(ctx_token)
+        return {
+            'status': 'error',
+            'process_id': process_id,
+            'worker_id': worker_id,
+            'message': f'Limite global de {MAX_RPA_WORKERS_GLOBAL} workers no servidor atingido',
+            'error': 'Global semaphore timeout'
+        }
+    
+    log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} adquiriu semáforo GLOBAL para processo #{process_id}")
     
     try:
         # Inicializar RPA Monitor (se habilitado)
@@ -9628,9 +9705,13 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
             except Exception:
                 pass  # Ignorar erros de limpeza no finally
         
-        # ✅ Liberar semáforo
-        _execute_rpa_semaphore.release()
-        log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} liberou semáforo para processo #{process_id}")
+        # ✅ Liberar semáforo GLOBAL
+        _global_rpa_semaphore.release()
+        log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} liberou semáforo GLOBAL para processo #{process_id}")
+        
+        # ✅ Liberar semáforo do USUÁRIO
+        user_semaphore.release()
+        log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} liberou semáforo do usuário {user_id} para processo #{process_id}")
         
         # ✅ Resetar contexto thread-local
         reset_rpa_context(ctx_token)
