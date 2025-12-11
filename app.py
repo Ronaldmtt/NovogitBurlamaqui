@@ -147,9 +147,11 @@ def create_app():
     # Importa DEPOIS de init_app para evitar import cíclico
     from routes import bp as core_bp
     from routes_batch import batch_bp
+    from routes_admin import admin_bp
     
     app.register_blueprint(core_bp)
     app.register_blueprint(batch_bp)
+    app.register_blueprint(admin_bp)
 
     # favicon (evita 404 quando não há arquivo)
     @app.route("/favicon.ico")
