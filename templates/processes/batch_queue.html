@@ -284,18 +284,24 @@ function updateQueueStatus() {
                                 badgeContainer.appendChild(statusBadge);
                             }
                             
-                            if (batch.is_current && running > 0) {
+                            const ready = batch.ready || 0;
+                            const isFullyCompleted = (completed + errors === total) && running === 0 && ready === 0 && total > 0;
+                            
+                            if (running > 0) {
                                 statusBadge.className = 'status-badge badge bg-primary ms-2';
-                                statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando';
-                            } else if (batch.is_current) {
+                                statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando (' + running + ')';
+                            } else if (batch.is_current && ready > 0) {
                                 statusBadge.className = 'status-badge badge bg-success ms-2';
                                 statusBadge.innerHTML = '<i class="fas fa-play me-1"></i>Em execução';
-                            } else if (percent === 100) {
+                            } else if (isFullyCompleted) {
                                 statusBadge.className = 'status-badge badge bg-success ms-2';
                                 statusBadge.innerHTML = '<i class="fas fa-check me-1"></i>Concluído';
-                            } else if (percent > 0) {
+                            } else if (percent > 0 && percent < 100) {
                                 statusBadge.className = 'status-badge badge bg-info ms-2';
                                 statusBadge.innerHTML = percent + '% concluído';
+                            } else if (percent === 100 && !isFullyCompleted) {
+                                statusBadge.className = 'status-badge badge bg-warning ms-2';
+                                statusBadge.innerHTML = '<i class="fas fa-clock me-1"></i>Finalizando...';
                             } else {
                                 statusBadge.className = 'status-badge badge bg-secondary ms-2';
                                 statusBadge.textContent = 'Aguardando';
