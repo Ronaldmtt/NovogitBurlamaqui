@@ -528,6 +528,12 @@ class GlobalBatchQueueRunner:
                 if not batch:
                     return {'success': False, 'error': 'Batch não encontrado'}
                 
+                # Garantir que apenas este batch esteja como 'running'
+                BatchUpload.query.filter(
+                    BatchUpload.status == 'running',
+                    BatchUpload.id != batch_id
+                ).update({'status': 'queued'})
+                
                 batch.status = 'running'
                 batch.started_at = datetime.utcnow()
                 batch.processed_count = 0
