@@ -48,6 +48,26 @@ except ImportError:
     RPA_LOG_AVAILABLE = False
     rpa_log = None
 
+# Sistema de Logging Centralizado
+try:
+    from logging_config import (
+        rpa_log as central_rpa_log, 
+        log_start, log_end, log_success, log_err, log_event
+    )
+    CENTRAL_LOGGING_AVAILABLE = True
+except ImportError:
+    CENTRAL_LOGGING_AVAILABLE = False
+    def log_start(op, msg, **kw): pass
+    def log_end(op, msg, **kw): pass
+    def log_success(op, msg, **kw): pass
+    def log_err(op, msg, **kw): pass
+    def log_event(op, msg, **kw): pass
+    central_rpa_log = type('obj', (object,), {
+        'step_start': lambda *a, **kw: None,
+        'step_end': lambda *a, **kw: None,
+        'step_error': lambda *a, **kw: None
+    })()
+
 # --- imports opcionais (ok se faltar python-docx) ----------------------------
 try:
     from docx import Document as DocxDocument  # type: ignore
@@ -9511,6 +9531,12 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
     # 🔧 FIX 2025-12-09: Resetar flag de processo encerrado para evitar contaminação entre execuções
     reset_process_encerrado()
     
+    # 📊 Logging centralizado
+    import time as time_module
+    rpa_start_time = time_module.time()
+    log_start("RPA_EXECUTE", f"Iniciando execução RPA paralela", process_id=process_id, worker_id=worker_id)
+    central_rpa_log.step_start("rpa_init", process_id=process_id, worker_id=worker_id)
+    
     log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} iniciando processo #{process_id}")
     
     # 🔒 SEMÁFORO: Permite até MAX_RPA_WORKERS execuções simultâneas
@@ -9558,7 +9584,12 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
             db.session.remove()
         
         # Retornar baseado no status REAL gravado pelo RPA (fora do app_context)
+        rpa_duration_ms = (time_module.time() - rpa_start_time) * 1000
+        
         if elaw_status == 'success':
+            log_success("RPA_EXECUTE", f"Processo preenchido com sucesso no eLaw", 
+                       process_id=process_id, worker_id=worker_id, duration_ms=rpa_duration_ms)
+            central_rpa_log.step_end("rpa_complete", success=True, process_id=process_id)
             return {
                 'status': 'success',
                 'process_id': process_id,
@@ -9566,6 +9597,9 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
                 'message': f'Processo #{process_id} preenchido com sucesso no eLaw'
             }
         elif elaw_status == 'error':
+            log_err("RPA_EXECUTE", f"Erro durante execução do RPA", 
+                   error=elaw_error_message, process_id=process_id, worker_id=worker_id)
+            central_rpa_log.step_error("rpa_complete", error=elaw_error_message, process_id=process_id)
             return {
                 'status': 'error',
                 'process_id': process_id,
@@ -9576,6 +9610,8 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
         else:
             # Status inesperado (running, pending, etc)
             log(f"[EXECUTE_RPA_PARALLEL][WARNING] Status inesperado após RPA: {elaw_status}")
+            log_err("RPA_EXECUTE", f"Status inesperado após RPA", 
+                   status=elaw_status, process_id=process_id, worker_id=worker_id)
             return {
                 'status': 'error',
                 'process_id': process_id,
@@ -9588,6 +9624,9 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
         error_msg = f"Erro ao executar RPA paralelo para processo #{process_id}: {str(e)}"
         log(f"[EXECUTE_RPA_PARALLEL][ERROR] {error_msg}")
         log_error_to_monitor(error_msg, exc=e)
+        log_err("RPA_EXECUTE", f"Exceção durante execução RPA", 
+               error=str(e), process_id=process_id, worker_id=worker_id, include_traceback=True)
+        central_rpa_log.step_error("rpa_exception", error=str(e), process_id=process_id)
         
         # 🔒 CRITICAL: Atualizar status para error (para não ficar "running")
         update_status("erro_fatal", f"Erro fatal durante execução: {str(e)[:200]}", status="error", process_id=process_id)
@@ -9635,6 +9674,11 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
         # ✅ Resetar contexto thread-local
         reset_rpa_context(ctx_token)
         log(f"[EXECUTE_RPA_PARALLEL] Contexto resetado para processo #{process_id}")
+        
+        # 📊 Log de fim
+        rpa_duration_ms = (time_module.time() - rpa_start_time) * 1000
+        log_end("RPA_EXECUTE", f"Execução RPA finalizada", 
+               process_id=process_id, worker_id=worker_id, duration_ms=rpa_duration_ms)
 
 
 if __name__ == "__main__":
