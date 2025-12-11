@@ -25,6 +25,20 @@ except ImportError:
 
 batch_bp = Blueprint("batch", __name__, url_prefix="/processos/batch")
 
+
+def check_batch_permission(batch):
+    """
+    Verifica se o usuário atual tem permissão para acessar o batch.
+    Admins podem acessar qualquer batch.
+    
+    Returns:
+        bool: True se tem permissão, False caso contrário
+    """
+    if current_user.is_admin:
+        return True
+    return batch.owner_id == current_user.id
+
+
 # Configurações
 ALLOWED_EXTENSIONS = {'pdf'}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB por arquivo (suporte a PDFs grandes)
@@ -708,8 +722,12 @@ def batch_new():
 @batch_bp.route("/list")
 @login_required
 def batch_list():
-    """Lista todos os batches do usuário"""
-    batches = BatchUpload.query.filter_by(owner_id=current_user.id).order_by(BatchUpload.created_at.desc()).all()
+    """Lista todos os batches do usuário (admins veem todos)"""
+    # Multi-tenant: Admins veem todos os batches, usuários só veem os seus
+    if current_user.is_admin:
+        batches = BatchUpload.query.order_by(BatchUpload.created_at.desc()).all()
+    else:
+        batches = BatchUpload.query.filter_by(owner_id=current_user.id).order_by(BatchUpload.created_at.desc()).all()
     return render_template("processes/batch_list.html", batches=batches)
 
 
@@ -720,8 +738,8 @@ def batch_detail(id):
     from models import Process
     batch = BatchUpload.query.get_or_404(id)
     
-    # Verificar permissão
-    if batch.owner_id != current_user.id:
+    # Multi-tenant: Verificar permissão (admins podem acessar qualquer batch)
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para acessar este batch.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -744,8 +762,8 @@ def batch_progress(id):
     """Tela de progresso do processamento em lote"""
     batch = BatchUpload.query.get_or_404(id)
     
-    # Verificar permissão
-    if batch.owner_id != current_user.id:
+    # Multi-tenant: Verificar permissão (admins podem acessar qualquer batch)
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para acessar este batch.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -761,8 +779,8 @@ def batch_progress_status(id):
     
     batch = BatchUpload.query.get_or_404(id)
     
-    # Verificar permissão
-    if batch.owner_id != current_user.id:
+    # Multi-tenant: Verificar permissão (admins podem acessar qualquer batch)
+    if not check_batch_permission(batch):
         return jsonify({'error': 'Permissão negada'}), 403
     
     items = BatchItem.query.filter_by(batch_id=id).order_by(BatchItem.process_id.asc().nullslast()).all()
@@ -909,8 +927,8 @@ def batch_start(id):
         if not batch:
             return jsonify({'success': False, 'error': 'Batch não encontrado'}), 404
         
-        # Verificar permissão
-        if batch.owner_id != current_user.id:
+        # Multi-tenant: Verificar permissão (admins podem acessar qualquer batch)
+        if not check_batch_permission(batch):
             return jsonify({'success': False, 'error': 'Permissão negada'}), 403
         
         # Verificar se batch está pronto (permite reprocessar batches com erro ou running travados)
@@ -1158,7 +1176,7 @@ def batch_status(id):
             return jsonify({'success': False, 'error': 'Batch não encontrado'}), 404
         
         # Verificar permissão
-        if batch.owner_id != current_user.id:
+        if not check_batch_permission(batch):
             return jsonify({'success': False, 'error': 'Permissão negada'}), 403
         
         items = BatchItem.query.filter_by(batch_id=id).order_by(BatchItem.process_id.asc().nullslast()).all()
@@ -1269,7 +1287,7 @@ def batch_item_retry(id):
     batch = item.batch
     
     # Verificar permissão
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         flash("Permissão negada", "danger")
         return redirect(url_for('batch.batch_detail', id=batch.id))
     
@@ -1340,7 +1358,7 @@ def batch_item_pdf(id):
     batch = item.batch
     
     # Verificar permissão
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para acessar este arquivo.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -1357,7 +1375,7 @@ def batch_item_delete(id):
     batch = item.batch
     
     # Verificar permissão
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para deletar este item.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -1392,7 +1410,7 @@ def batch_cleanup(id):
     batch = BatchUpload.query.get_or_404(id)
     
     # Verificar permissão
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         return jsonify({'success': False, 'error': 'Permissão negada'}), 403
     
     try:
@@ -1418,7 +1436,7 @@ def batch_reprocess(id):
     batch = BatchUpload.query.get_or_404(id)
     
     # Verificar permissão
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para reprocessar este batch.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -1596,7 +1614,7 @@ def batch_reextract(id):
     
     batch = BatchUpload.query.get_or_404(id)
     
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para reprocessar este batch.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -1727,7 +1745,7 @@ def batch_rerpa(id):
     
     batch = BatchUpload.query.get_or_404(id)
     
-    if batch.owner_id != current_user.id:
+    if not check_batch_permission(batch):
         flash("Você não tem permissão para reprocessar este batch.", "danger")
         return redirect(url_for('batch.batch_list'))
     
@@ -1910,7 +1928,7 @@ def batch_delete(id):
             return redirect(url_for('batch.batch_list'))
         
         # Verificar propriedade
-        if batch.owner_id != current_user.id:
+        if not check_batch_permission(batch):
             flash("Você não tem permissão para deletar este batch.", "danger")
             return redirect(url_for('batch.batch_list'))
         
