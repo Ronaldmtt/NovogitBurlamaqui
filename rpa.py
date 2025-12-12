@@ -5148,6 +5148,20 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     _must(await wait_for_cnj_container(page), "Campo CNJ não apareceu no DOM")
     
     _must(await set_cnj_value(page, cnj), "Número do Processo (CNJ)")
+    
+    # 🔧 2025-12-12: APERTAR ENTER após preencher CNJ (simula fluxo manual)
+    # Isso garante que o eLaw processe o número e dispare o autofill
+    try:
+        cnj_input = page.locator("#ProtocoloInicial, #NumeroProcesso, input[name*='cnj' i], input[name*='processo' i]").first
+        if await cnj_input.count() > 0:
+            await cnj_input.press("Enter")
+            log("[CNJ] ✅ Enter pressionado após preencher número do processo")
+        else:
+            await page.keyboard.press("Enter")
+            log("[CNJ] ✅ Enter pressionado via keyboard global")
+    except Exception as e:
+        log(f"[CNJ][WARN] Erro ao pressionar Enter: {e}")
+    
     await _settle(page, "input:cnj")
     await ensure_cnj_still_present(page, cnj)
     log(f"✅ [FORM] CNJ preenchido: {cnj}")
