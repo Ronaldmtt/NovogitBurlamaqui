@@ -5281,18 +5281,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         update_field_status("numero_processo_antigo", "Número Processo Antigo", old_num)
 
     # 5) Área do Direito
+    # 🔧 2025-12-12: Otimizado para não abrir dropdown 2x - seleciona diretamente
     update_status("area_direito", "Preenchendo Área do Direito...", process_id=process_id)
     await wait_for_select_ready(page, "AreaDireitoId", 1, 15000)
-    btn, cont = await _open_bs_and_get_container(page, "AreaDireitoId")
-    area_options = _clean_choices(await _collect_options_from_container(cont)) if cont else []
-    if btn:
-        try:
-            await btn.press("Escape")
-        except Exception:
-            pass
-    wanted_area = _best_match(area_options, resolve_area_direito(data), threshold=10) if area_options else resolve_area_direito(data)
+    wanted_area = resolve_area_direito(data)
     _must(
-        await set_select_fuzzy_any(page, "AreaDireitoId", wanted_area, fallbacks=(area_options[:8] if area_options else AREA_LIST)),
+        await set_select_fuzzy_any(page, "AreaDireitoId", wanted_area, fallbacks=AREA_LIST),
         "Área do Direito",
     )
     await _settle(page, "select:area")
@@ -7053,10 +7047,9 @@ async def ensure_elaw_detail_url_via_relatorio(page, process_id: int, data: dict
                 log("[FALLBACK_URL][ERRO] Não encontrou botão de Localizar")
                 continue
             
-            # 6. Aguardar o carregamento dos resultados (AJAX)
+            # 6. Aguardar o carregamento dos resultados (AJAX) - espera dinâmica
             log("[FALLBACK_URL][WAIT] Aguardando resultados...")
-            await short_sleep_ms(2000)  # Esperar AJAX carregar
-            
+            # 🔧 2025-12-12: Removido short_sleep_ms(2000) redundante - wait_for_selector já faz a espera
             try:
                 await page.wait_for_selector('#processoRelatorioList', state='visible', timeout=20000)  # 20s - tolerante a tabela lenta
             except Exception:
