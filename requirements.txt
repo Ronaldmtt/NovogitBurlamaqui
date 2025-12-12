@@ -43,14 +43,9 @@ urllib3
 werkzeug
 wtforms
 
-# === OCR & Image Processing ===
+# === OCR & Image Processing (Tesseract-based, NO torch/easyocr) ===
 numpy
 opencv-python-headless
-easyocr
 pdf2image
 pytesseract
 Pillow
-
-# === Deep Learning (EasyOCR dependency) ===
-torch
-torchvision
