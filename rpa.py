@@ -1263,10 +1263,12 @@ async def login_elaw(page, user: str, password: str, url: str) -> bool:
         for check_attempt in range(90):  # 90s de espera para redirect
             if await _check_login_success(page):
                 log(f"[LOGIN] ✅ Login bem-sucedido! (tentativa {attempt})")
+                monitor_log_info(f"✅ Login eLaw bem-sucedido (tentativa {attempt})", region="RPA")
                 return True
             
             if await _check_login_failure(page):
                 # Capturar screenshot da falha
+                screenshot_path = None
                 try:
                     screenshot_path = f"/home/runner/workspace/rpa_screenshots/login_falha_attempt{attempt}.png"
                     await page.screenshot(path=screenshot_path)
@@ -1276,6 +1278,7 @@ async def login_elaw(page, user: str, password: str, url: str) -> bool:
                     pass
                 
                 log(f"[LOGIN] ❌ Falha detectada (tentativa {attempt})")
+                monitor_log_warning(f"⚠️ Login falhou na tentativa {attempt}", region="RPA")
                 break
             
             await short_sleep_ms(1000)
@@ -1288,6 +1291,7 @@ async def login_elaw(page, user: str, password: str, url: str) -> bool:
                 await short_sleep_ms(wait_secs * 1000)
     
     log("[LOGIN] ❌ FALHA DEFINITIVA após todas as tentativas")
+    monitor_log_error("❌ Login falhou definitivamente após todas as tentativas", exc=None, region="RPA", screenshot_path=None)
     return False
 
 async def temporarily_disable_navbar(page, ms=800):
@@ -4921,6 +4925,7 @@ ESTRATEGIA_SELECT_ID = "EstrategiaId"
 
 async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  # 2025-11-21: process_id OBRIGATÓRIO
     update_status("navegando_formulario", "Navegando para formulário de novo processo...", process_id=process_id)
+    monitor_log_info(f"📝 Iniciando preenchimento do formulário eLaw para processo #{process_id}", region="RPA")
     log("[FORM] aguardando /Processo/form")
     try:
         await page.wait_for_url(re.compile(r"/Processo/form"), timeout=NAV_TIMEOUT_MS)
@@ -5118,6 +5123,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     await ensure_cnj_still_present(page, cnj)
     log(f"✅ [FORM] CNJ preenchido: {cnj}")
     update_status("cnj_preenchido", f"CNJ preenchido com sucesso: {cnj}", process_id=process_id)
+    monitor_log_info(f"✅ CNJ preenchido: {cnj} (processo #{process_id})", region="RPA")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # FIM DO FLUXO CNJ (2 etapas concluídas: Radio Sim + Textbox preenchido)
@@ -5239,6 +5245,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     await _settle(page, "select:sistema")
     await ensure_cnj_still_present(page, cnj)
     update_field_status("sistema_eletronico", "Sistema Eletrônico", wanted_sys)
+    monitor_log_info(f"✅ Sistema Eletrônico selecionado: {wanted_sys} (processo #{process_id})", region="RPA")
 
     # 4) Número Processo Antigo
     old_num = (data.get("numero_processo_antigo") or "").strip()
@@ -5823,9 +5830,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             log(f"✅ [CLIENTE] {GRUPO_CLIENTE_SELECT_ID}: '{target_group}'")
             update_status("cliente_preenchido", f"✅ Cliente preenchido: {target_group}", process_id=process_id)
             update_field_status("cliente", "Cliente/Grupo", target_group)
+            monitor_log_info(f"✅ Cliente selecionado: {target_group} (processo #{process_id})", region="RPA")
         await _settle(page, "select:grupo_cliente")
     except Exception as e:
         log(f"[Cliente (Grupo)][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao selecionar cliente: {e}", region="RPA")
 
     # 17.2) Parte Adversa (Tipo) — radio (1=Física, 2=Jurídica)
     try:
@@ -5908,9 +5917,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             log(f"✅ [PARTE ADVERSA] Nome preenchido: {adv_nome}")
             update_status("parte_adversa_preenchida", f"✅ Parte adversa preenchida: {adv_nome}", process_id=process_id)
             update_field_status("parte_adversa_nome", "Nome Parte Adversa", adv_nome)
+            monitor_log_info(f"✅ Parte adversa preenchida: {adv_nome} (processo #{process_id})", region="RPA")
             await _settle(page, "input:adverso_nome")
     except Exception as e:
         log(f"[Adverso Nome][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher parte adversa: {e}", region="RPA")
 
     # 17.4.1) UF OAB Advogado Adverso (dropdown)
     try:
@@ -9242,12 +9253,16 @@ async def perform_login(page, user: str, pwd: str, process_id: int):
     """2025-11-21: process_id OBRIGATÓRIO"""
     ok = await login_elaw(page, user, pwd, BASE_URL)
     if not ok:
+        screenshot_path_str = None
         try:
             png = _get_screenshot_path("elaw_login_form_nao_encontrado.png", process_id=process_id)
             await page.screenshot(path=str(png), full_page=True)
+            screenshot_path_str = str(png)
             log(f"[SHOT] login_falha: {png}")
         except Exception:
             pass
+        error_msg = f"Não foi possível efetuar o login no eLaw (processo #{process_id})"
+        monitor_log_error(error_msg, exc=None, region="RPA", screenshot_path=screenshot_path_str)
         raise RuntimeError("Não foi possível efetuar o login no eLaw.")
 
 async def run_elaw_login_once(process_id: int):
@@ -9266,18 +9281,22 @@ async def run_elaw_login_once(process_id: int):
     reset_process_encerrado()
     
     log(f"[RPA][ASYNC] Contexto setado dentro de run_elaw_login_once para processo #{process_id}")
+    monitor_log_info(f"🚀 Iniciando RPA para processo #{process_id}", region="RPA")
     
     try:
         validate_env()
         _init_status(process_id)  # Inicializa sistema de status
         update_status("abrindo_navegador", "Abrindo navegador Chromium em modo headless...", process_id=process_id)
+        monitor_log_info(f"Abrindo navegador para processo #{process_id}", region="RPA")
     
         # 🔒 CRITICAL: try/finally garante que status NUNCA fica 'running' após RPA terminar
         async with launch_browser() as page:
             try:
                 update_status("fazendo_login", "Fazendo login no eLaw...", process_id=process_id)
+                monitor_log_info(f"Fazendo login no eLaw para processo #{process_id}", region="RPA")
                 await perform_login(page, ELAW_USER, ELAW_PASS, process_id)
                 update_status("login_sucesso", "Login realizado com sucesso!", process_id=process_id)
+                monitor_log_info(f"✅ Login realizado com sucesso para processo #{process_id}", region="RPA")
                 await after_login_flow(page, process_id=process_id)
                 if KEEP_OPEN_AFTER_LOGIN_SECONDS > 0:
                     log(f"Janela aberta por {KEEP_OPEN_AFTER_LOGIN_SECONDS:.1f}s p/ inspeção…")
@@ -9286,19 +9305,21 @@ async def run_elaw_login_once(process_id: int):
                 error_msg = f"Erro durante execução do RPA: {str(e)}"
                 update_status("erro", error_msg, status="error", process_id=process_id)
                 
-                # Enviar erro para monitor remoto
-                log_error_to_monitor(error_msg, exc=e)
-                
                 # 🔧 FIX PROBLEMA 2: Capturar screenshot de erro E salvar em Process.elaw_screenshot_after_path
                 screenshot_filename = None
+                screenshot_full_path = None
                 try:
                     png = _get_screenshot_path("elaw_flow_error.png", process_id=process_id)
                     await page.screenshot(path=str(png), full_page=True)
                     screenshot_filename = png.name  # Apenas nome do arquivo, sem path
+                    screenshot_full_path = str(png)
                     log(f"[SHOT][ERRO] {png}")
                     send_screenshot_to_monitor(png, region="RPA_ERROR")
                 except Exception as screenshot_ex:
                     log(f"[SHOT][ERRO] Falha ao capturar screenshot: {screenshot_ex}")
+                
+                # 📡 Enviar erro para monitor remoto COM screenshot obrigatório
+                monitor_log_error(error_msg, exc=e, region="RPA", screenshot_path=screenshot_full_path)
                 
                 # Atualizar status de erro no banco de dados + screenshot
                 if process_id and flask_app:
@@ -9330,6 +9351,7 @@ async def run_elaw_login_once(process_id: int):
             
             # Sucesso - atualiza status final (APENAS se não foi marcado como erro antes)
             update_status("concluido", "Processo preenchido com sucesso no eLaw!", status="completed", process_id=process_id)
+            monitor_log_info(f"✅ Processo #{process_id} preenchido com sucesso no eLaw!", region="RPA")
             
             # Atualizar status do processo no banco de dados - FINAL DO FLUXO COMPLETO
             if process_id and flask_app:
@@ -9546,6 +9568,7 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
     central_rpa_log.step_start("rpa_init", process_id=process_id, worker_id=worker_id)
     
     log(f"[EXECUTE_RPA_PARALLEL] Worker {worker_id} iniciando processo #{process_id}")
+    monitor_log_info(f"🚀 Worker {worker_id} iniciando RPA paralelo para processo #{process_id}", region="RPA")
     
     # 🔒 SEMÁFORO: Permite até MAX_RPA_WORKERS execuções simultâneas
     acquired = _execute_rpa_semaphore.acquire(blocking=True, timeout=300)  # 5 min timeout
@@ -9598,6 +9621,7 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
             log_success("RPA_EXECUTE", f"Processo preenchido com sucesso no eLaw", 
                        process_id=process_id, worker_id=worker_id, duration_ms=rpa_duration_ms)
             central_rpa_log.step_end("rpa_complete", success=True, process_id=process_id)
+            monitor_log_info(f"✅ Worker {worker_id} completou processo #{process_id} com sucesso", region="RPA")
             return {
                 'status': 'success',
                 'process_id': process_id,
@@ -9631,10 +9655,12 @@ def execute_rpa_parallel(process_id: int, worker_id: Optional[int] = None) -> di
     except Exception as e:
         error_msg = f"Erro ao executar RPA paralelo para processo #{process_id}: {str(e)}"
         log(f"[EXECUTE_RPA_PARALLEL][ERROR] {error_msg}")
-        log_error_to_monitor(error_msg, exc=e)
         log_err("RPA_EXECUTE", f"Exceção durante execução RPA", 
                error=str(e), process_id=process_id, worker_id=worker_id, include_traceback=True)
         central_rpa_log.step_error("rpa_exception", error=str(e), process_id=process_id)
+        
+        # 📡 Enviar erro para monitor remoto (screenshot já foi capturado no run_elaw_login_once)
+        monitor_log_error(error_msg, exc=e, region="RPA", screenshot_path=None)
         
         # 🔒 CRITICAL: Atualizar status para error (para não ficar "running")
         update_status("erro_fatal", f"Erro fatal durante execução: {str(e)[:200]}", status="error", process_id=process_id)

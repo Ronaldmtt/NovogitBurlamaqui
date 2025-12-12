@@ -88,6 +88,7 @@ class GlobalBatchQueueRunner:
         }
         
         logger.info("[QUEUE_RUNNER] GlobalBatchQueueRunner inicializado (singleton)")
+        monitor_log_info("GlobalBatchQueueRunner inicializado (singleton)", region="QUEUE")
     
     def set_flask_app(self, app):
         """Define o Flask app para usar no contexto de banco de dados."""
@@ -115,13 +116,16 @@ class GlobalBatchQueueRunner:
                 
                 if result:
                     logger.info("[QUEUE_RUNNER] Advisory lock adquirido com sucesso")
+                    monitor_log_info("Advisory lock adquirido com sucesso", region="QUEUE")
                 else:
                     logger.warning("[QUEUE_RUNNER] Outro processo já possui o advisory lock")
+                    monitor_log_warning("Outro processo já possui o advisory lock", region="QUEUE")
                 
                 return bool(result)
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao adquirir advisory lock: {e}")
+            monitor_log_error(f"Erro ao adquirir advisory lock: {e}", exc=e, region="QUEUE")
             return False
     
     def _release_db_lock(self):
@@ -139,9 +143,11 @@ class GlobalBatchQueueRunner:
                 )
                 db.session.commit()
                 logger.info("[QUEUE_RUNNER] Advisory lock liberado")
+                monitor_log_info("Advisory lock liberado", region="QUEUE")
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao liberar advisory lock: {e}")
+            monitor_log_error(f"Erro ao liberar advisory lock: {e}", exc=e, region="QUEUE")
     
     @property
     def is_running(self) -> bool:
@@ -223,6 +229,7 @@ class GlobalBatchQueueRunner:
                     
             except Exception as e:
                 logger.error(f"[QUEUE_RUNNER] Erro ao obter status: {e}")
+                monitor_log_error(f"Erro ao obter status: {e}", exc=e, region="QUEUE")
                 return {
                     'running': self._running,
                     'error': str(e)
@@ -275,6 +282,7 @@ class GlobalBatchQueueRunner:
                          batch_id=batch_id, position=new_position, user_id=user_id)
                 
                 logger.info(f"[QUEUE_RUNNER] Batch {batch_id} adicionado à fila (posição {new_position})")
+                monitor_log_info(f"Batch {batch_id} adicionado à fila (posição {new_position})", region="QUEUE")
                 
                 return {
                     'success': True, 
@@ -284,6 +292,7 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao adicionar batch {batch_id} à fila: {e}")
+            monitor_log_error(f"Erro ao adicionar batch {batch_id} à fila: {e}", exc=e, region="QUEUE")
             return {'success': False, 'error': str(e)}
     
     def remove_from_queue(self, batch_id: int) -> Dict[str, Any]:
@@ -326,6 +335,7 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao remover batch {batch_id} da fila: {e}")
+            monitor_log_error(f"Erro ao remover batch {batch_id} da fila: {e}", exc=e, region="QUEUE")
             return {'success': False, 'error': str(e)}
     
     def start_queue_processing(self, user_id: int) -> Dict[str, Any]:
@@ -386,6 +396,7 @@ class GlobalBatchQueueRunner:
                      user_id=user_id, queued_batches=queued_count)
             
             logger.info(f"[QUEUE_RUNNER] Processamento da fila iniciado ({queued_count} batches)")
+            monitor_log_info(f"Processamento da fila iniciado ({queued_count} batches)", region="QUEUE")
             
             return {
                 'success': True,
@@ -397,6 +408,7 @@ class GlobalBatchQueueRunner:
             self._running = False
             self._release_db_lock()
             logger.error(f"[QUEUE_RUNNER] Erro ao iniciar fila: {e}")
+            monitor_log_error(f"Erro ao iniciar fila: {e}", exc=e, region="QUEUE")
             return {'success': False, 'error': str(e)}
     
     def stop_queue_processing(self) -> Dict[str, Any]:
@@ -408,6 +420,7 @@ class GlobalBatchQueueRunner:
         
         log_event("QUEUE_STOP", f"Parada da fila solicitada")
         logger.info("[QUEUE_RUNNER] Parada da fila solicitada (aguardando batch atual terminar)")
+        monitor_log_info("Parada da fila solicitada (aguardando batch atual terminar)", region="QUEUE")
         
         return {
             'success': True,
@@ -422,6 +435,7 @@ class GlobalBatchQueueRunner:
         """
         log_start("QUEUE_LOOP", f"Loop da fila iniciado")
         logger.info("[QUEUE_RUNNER] Loop da fila iniciado")
+        monitor_log_info("Loop da fila iniciado", region="QUEUE")
         
         try:
             while not self._stop_requested:
@@ -429,6 +443,7 @@ class GlobalBatchQueueRunner:
                 
                 if next_batch is None:
                     logger.info("[QUEUE_RUNNER] Fila vazia, encerrando loop")
+                    monitor_log_info("Fila vazia, encerrando loop", region="QUEUE")
                     break
                 
                 batch_id = next_batch['id']
@@ -437,6 +452,7 @@ class GlobalBatchQueueRunner:
                 log_event("QUEUE_BATCH_START", f"Iniciando processamento de batch da fila",
                          batch_id=batch_id, position=next_batch['queue_position'])
                 logger.info(f"[QUEUE_RUNNER] Processando batch {batch_id} (posição {next_batch['queue_position']})")
+                monitor_log_info(f"Processando batch {batch_id} (posição {next_batch['queue_position']})", region="QUEUE")
                 
                 try:
                     result = self._process_single_batch(batch_id)
@@ -459,6 +475,7 @@ class GlobalBatchQueueRunner:
                 except Exception as e:
                     self._stats['batches_failed'] += 1
                     logger.error(f"[QUEUE_RUNNER] Erro ao processar batch {batch_id}: {e}")
+                    monitor_log_error(f"Erro ao processar batch {batch_id}: {e}", exc=e, region="QUEUE")
                     log_err("QUEUE_BATCH", f"Exceção ao processar batch",
                            batch_id=batch_id, error=str(e))
                 
@@ -471,6 +488,7 @@ class GlobalBatchQueueRunner:
         
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro fatal no loop da fila: {e}")
+            monitor_log_error(f"Erro fatal no loop da fila: {e}", exc=e, region="QUEUE")
             log_err("QUEUE_LOOP", f"Erro fatal no loop", error=str(e))
         
         finally:
@@ -484,6 +502,7 @@ class GlobalBatchQueueRunner:
                    batches_completed=self._stats['batches_completed'],
                    batches_failed=self._stats['batches_failed'])
             logger.info("[QUEUE_RUNNER] Loop da fila encerrado")
+            monitor_log_info(f"Loop da fila encerrado (completed={self._stats['batches_completed']}, failed={self._stats['batches_failed']})", region="QUEUE")
     
     def _get_next_batch(self) -> Optional[Dict[str, Any]]:
         """Retorna o próximo batch da fila para processar."""
@@ -515,6 +534,7 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao obter próximo batch: {e}")
+            monitor_log_error(f"Erro ao obter próximo batch: {e}", exc=e, region="QUEUE")
             return None
     
     def _process_single_batch(self, batch_id: int) -> Dict[str, Any]:
@@ -576,6 +596,7 @@ class GlobalBatchQueueRunner:
                 error_count = total_items - len(items_data)
                 
                 logger.info(f"[QUEUE_RUNNER] Processando {len(items_data)} itens do batch {batch_id}")
+                monitor_log_info(f"Processando {len(items_data)} itens do batch {batch_id}", region="QUEUE")
                 
                 def execute_single_rpa(item_id: int, process_id: int, worker_id: int):
                     try:
@@ -611,6 +632,7 @@ class GlobalBatchQueueRunner:
                             
                     except Exception as e:
                         logger.error(f"[QUEUE_RUNNER] Erro ao executar RPA para item {item_id}: {e}")
+                        monitor_log_error(f"Erro ao executar RPA para item {item_id}: {e}", exc=e, region="QUEUE")
                         try:
                             with self._flask_app.app_context():
                                 from models import BatchItem, db
@@ -662,6 +684,7 @@ class GlobalBatchQueueRunner:
                         except Exception as e:
                             error_count += 1
                             logger.error(f"[QUEUE_RUNNER] Erro no future: {e}")
+                            monitor_log_error(f"Erro no future: {e}", exc=e, region="QUEUE")
                 
                 with self._flask_app.app_context():
                     from models import BatchUpload, db
@@ -674,6 +697,7 @@ class GlobalBatchQueueRunner:
                     db.session.remove()
                 
                 logger.info(f"[QUEUE_RUNNER] Batch {batch_id} concluído: {success_count} sucesso, {error_count} erros")
+                monitor_log_info(f"Batch {batch_id} concluído: {success_count} sucesso, {error_count} erros", region="QUEUE")
                 
                 return {
                     'success': True,
@@ -683,6 +707,7 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao processar batch {batch_id}: {e}")
+            monitor_log_error(f"Erro ao processar batch {batch_id}: {e}", exc=e, region="QUEUE")
             
             try:
                 with self._flask_app.app_context():
@@ -722,6 +747,7 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao remover batch {batch_id} da fila: {e}")
+            monitor_log_error(f"Erro ao remover batch {batch_id} da fila: {e}", exc=e, region="QUEUE")
 
 
 global_queue_runner = GlobalBatchQueueRunner()
