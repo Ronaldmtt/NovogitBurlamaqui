@@ -12,7 +12,9 @@ from typing import Optional
 LOG = logging.getLogger(__name__)
 
 # Adicionar caminho do rpa_monitor_client ao sys.path antes do import
-_RPA_CLIENT_PATH = '/home/runner/workspace/rpa_monitor_client'
+# Usa caminho relativo ao diretório do projeto (funciona em qualquer ambiente)
+_PROJECT_DIR = Path(__file__).resolve().parent
+_RPA_CLIENT_PATH = str(_PROJECT_DIR / 'rpa_monitor_client')
 if _RPA_CLIENT_PATH not in sys.path:
     sys.path.insert(0, _RPA_CLIENT_PATH)
 
