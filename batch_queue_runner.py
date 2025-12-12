@@ -69,6 +69,8 @@ class GlobalBatchQueueRunner:
         if self._initialized:
             return
         
+        monitor_log_info("QueueRunner: __init__() iniciada", region="QUEUE")
+        
         self._initialized = True
         self._running = False
         self._runner_thread: Optional[threading.Thread] = None
@@ -88,11 +90,13 @@ class GlobalBatchQueueRunner:
         }
         
         logger.info("[QUEUE_RUNNER] GlobalBatchQueueRunner inicializado (singleton)")
-        monitor_log_info("GlobalBatchQueueRunner inicializado (singleton)", region="QUEUE")
+        monitor_log_info("QueueRunner: __init__() concluída - singleton inicializado", region="QUEUE")
     
     def set_flask_app(self, app):
         """Define o Flask app para usar no contexto de banco de dados."""
+        monitor_log_info("QueueRunner: set_flask_app() iniciada", region="QUEUE")
         self._flask_app = app
+        monitor_log_info("QueueRunner: set_flask_app() concluída - Flask app configurado", region="QUEUE")
     
     def _acquire_db_lock(self) -> bool:
         """
@@ -102,7 +106,10 @@ class GlobalBatchQueueRunner:
         Returns:
             True se o lock foi adquirido, False se outro processo já tem o lock.
         """
+        monitor_log_info("QueueRunner: _acquire_db_lock() iniciada - tentando adquirir lock", region="QUEUE")
+        
         if not self._flask_app:
+            monitor_log_warning("QueueRunner: _acquire_db_lock() - Flask app não configurado", region="QUEUE")
             return False
         
         try:
@@ -116,21 +123,24 @@ class GlobalBatchQueueRunner:
                 
                 if result:
                     logger.info("[QUEUE_RUNNER] Advisory lock adquirido com sucesso")
-                    monitor_log_info("Advisory lock adquirido com sucesso", region="QUEUE")
+                    monitor_log_info("QueueRunner: _acquire_db_lock() concluída - lock ADQUIRIDO", region="QUEUE")
                 else:
                     logger.warning("[QUEUE_RUNNER] Outro processo já possui o advisory lock")
-                    monitor_log_warning("Outro processo já possui o advisory lock", region="QUEUE")
+                    monitor_log_warning("QueueRunner: _acquire_db_lock() concluída - lock NÃO adquirido (outro processo)", region="QUEUE")
                 
                 return bool(result)
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao adquirir advisory lock: {e}")
-            monitor_log_error(f"Erro ao adquirir advisory lock: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: _acquire_db_lock() - ERRO: {e}", exc=e, region="QUEUE")
             return False
     
     def _release_db_lock(self):
         """Libera o advisory lock no PostgreSQL."""
+        monitor_log_info("QueueRunner: _release_db_lock() iniciada", region="QUEUE")
+        
         if not self._flask_app:
+            monitor_log_warning("QueueRunner: _release_db_lock() - Flask app não configurado", region="QUEUE")
             return
         
         try:
@@ -143,11 +153,11 @@ class GlobalBatchQueueRunner:
                 )
                 db.session.commit()
                 logger.info("[QUEUE_RUNNER] Advisory lock liberado")
-                monitor_log_info("Advisory lock liberado", region="QUEUE")
+                monitor_log_info("QueueRunner: _release_db_lock() concluída - lock liberado", region="QUEUE")
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao liberar advisory lock: {e}")
-            monitor_log_error(f"Erro ao liberar advisory lock: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: _release_db_lock() - ERRO: {e}", exc=e, region="QUEUE")
     
     @property
     def is_running(self) -> bool:
@@ -246,7 +256,10 @@ class GlobalBatchQueueRunner:
         Returns:
             Dict com status da operação
         """
+        monitor_log_info(f"QueueRunner: add_to_queue() iniciada - batch_id={batch_id}, user_id={user_id}", region="QUEUE")
+        
         if not self._flask_app:
+            monitor_log_warning("QueueRunner: add_to_queue() - Flask app não configurado", region="QUEUE")
             return {'success': False, 'error': 'Flask app não configurado'}
         
         try:
@@ -282,7 +295,7 @@ class GlobalBatchQueueRunner:
                          batch_id=batch_id, position=new_position, user_id=user_id)
                 
                 logger.info(f"[QUEUE_RUNNER] Batch {batch_id} adicionado à fila (posição {new_position})")
-                monitor_log_info(f"Batch {batch_id} adicionado à fila (posição {new_position})", region="QUEUE")
+                monitor_log_info(f"QueueRunner: add_to_queue() concluída - batch {batch_id} na posição {new_position}", region="QUEUE")
                 
                 return {
                     'success': True, 
@@ -292,12 +305,15 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao adicionar batch {batch_id} à fila: {e}")
-            monitor_log_error(f"Erro ao adicionar batch {batch_id} à fila: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: add_to_queue() - ERRO: {e}", exc=e, region="QUEUE")
             return {'success': False, 'error': str(e)}
     
     def remove_from_queue(self, batch_id: int) -> Dict[str, Any]:
         """Remove um batch da fila."""
+        monitor_log_info(f"QueueRunner: remove_from_queue() iniciada - batch_id={batch_id}", region="QUEUE")
+        
         if not self._flask_app:
+            monitor_log_warning("QueueRunner: remove_from_queue() - Flask app não configurado", region="QUEUE")
             return {'success': False, 'error': 'Flask app não configurado'}
         
         try:
@@ -331,11 +347,12 @@ class GlobalBatchQueueRunner:
                 log_event("QUEUE_REMOVE", f"Batch removido da fila", 
                          batch_id=batch_id, old_position=old_position)
                 
+                monitor_log_info(f"QueueRunner: remove_from_queue() concluída - batch {batch_id} removido", region="QUEUE")
                 return {'success': True, 'message': 'Batch removido da fila'}
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao remover batch {batch_id} da fila: {e}")
-            monitor_log_error(f"Erro ao remover batch {batch_id} da fila: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: remove_from_queue() - ERRO: {e}", exc=e, region="QUEUE")
             return {'success': False, 'error': str(e)}
     
     def start_queue_processing(self, user_id: int) -> Dict[str, Any]:
@@ -351,10 +368,14 @@ class GlobalBatchQueueRunner:
         Returns:
             Dict com status da operação
         """
+        monitor_log_info(f"QueueRunner: start_queue_processing() iniciada - user_id={user_id}", region="QUEUE")
+        
         if self._running:
+            monitor_log_warning("QueueRunner: start_queue_processing() - fila já em execução", region="QUEUE")
             return {'success': False, 'error': 'Fila já está em execução neste worker'}
         
         if not self._flask_app:
+            monitor_log_warning("QueueRunner: start_queue_processing() - Flask app não configurado", region="QUEUE")
             return {'success': False, 'error': 'Flask app não configurado'}
         
         if not self._acquire_db_lock():
@@ -396,7 +417,7 @@ class GlobalBatchQueueRunner:
                      user_id=user_id, queued_batches=queued_count)
             
             logger.info(f"[QUEUE_RUNNER] Processamento da fila iniciado ({queued_count} batches)")
-            monitor_log_info(f"Processamento da fila iniciado ({queued_count} batches)", region="QUEUE")
+            monitor_log_info(f"QueueRunner: start_queue_processing() concluída - {queued_count} batches na fila", region="QUEUE")
             
             return {
                 'success': True,
@@ -408,19 +429,22 @@ class GlobalBatchQueueRunner:
             self._running = False
             self._release_db_lock()
             logger.error(f"[QUEUE_RUNNER] Erro ao iniciar fila: {e}")
-            monitor_log_error(f"Erro ao iniciar fila: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: start_queue_processing() - ERRO: {e}", exc=e, region="QUEUE")
             return {'success': False, 'error': str(e)}
     
     def stop_queue_processing(self) -> Dict[str, Any]:
         """Para o processamento da fila após o batch atual terminar."""
+        monitor_log_info("QueueRunner: stop_queue_processing() iniciada", region="QUEUE")
+        
         if not self._running:
+            monitor_log_warning("QueueRunner: stop_queue_processing() - fila não está em execução", region="QUEUE")
             return {'success': False, 'error': 'Fila não está em execução'}
         
         self._stop_requested = True
         
         log_event("QUEUE_STOP", f"Parada da fila solicitada")
         logger.info("[QUEUE_RUNNER] Parada da fila solicitada (aguardando batch atual terminar)")
-        monitor_log_info("Parada da fila solicitada (aguardando batch atual terminar)", region="QUEUE")
+        monitor_log_info(f"QueueRunner: stop_queue_processing() concluída - parada solicitada, batch atual={self._current_batch_id}", region="QUEUE")
         
         return {
             'success': True,
@@ -433,9 +457,9 @@ class GlobalBatchQueueRunner:
         Loop principal que processa batches em sequência.
         Executa em thread separada.
         """
+        monitor_log_info("QueueRunner: _run_queue_loop() iniciada", region="QUEUE")
         log_start("QUEUE_LOOP", f"Loop da fila iniciado")
         logger.info("[QUEUE_RUNNER] Loop da fila iniciado")
-        monitor_log_info("Loop da fila iniciado", region="QUEUE")
         
         try:
             while not self._stop_requested:
@@ -502,10 +526,11 @@ class GlobalBatchQueueRunner:
                    batches_completed=self._stats['batches_completed'],
                    batches_failed=self._stats['batches_failed'])
             logger.info("[QUEUE_RUNNER] Loop da fila encerrado")
-            monitor_log_info(f"Loop da fila encerrado (completed={self._stats['batches_completed']}, failed={self._stats['batches_failed']})", region="QUEUE")
+            monitor_log_info(f"QueueRunner: _run_queue_loop() concluída - completed={self._stats['batches_completed']}, failed={self._stats['batches_failed']}", region="QUEUE")
     
     def _get_next_batch(self) -> Optional[Dict[str, Any]]:
         """Retorna o próximo batch da fila para processar."""
+        monitor_log_info("QueueRunner: _get_next_batch() iniciada", region="QUEUE")
         try:
             with self._flask_app.app_context():
                 from models import BatchUpload, BatchItem, db
@@ -516,6 +541,7 @@ class GlobalBatchQueueRunner:
                 ).order_by(BatchUpload.queue_position.asc()).first()
                 
                 if not next_batch:
+                    monitor_log_info("QueueRunner: _get_next_batch() concluída - fila vazia", region="QUEUE")
                     return None
                 
                 ready_items = BatchItem.query.filter_by(
@@ -530,11 +556,12 @@ class GlobalBatchQueueRunner:
                 }
                 
                 db.session.remove()
+                monitor_log_info(f"QueueRunner: _get_next_batch() concluída - próximo batch_id={next_batch.id}, pos={next_batch.queue_position}", region="QUEUE")
                 return result
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao obter próximo batch: {e}")
-            monitor_log_error(f"Erro ao obter próximo batch: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: _get_next_batch() - ERRO: {e}", exc=e, region="QUEUE")
             return None
     
     def _process_single_batch(self, batch_id: int) -> Dict[str, Any]:
@@ -543,6 +570,8 @@ class GlobalBatchQueueRunner:
         
         Reutiliza a lógica existente em routes_batch.py mas de forma síncrona.
         """
+        monitor_log_info(f"QueueRunner: _process_single_batch() iniciada - batch_id={batch_id}", region="QUEUE")
+        
         import rpa
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
@@ -697,7 +726,7 @@ class GlobalBatchQueueRunner:
                     db.session.remove()
                 
                 logger.info(f"[QUEUE_RUNNER] Batch {batch_id} concluído: {success_count} sucesso, {error_count} erros")
-                monitor_log_info(f"Batch {batch_id} concluído: {success_count} sucesso, {error_count} erros", region="QUEUE")
+                monitor_log_info(f"QueueRunner: _process_single_batch() concluída - batch {batch_id}: {success_count} sucesso, {error_count} erros", region="QUEUE")
                 
                 return {
                     'success': True,
@@ -707,7 +736,7 @@ class GlobalBatchQueueRunner:
                 
         except Exception as e:
             logger.error(f"[QUEUE_RUNNER] Erro ao processar batch {batch_id}: {e}")
-            monitor_log_error(f"Erro ao processar batch {batch_id}: {e}", exc=e, region="QUEUE")
+            monitor_log_error(f"QueueRunner: _process_single_batch() - ERRO: {e}", exc=e, region="QUEUE")
             
             try:
                 with self._flask_app.app_context():

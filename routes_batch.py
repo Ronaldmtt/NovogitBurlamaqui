@@ -75,6 +75,7 @@ def cleanup_stuck_processes():
         int: Número de processos cancelados
     """
     from datetime import timedelta
+    log_info("cleanup_stuck_processes() iniciada", region="BATCH")
     
     try:
         timeout_threshold = datetime.utcnow() - timedelta(minutes=10)
@@ -107,12 +108,12 @@ def cleanup_stuck_processes():
         
         db.session.commit()
         logger.info(f"[CLEANUP] ✅ {len(stuck_items)} processos travados foram cancelados")
-        log_info(f"{len(stuck_items)} processos travados foram cancelados", region="BATCH")
+        log_info(f"cleanup_stuck_processes() concluída: {len(stuck_items)} processos cancelados", region="BATCH")
         return len(stuck_items)
         
     except Exception as e:
         logger.error(f"[CLEANUP] Erro ao limpar processos travados: {e}", exc_info=True)
-        log_error(f"Erro ao limpar processos travados: {e}", exc=e, region="BATCH")
+        log_error(f"cleanup_stuck_processes() erro: {e}", exc=e, region="BATCH")
         db.session.rollback()
         return 0
 
@@ -125,6 +126,7 @@ def reset_sequence_if_empty(table_name: str):
         table_name: Nome da tabela ('batch_upload', 'process', 'batch_item')
     """
     from sqlalchemy import text
+    log_info(f"reset_sequence_if_empty() iniciada para tabela {table_name}", region="BATCH")
     
     try:
         result = db.session.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
@@ -135,9 +137,12 @@ def reset_sequence_if_empty(table_name: str):
             db.session.execute(text(f"ALTER SEQUENCE {sequence_name} RESTART WITH 1"))
             db.session.commit()
             logger.info(f"[RESET_SEQ] ✅ Sequência {sequence_name} resetada para 1")
+            log_info(f"reset_sequence_if_empty() concluída: {sequence_name} resetada", region="BATCH")
             return True
+        log_info(f"reset_sequence_if_empty() concluída: tabela {table_name} não está vazia ({count} registros)", region="BATCH")
     except Exception as e:
         logger.warning(f"[RESET_SEQ] Não foi possível resetar sequência de {table_name}: {e}")
+        monitor_warn(f"reset_sequence_if_empty() falhou para {table_name}: {e}", region="BATCH")
         db.session.rollback()
     
     return False
@@ -161,6 +166,7 @@ def _create_process_from_data(data, user_id):
     """Helper para criar Process a partir de dados extraídos"""
     from models import Process
     from datetime import datetime
+    log_info(f"_create_process_from_data() iniciada para user_id={user_id}", region="BATCH")
     
     # Debug logging
     logger.debug(f"[CREATE_PROCESS] data type: {type(data)}, user_id: {user_id}")
@@ -238,6 +244,7 @@ def _create_process_from_data(data, user_id):
     db.session.flush()
     
     logger.debug(f"[CREATE_PROCESS] ✅ Processo criado com ID: {proc.id}")
+    log_info(f"_create_process_from_data() concluída: processo #{proc.id} criado", region="BATCH")
     return proc.id
 
 
@@ -515,6 +522,7 @@ def process_batch_async(batch_id, user_id):
 @login_required
 def batch_new():
     """Upload de múltiplos PDFs"""
+    log_info(f"batch_new() iniciada, method={request.method}", region="BATCH")
     # 🔧 DEBUG 2025-12-03: Log IMEDIATO para verificar se a requisição chega
     import traceback
     logger.info(f"[UPLOAD][TRACE] ========== REQUISIÇÃO RECEBIDA ==========")
@@ -739,6 +747,7 @@ def batch_new():
             flash(f"Batch criado! {len(file_data)} arquivo(s) sendo enviados e processados.", "success")
             
             # Redirecionar IMEDIATAMENTE para tela de progresso
+            log_info(f"batch_new() concluída: batch_id={batch.id} criado com {len(file_data)} arquivos", region="BATCH")
             return redirect(url_for('batch.batch_progress', id=batch.id))
         
         except Exception as e:
@@ -746,9 +755,11 @@ def batch_new():
             logger.error(f"[UPLOAD][DEBUG] ========== ERRO GERAL NO UPLOAD ==========")
             logger.error(f"[UPLOAD][DEBUG] Erro: {e}")
             logger.error(f"[UPLOAD][DEBUG] Stack trace:\n{traceback.format_exc()}")
+            log_error(f"batch_new() erro: {e}", exc=e, region="BATCH")
             flash(f"Erro ao processar arquivos: {str(e)}", "danger")
             return redirect(request.url)
     
+    log_info(f"batch_new() concluída: renderizando formulário", region="BATCH")
     return render_template("processes/batch_upload.html")
 
 
@@ -756,7 +767,9 @@ def batch_new():
 @login_required
 def batch_list():
     """Lista todos os batches do usuário"""
+    log_info(f"batch_list() acessada por user_id={current_user.id}", region="BATCH")
     batches = BatchUpload.query.filter_by(owner_id=current_user.id).order_by(BatchUpload.created_at.desc()).all()
+    log_info(f"batch_list() concluída: {len(batches)} batches encontrados", region="BATCH")
     return render_template("processes/batch_list.html", batches=batches)
 
 
@@ -764,6 +777,7 @@ def batch_list():
 @login_required
 def batch_detail(id):
     """Detalhes de um batch"""
+    log_info(f"batch_detail() acessada: batch_id={id}, user_id={current_user.id}", region="BATCH")
     from models import Process
     batch = BatchUpload.query.get_or_404(id)
     
@@ -782,6 +796,7 @@ def batch_detail(id):
         else:
             item.process = None
     
+    log_info(f"batch_detail() concluída: batch_id={id}, {len(items)} itens", region="BATCH")
     return render_template("processes/batch_detail.html", batch=batch, items=items)
 
 
@@ -789,6 +804,7 @@ def batch_detail(id):
 @login_required
 def batch_progress(id):
     """Tela de progresso do processamento em lote"""
+    log_info(f"batch_progress() acessada: batch_id={id}", region="BATCH")
     batch = BatchUpload.query.get_or_404(id)
     
     # Verificar permissão
@@ -796,6 +812,7 @@ def batch_progress(id):
         flash("Você não tem permissão para acessar este batch.", "danger")
         return redirect(url_for('batch.batch_list'))
     
+    log_info(f"batch_progress() concluída: batch_id={id}", region="BATCH")
     return render_template("processes/batch_progress.html", batch_id=batch.id)
 
 
@@ -975,6 +992,7 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
 @login_required
 def batch_start(id):
     """Inicia processamento RPA do batch com execução PARALELA"""
+    log_info(f"batch_start() iniciada: batch_id={id}", region="BATCH")
     log_start("BATCH_RPA_START", f"Iniciando processamento RPA do batch", batch_id=id)
     ui.button_click("Processar RPA")
     
@@ -1240,6 +1258,7 @@ def batch_start(id):
         logger.info(f"[BATCH RPA] Thread de processamento PARALELO iniciada para batch {id}")
         
         # Retornar imediatamente
+        log_info(f"batch_start() concluída: batch_id={id}, RPA iniciado com {MAX_RPA_WORKERS} workers", region="BATCH")
         return jsonify({
             'success': True,
             'message': f'Processamento RPA em lote iniciado com {MAX_RPA_WORKERS} processos simultâneos! Acompanhe o progresso na lista.'
@@ -1247,6 +1266,7 @@ def batch_start(id):
     
     except Exception as e:
         logger.error(f"Erro ao iniciar batch {id}: {e}", exc_info=True)
+        log_error(f"batch_start() erro para batch_id={id}: {e}", exc=e, region="BATCH")
         try:
             batch.status = 'error'
             db.session.commit()
@@ -1259,6 +1279,7 @@ def batch_start(id):
 @login_required
 def batch_status(id):
     """Retorna status atual do batch (JSON para polling)"""
+    log_info(f"batch_status() acessada: batch_id={id}", region="BATCH")
     try:
         # 🔧 2025-11-27: FORÇAR dados frescos do banco (evitar cache de sessão SQLAlchemy)
         db.session.expire_all()
@@ -1375,6 +1396,7 @@ def batch_status(id):
 @login_required
 def batch_item_retry(id):
     """Reenfileira item com erro para reprocessamento E executa RPA automaticamente"""
+    log_info(f"batch_item_retry() iniciada: item_id={id}", region="BATCH")
     item = BatchItem.query.get_or_404(id)
     batch = item.batch
     
@@ -1432,12 +1454,14 @@ def batch_item_retry(id):
         thread.start()
         
         logger.info(f"[RETRY RPA] Thread iniciada para item {item_id} (total running: {running_count + 1})")
+        log_info(f"batch_item_retry() concluída: item_id={item_id}, RPA iniciado", region="BATCH")
         flash(f"RPA iniciado para '{filename}'! Acompanhe o progresso na tela.", "success")
         return redirect(url_for('batch.batch_detail', id=batch_id))
     
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao iniciar retry para item {id}: {e}")
+        log_error(f"batch_item_retry() erro para item_id={id}: {e}", exc=e, region="BATCH")
         flash(f"Erro ao reprocessar: {str(e)}", "danger")
         return redirect(url_for('batch.batch_detail', id=batch.id))
 
@@ -1463,6 +1487,7 @@ def batch_item_pdf(id):
 @login_required
 def batch_item_delete(id):
     """Deletar um item do batch"""
+    log_info(f"batch_item_delete() iniciada: item_id={id}", region="BATCH")
     item = BatchItem.query.get_or_404(id)
     batch = item.batch
     
@@ -1485,12 +1510,14 @@ def batch_item_delete(id):
         batch.total_count = max(0, batch.total_count - 1)
         db.session.commit()
         
+        log_info(f"batch_item_delete() concluída: item_id={id} deletado", region="BATCH")
         flash(f"Item '{item.source_filename}' deletado com sucesso!", "success")
         return redirect(url_for('batch.batch_detail', id=batch_id))
     
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao deletar item {id}: {e}")
+        log_error(f"batch_item_delete() erro para item_id={id}: {e}", exc=e, region="BATCH")
         flash(f"Erro ao deletar item: {str(e)}", "danger")
         return redirect(url_for('batch.batch_detail', id=batch.id))
 
@@ -1499,6 +1526,7 @@ def batch_item_delete(id):
 @login_required
 def batch_cleanup(id):
     """Endpoint manual para limpar processos travados de um batch específico"""
+    log_info(f"batch_cleanup() iniciada: batch_id={id}", region="BATCH")
     batch = BatchUpload.query.get_or_404(id)
     
     # Verificar permissão
@@ -1507,6 +1535,7 @@ def batch_cleanup(id):
     
     try:
         cleaned = cleanup_stuck_processes()
+        log_info(f"batch_cleanup() concluída: batch_id={id}, {cleaned} processos limpos", region="BATCH")
         return jsonify({
             'success': True,
             'cleaned': cleaned,
@@ -1514,6 +1543,7 @@ def batch_cleanup(id):
         })
     except Exception as e:
         logger.error(f"Erro ao limpar processos: {e}", exc_info=True)
+        log_error(f"batch_cleanup() erro para batch_id={id}: {e}", exc=e, region="BATCH")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -1521,6 +1551,7 @@ def batch_cleanup(id):
 @login_required
 def batch_reprocess(id):
     """Reprocessar TODOS os processos do batch, resetando status e executando RPA novamente"""
+    log_info(f"batch_reprocess() iniciada: batch_id={id}", region="BATCH")
     import threading
     from main import app
     from models import Process
@@ -1683,6 +1714,7 @@ def batch_reprocess(id):
         thread = threading.Thread(target=execute_batch_reprocess_background, daemon=True)
         thread.start()
         logger.info(f"[BATCH REPROCESS] Thread de reprocessamento iniciada para batch {id}")
+        log_info(f"batch_reprocess() concluída: batch_id={id}, {len(items_to_reprocess)} itens para reprocessar", region="BATCH")
         
         flash(f"Reprocessamento iniciado! {len(items_to_reprocess)} itens serão processados novamente.", "success")
         return redirect(url_for('batch.batch_progress', id=id))
@@ -1690,6 +1722,7 @@ def batch_reprocess(id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao reprocessar batch {id}: {e}", exc_info=True)
+        log_error(f"batch_reprocess() erro para batch_id={id}: {e}", exc=e, region="BATCH")
         flash(f"Erro ao reprocessar: {str(e)}", "danger")
         return redirect(url_for('batch.batch_detail', id=id))
 
@@ -1701,6 +1734,7 @@ def batch_reextract(id):
     Reprocessar EXTRAÇÃO dos PDFs selecionados.
     Reseta os dados do processo e executa novamente a extração.
     """
+    log_info(f"batch_reextract() iniciada: batch_id={id}", region="BATCH")
     import threading
     from main import app as flask_app_main
     
@@ -1821,12 +1855,14 @@ def batch_reextract(id):
         thread = threading.Thread(target=execute_reextract_background, daemon=True)
         thread.start()
         
+        log_info(f"batch_reextract() concluída: batch_id={id}, {len(items_to_reextract)} PDFs para reextrair", region="BATCH")
         flash(f"Reextração iniciada! {len(items_to_reextract)} PDF(s) serão reprocessados.", "success")
         return redirect(url_for('batch.batch_detail', id=id))
     
     except Exception as e:
         db.session.rollback()
         logger.error(f"[REEXTRACT] Erro: {e}", exc_info=True)
+        log_error(f"batch_reextract() erro para batch_id={id}: {e}", exc=e, region="BATCH")
         flash(f"Erro ao reprocessar extração: {str(e)}", "danger")
         return redirect(url_for('batch.batch_detail', id=id))
 
@@ -1838,6 +1874,7 @@ def batch_rerpa(id):
     Reprocessar RPA (preenchimento eLaw) dos itens selecionados.
     Não refaz a extração, apenas o envio para o eLaw.
     """
+    log_info(f"batch_rerpa() iniciada: batch_id={id}", region="BATCH")
     import threading
     from main import app as flask_app_main
     import rpa
@@ -2011,12 +2048,14 @@ def batch_rerpa(id):
         thread = threading.Thread(target=execute_rerpa_background, daemon=True)
         thread.start()
         
+        log_info(f"batch_rerpa() concluída: batch_id={id}, {len(items_to_rerpa)} processos para ReRPA", region="BATCH")
         flash(f"Reprocessamento RPA iniciado! {len(items_to_rerpa)} processo(s) serão enviados ao eLaw.", "success")
         return redirect(url_for('batch.batch_detail', id=id))
     
     except Exception as e:
         db.session.rollback()
         logger.error(f"[RERPA] Erro: {e}", exc_info=True)
+        log_error(f"batch_rerpa() erro para batch_id={id}: {e}", exc=e, region="BATCH")
         flash(f"Erro ao reprocessar RPA: {str(e)}", "danger")
         return redirect(url_for('batch.batch_detail', id=id))
 
@@ -2025,6 +2064,7 @@ def batch_rerpa(id):
 @login_required
 def batch_delete(id):
     """Deletar batch e todos os processos associados"""
+    log_info(f"batch_delete() iniciada: batch_id={id}", region="BATCH")
     try:
         batch = BatchUpload.query.get(id)
         
@@ -2072,6 +2112,7 @@ def batch_delete(id):
 @login_required
 def batch_delete_multiple():
     """Deletar múltiplos batches e seus processos"""
+    log_info(f"batch_delete_multiple() iniciada", region="BATCH")
     try:
         batch_ids = request.form.getlist('batch_ids')
         
@@ -2139,6 +2180,7 @@ def reextract_ocr():
     2. Iniciar re-extração OCR seletiva em lote
     3. Acompanhar progresso
     """
+    log_info(f"reextract_ocr() iniciada, method={request.method}", region="BATCH")
     from sqlalchemy import or_
     
     # Estatísticas de campos vazios
@@ -2193,8 +2235,10 @@ def reextract_ocr():
             
         except Exception as e:
             logger.error(f"[REEXTRACT] Erro: {e}", exc_info=True)
+            log_error(f"reextract_ocr() erro: {e}", exc=e, region="BATCH")
             flash(f"Erro na re-extração: {str(e)}", "danger")
     
+    log_info(f"reextract_ocr() concluída", region="BATCH")
     return render_template('processes/reextract_ocr.html', stats=stats)
 
 
@@ -2260,6 +2304,7 @@ def queue_ocr_batch():
                            - Só processar campos realmente faltantes
                            - Melhor validação de PDF
     """
+    log_info(f"queue_ocr_batch() iniciada por user_id={current_user.id}", region="BATCH")
     from sqlalchemy import or_, case, func
     from extractors.ocr_utils import queue_ocr_task, extract_pdf_bookmarks, get_pdf_total_pages, get_ocr_queue_status
     
@@ -2357,6 +2402,7 @@ def queue_ocr_batch():
         
         status = get_ocr_queue_status()
         
+        log_info(f"queue_ocr_batch() concluída: {queued_count} processos enfileirados", region="BATCH")
         return jsonify({
             "message": f"OCR enfileirado para {queued_count} processos (ordenado por mais campos faltantes)",
             "queued": queued_count,
@@ -2367,6 +2413,7 @@ def queue_ocr_batch():
         
     except Exception as e:
         logger.error(f"[OCR-BATCH] Erro: {e}", exc_info=True)
+        log_error(f"queue_ocr_batch() erro: {e}", exc=e, region="BATCH")
         return jsonify({"error": str(e)}), 500
 
 
@@ -2378,6 +2425,7 @@ def queue_ocr_batch():
 @login_required
 def queue_list():
     """Página da fila global de batches."""
+    log_info(f"queue_list() acessada por user_id={current_user.id}", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2393,6 +2441,7 @@ def queue_list():
     
     queue_status = global_queue_runner.get_status()
     
+    log_info(f"queue_list() concluída: {len(queued_batches)} na fila, {len(available_batches)} disponíveis", region="BATCH")
     return render_template(
         "processes/batch_queue.html",
         queued_batches=queued_batches,
@@ -2405,6 +2454,7 @@ def queue_list():
 @login_required
 def queue_add(batch_id):
     """Adiciona um batch à fila global."""
+    log_info(f"queue_add() iniciada: batch_id={batch_id}", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2422,8 +2472,10 @@ def queue_add(batch_id):
     if result['success']:
         log_event("QUEUE_ADD", f"Batch adicionado à fila", 
                  batch_id=batch_id, user_id=current_user.id)
+        log_info(f"queue_add() concluída: batch_id={batch_id} adicionado à fila", region="BATCH")
         return jsonify(result)
     else:
+        monitor_warn(f"queue_add() falhou para batch_id={batch_id}: {result.get('error')}", region="BATCH")
         return jsonify(result), 400
 
 
@@ -2431,6 +2483,7 @@ def queue_add(batch_id):
 @login_required
 def queue_remove(batch_id):
     """Remove um batch da fila global."""
+    log_info(f"queue_remove() iniciada: batch_id={batch_id}", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2448,8 +2501,10 @@ def queue_remove(batch_id):
     if result['success']:
         log_event("QUEUE_REMOVE", f"Batch removido da fila", 
                  batch_id=batch_id, user_id=current_user.id)
+        log_info(f"queue_remove() concluída: batch_id={batch_id} removido da fila", region="BATCH")
         return jsonify(result)
     else:
+        monitor_warn(f"queue_remove() falhou para batch_id={batch_id}: {result.get('error')}", region="BATCH")
         return jsonify(result), 400
 
 
@@ -2457,6 +2512,7 @@ def queue_remove(batch_id):
 @login_required
 def queue_start():
     """Inicia o processamento da fila global."""
+    log_info(f"queue_start() iniciada por user_id={current_user.id}", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2467,8 +2523,10 @@ def queue_start():
     result = global_queue_runner.start_queue_processing(current_user.id)
     
     if result['success']:
+        log_info(f"queue_start() concluída: fila iniciada com sucesso", region="BATCH")
         return jsonify(result)
     else:
+        monitor_warn(f"queue_start() falhou: {result.get('error')}", region="BATCH")
         return jsonify(result), 400
 
 
@@ -2476,6 +2534,7 @@ def queue_start():
 @login_required
 def queue_stop():
     """Para o processamento da fila global."""
+    log_info(f"queue_stop() iniciada por user_id={current_user.id}", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2486,8 +2545,10 @@ def queue_stop():
     result = global_queue_runner.stop_queue_processing()
     
     if result['success']:
+        log_info(f"queue_stop() concluída: fila parada com sucesso", region="BATCH")
         return jsonify(result)
     else:
+        monitor_warn(f"queue_stop() falhou: {result.get('error')}", region="BATCH")
         return jsonify(result), 400
 
 
@@ -2495,6 +2556,7 @@ def queue_stop():
 @login_required
 def queue_status():
     """Retorna status atual da fila global (JSON para polling)."""
+    log_info(f"queue_status() acessada", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2509,6 +2571,7 @@ def queue_status():
 @login_required
 def queue_add_all():
     """Adiciona todos os batches prontos à fila global."""
+    log_info(f"queue_add_all() iniciada por user_id={current_user.id}", region="BATCH")
     from batch_queue_runner import global_queue_runner
     from main import app
     
@@ -2536,6 +2599,7 @@ def queue_add_all():
         log_event("QUEUE_ADD_ALL", f"Múltiplos batches adicionados à fila", 
                  count=added, user_id=current_user.id)
     
+    log_info(f"queue_add_all() concluída: {added} batches adicionados, {len(errors)} erros", region="BATCH")
     return jsonify({
         'success': True,
         'message': f'{added} batches adicionados à fila',

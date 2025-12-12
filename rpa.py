@@ -630,6 +630,7 @@ async def navigate_to_tab_via_url(page, process_id: int, tab_hash: str) -> bool:
     Returns:
         bool: True se navegou com sucesso
     """
+    monitor_log_info(f"Função navigate_to_tab_via_url() iniciada - aba: {tab_hash}", region="RPA")
     try:
         # Pegar URL atual
         current_url = page.url
@@ -715,11 +716,15 @@ async def navigate_to_tab_via_url(page, process_id: int, tab_hash: str) -> bool:
         
         if not tab_activated:
             log(f"[NAV_TAB][WARN] Não foi possível ativar aba #{tab_hash} - tentando continuar...")
+            monitor_log_warning(f"Não foi possível ativar aba #{tab_hash}", region="RPA")
+        else:
+            monitor_log_info(f"Função navigate_to_tab_via_url() concluída - aba {tab_hash} ativada com sucesso", region="RPA")
         
         return tab_activated
         
     except Exception as e:
         log(f"[NAV_TAB][ERRO] Falha geral ao navegar para #{tab_hash}: {e}")
+        monitor_log_error(f"Falha ao navegar para aba #{tab_hash}: {e}", exc=e, region="RPA")
         return False
 
 
@@ -840,6 +845,7 @@ def get_process_pdf_text(data: Dict[str, Any], process_id: Optional[int] = None)
 # =========================
 @asynccontextmanager
 async def launch_browser():
+    monitor_log_info("Função launch_browser() iniciada - abrindo navegador Chromium", region="RPA")
     async with async_playwright() as p:
         args = [
             "--disable-dev-shm-usage",
@@ -1017,6 +1023,7 @@ async def launch_browser():
         context.set_default_navigation_timeout(NAV_TIMEOUT_MS)
 
         page = await context.new_page()
+        monitor_log_info("Navegador Chromium iniciado com sucesso", region="RPA")
         page.on("console", lambda m: LOG.info(f"[pw.console] {m.type.upper()}: {m.text}"))
         page.on("pageerror", lambda e: LOG.info(f"[pw.pageerror] {e}"))
 
@@ -1144,9 +1151,11 @@ async def _check_login_failure(page) -> bool:
 
 async def login_elaw(page, user: str, password: str, url: str) -> bool:
     """Login com retry logic, waits robustos e detecção precisa"""
+    monitor_log_info("Função login_elaw() iniciada", region="RPA")
     MAX_ATTEMPTS = 3
     
     for attempt in range(1, MAX_ATTEMPTS + 1):
+        monitor_log_info(f"Tentativa de login {attempt}/{MAX_ATTEMPTS}", region="RPA")
         log(f"[LOGIN] Tentativa {attempt}/{MAX_ATTEMPTS}")
         
         # Verificar se já está logado
@@ -1292,6 +1301,7 @@ async def login_elaw(page, user: str, password: str, url: str) -> bool:
     
     log("[LOGIN] ❌ FALHA DEFINITIVA após todas as tentativas")
     monitor_log_error("❌ Login falhou definitivamente após todas as tentativas", exc=None, region="RPA", screenshot_path=None)
+    monitor_log_info("Função login_elaw() concluída - FALHA", region="RPA")
     return False
 
 async def temporarily_disable_navbar(page, ms=800):
@@ -1336,6 +1346,7 @@ async def click_hard(locator, label=""):
     return False
 
 async def open_menu_processos(page):
+    monitor_log_info("Função open_menu_processos() iniciada - clicando no menu Processos", region="RPA")
     MAX_TRIES = 6
     for _ in range(MAX_TRIES):
         for sel in [
@@ -1354,8 +1365,10 @@ async def open_menu_processos(page):
     target = BASE_URL.rstrip("/") + "/Processo/form"
     log(f"[FALLBACK] indo direto: {target}")
     await goto_with_retries(page, target, attempts=2, nav_timeout_ms=60000)  # 60s - aumentado para produção
+    monitor_log_info("Função open_menu_processos() concluída - menu Processos aberto", region="RPA")
 
 async def click_novo_processo(page):
+    monitor_log_info("Função click_novo_processo() iniciada - abrindo formulário de novo processo", region="RPA")
     for sel in ["a[href='/Processo/form']", "a:has-text('Novo Processo')", "xpath=//a[contains(., 'Novo Processo')]"]:
         loc = page.locator(sel).first
         if await loc.count():
@@ -1374,10 +1387,12 @@ async def click_novo_processo(page):
         png = _get_screenshot_path("novo_processo_aberto.png", process_id=process_id)  # 2025-11-21: Corrigido
         await page.screenshot(path=str(png), full_page=True)
         log(f"[SHOT] novo processo: {png}")
+        monitor_log_info(f"Screenshot salvo: {png}", region="RPA")
         send_screenshot_to_monitor(png, region="NOVO_PROCESSO_ABERTO")
     except Exception:
         pass
     await ensure_zoom_100(page, "form")
+    monitor_log_info("Função click_novo_processo() concluída - formulário de novo processo aberto", region="RPA")
 
 # =========================
 # Helpers UI (bootstrap-select & friends)
@@ -1420,9 +1435,11 @@ async def robust_click(desc: str, locator, timeout_ms: int = 1800) -> bool:
     🔧 FIX 2025-12-09: Prioriza clique via JavaScript para evitar problemas de coordenadas.
     O scroll_into_view + click() pode errar e clicar no menu Configuração.
     """
+    monitor_log_info(f"Função robust_click() iniciada - clicando em: {desc}", region="RPA")
     try:
         await locator.wait_for(state="attached", timeout=timeout_ms)
     except Exception as e:
+        monitor_log_warning(f"robust_click() falhou - elemento não anexado: {desc}", region="RPA")
         log(f"{desc}: não anexado ({e})")
         return False
     
@@ -1444,6 +1461,7 @@ async def robust_click(desc: str, locator, timeout_ms: int = 1800) -> bool:
         except Exception:
             continue
     
+    monitor_log_warning(f"robust_click() falhou - todos os métodos falharam: {desc}", region="RPA")
     log(f"{desc}: falhou em todos os métodos")
     return False
 
@@ -1584,6 +1602,7 @@ async def force_select_bootstrap_by_text(page, select_id: str, wanted_text: str)
     Returns:
         True se seleção foi bem-sucedida, False caso contrário
     """
+    monitor_log_info(f"Função force_select_bootstrap_by_text() iniciada - select: {select_id}, texto: {wanted_text}", region="RPA")
     try:
         log(f"[FORCE_SELECT] Tentando selecionar '{wanted_text}' em #{select_id}...")
         
@@ -1664,15 +1683,18 @@ async def force_select_bootstrap_by_text(page, select_id: str, wanted_text: str)
         
         if result.get("success"):
             log(f"[FORCE_SELECT] ✅ Selecionado: '{result.get('selectedText')}' (score: {result.get('score')})")
+            monitor_log_info(f"Função force_select_bootstrap_by_text() concluída - selecionado: {result.get('selectedText')}", region="RPA")
             # Aguardar eventos propagarem
             await page.wait_for_timeout(300)
             return True
         else:
             log(f"[FORCE_SELECT] ❌ Falha: {result.get('error', 'unknown')}")
+            monitor_log_warning(f"force_select_bootstrap_by_text() falhou: {result.get('error', 'unknown')}", region="RPA")
             return False
             
     except Exception as e:
         log(f"[FORCE_SELECT] ❌ Erro: {e}")
+        monitor_log_error(f"Erro em force_select_bootstrap_by_text(): {e}", exc=e, region="RPA")
         return False
 
 
@@ -1691,6 +1713,7 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
     Returns:
         (estado, comarca) - strings com valores selecionados ou vazias se falhou
     """
+    monitor_log_info(f"Função select_estado_comarca_manual() iniciada - CNJ: {cnj}", region="RPA")
     from rpa_status import update_status
     from extractors.regex_utils import (
         extract_trt_from_cnj, get_estado_variantes, 
@@ -1869,16 +1892,20 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
     # Atualizar status
     if estado and comarca:
         update_status("localizacao_ok", f"✅ {estado} - {comarca}", process_id=process_id)
+        monitor_log_info(f"Função select_estado_comarca_manual() concluída - Estado: {estado}, Comarca: {comarca}", region="RPA")
     elif estado:
         update_status("localizacao_parcial", f"⚠️ Estado: {estado} (Comarca não preenchida)", process_id=process_id)
+        monitor_log_warning(f"select_estado_comarca_manual() concluída parcialmente - Estado: {estado}, Comarca não preenchida", region="RPA")
     else:
         update_status("localizacao_erro", "❌ Estado e Comarca não preenchidos", process_id=process_id)
+        monitor_log_warning("select_estado_comarca_manual() falhou - Estado e Comarca não preenchidos", region="RPA")
     
     return estado, comarca
 
 async def set_bootstrap_select_fuzzy(
     page, select_id: str, wanted_text: str, fallbacks: Optional[List[str]] = None, prefer_words: Optional[List[str]] = None
 ) -> bool:
+    monitor_log_info(f"Função set_bootstrap_select_fuzzy() iniciada - select: {select_id}, texto: {wanted_text}", region="RPA")
     try:
         btn, container = await _open_bs_and_get_container(page, select_id)
         if not container:
@@ -1933,9 +1960,12 @@ async def set_bootstrap_select_fuzzy(
         await btn.press("Escape")
         if clicked:
             await nudge_change_event(page, select_id)
+            monitor_log_info(f"Função set_bootstrap_select_fuzzy() concluída - selecionado em {select_id}", region="RPA")
             return True
+        monitor_log_warning(f"set_bootstrap_select_fuzzy() não conseguiu selecionar em {select_id}", region="RPA")
         return False
-    except Exception:
+    except Exception as e:
+        monitor_log_error(f"Erro em set_bootstrap_select_fuzzy(): {e}", exc=e, region="RPA")
         return False
 
 async def _set_native_select_fuzzy(
@@ -7482,6 +7512,7 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
     
     extras = reclamadas[1:]  # Pula a primeira (já foi cadastrada como principal)
     log(f"[RECLAMADAS][RPA][ENTROU_HANDLE] Iniciando inserção de {len(extras)} reclamadas extras")
+    monitor_log_info(f"Função handle_reclamadas_extras() iniciada - {len(extras)} reclamadas para adicionar", region="RPA")
     update_status("reclamadas_extras", f"Adicionando {len(extras)} reclamadas extras...", process_id=process_id)
     
     try:
@@ -7505,6 +7536,7 @@ async def handle_extra_reclamadas(page, data: dict, process_id: int) -> bool:
         
         # Abrir aba "Partes e Advogados"
         log("[RECLAMADAS][RPA] Abrindo aba 'Partes e Advogados'...")
+        monitor_log_info("Navegando para aba Reclamadas (Partes e Advogados)", region="RPA")
         update_status("reclamadas_aba", "Abrindo aba Partes e Advogados...", process_id=process_id)
         
         # Lista de seletores possíveis para a aba (o eLaw pode usar diferentes estruturas)
@@ -7994,6 +8026,7 @@ async def _take_reclamadas_screenshot(page, process_id: int):
         
         await page.screenshot(path=str(screenshot_path), full_page=True)
         log(f"[RECLAMADAS][RPA][SHOT] Screenshot salvo em disco: {screenshot_path}")
+        monitor_log_info(f"Screenshot salvo: {screenshot_path}", region="RPA")
         
         # Salvar no banco de dados
         saved_to_db = False
@@ -8018,6 +8051,7 @@ async def _take_reclamadas_screenshot(page, process_id: int):
             log(f"[RECLAMADAS][RPA][SHOT][WARN] Screenshot capturado mas NÃO salvo no banco! Arquivo: {screenshot_filename}")
         
         send_screenshot_to_monitor(screenshot_path, region="RECLAMADAS_EXTRAS")
+        monitor_log_info("Função handle_reclamadas_extras() concluída - screenshot de reclamadas salvo", region="RPA")
         
     except Exception as e:
         log(f"[RECLAMADAS][RPA][SHOT][ERRO] Falha ao capturar screenshot: {e}")
@@ -8220,6 +8254,7 @@ async def handle_novo_pedido(page, data: dict, process_id: int) -> bool:
     start_time = time.time()
     
     log("[PEDIDOS][RPA] Iniciando adição de pedidos (OTIMIZADO)...")
+    monitor_log_info("Função handle_novo_pedido() iniciada - Navegando para aba Pedidos", region="RPA")
     update_status("pedidos_inicio", "Abrindo aba Pedidos...", process_id=process_id)
     
     try:
@@ -8504,14 +8539,17 @@ async def handle_novo_pedido(page, data: dict, process_id: int) -> bool:
             await _take_pedidos_screenshot(page, process_id, success_count=success_count)
             if success_count > 0:
                 update_status("pedidos_ok", f"✅ {success_count} pedido(s) adicionado(s)", process_id=process_id)
+                monitor_log_info(f"Função handle_novo_pedido() concluída - {success_count} pedidos adicionados", region="RPA")
             else:
                 update_status("pedidos_ok", f"✅ {skipped_count} pedido(s) já existiam no eLaw", process_id=process_id)
+                monitor_log_info(f"Função handle_novo_pedido() concluída - {skipped_count} pedidos já existiam", region="RPA")
         
         return success_count > 0 or skipped_count > 0
             
     except Exception as e:
         log(f"[PEDIDOS][RPA][ERRO] Falha ao adicionar pedidos: {e}")
         update_status("pedidos_erro", f"Erro ao adicionar pedidos: {e}", process_id=process_id)
+        monitor_log_error(f"Erro em handle_novo_pedido(): {e}", exc=e, region="RPA")
         return False
 
 
@@ -9039,6 +9077,7 @@ async def _take_pedidos_screenshot(page, process_id: int, success_count: int = 1
         
         await page.screenshot(path=str(screenshot_path), full_page=True)
         log(f"[PEDIDOS][RPA][SHOT] Screenshot salvo em disco: {screenshot_path}")
+        monitor_log_info(f"Screenshot salvo: {screenshot_path}", region="RPA")
         
         # Salvar no banco de dados
         saved_to_db = False
@@ -9210,6 +9249,7 @@ async def ensure_on_new_process_form(page, process_id: int = None):
 
 async def after_login_flow(page, process_id: int):
     """2025-11-21: process_id OBRIGATÓRIO (ZERO shared state)"""
+    monitor_log_info(f"Função after_login_flow() iniciada para processo #{process_id}", region="RPA")
     update_status("navegacao", "Acessando formulário de cadastro", process_id=process_id)
     log(f"[FLOW][DEBUG] after_login_flow iniciado para processo #{process_id}")
     try:
@@ -9245,6 +9285,7 @@ async def after_login_flow(page, process_id: int):
         data["_pdf_text"] = ""  # Vazio - funções vão usar apenas dados do banco
 
     await fill_new_process_form(page, data, process_id=process_id)
+    monitor_log_info(f"Função after_login_flow() concluída para processo #{process_id}", region="RPA")
 
 # =========================
 # Runner

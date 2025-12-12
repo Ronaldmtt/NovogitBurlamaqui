@@ -96,15 +96,20 @@ def _reset_process_sequence_if_empty():
 
 @bp.route("/")
 def index():
+    log_info("Função index() iniciada", region="ROUTES")
     if current_user.is_authenticated:
+        log_info("index() - Usuário autenticado, redirecionando para dashboard", region="ROUTES")
         return redirect(url_for("core.dashboard"))
+    log_info("index() - Usuário não autenticado, redirecionando para login", region="ROUTES")
     return redirect(url_for("core.login"))
 
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
+    log_info("Função login() iniciada", region="ROUTES")
     if current_user.is_authenticated:
         log_debug("LOGIN", "Usuário já autenticado, redirecionando para dashboard")
+        log_info("login() - Usuário já autenticado, redirecionando", region="ROUTES")
         return redirect(url_for("core.dashboard"))
 
     next_url = request.args.get("next") or url_for("core.dashboard")
@@ -157,12 +162,14 @@ def login():
             log_end("LOGIN", "Login falhou - formulário inválido")
 
     ui.page_view("login")
+    log_info("login() - Renderizando página de login", region="ROUTES")
     return render_template("login.html", form=form, next_url=next_url)
 
 
 @bp.route("/logout")
 @login_required
 def logout():
+    log_info("Função logout() iniciada", region="ROUTES")
     username = current_user.username if current_user else "unknown"
     user_id = current_user.id if current_user else None
     log_start("LOGOUT", f"Usuário {username} saindo do sistema")
@@ -179,7 +186,9 @@ def logout():
 @login_required
 def uploaded_file(filename):
     """Serve PDF files from uploads directory"""
+    log_info(f"Função uploaded_file() iniciada - arquivo: {filename}", region="ROUTES")
     uploads_dir = Path(__file__).parent / "uploads"
+    log_info(f"uploaded_file() - Servindo arquivo: {filename}", region="ROUTES")
     return send_from_directory(uploads_dir, filename)
 
 
@@ -190,9 +199,12 @@ def uploaded_file(filename):
 @bp.route("/dashboard")
 @login_required
 def dashboard():
+    log_info(f"Função dashboard() iniciada - usuário: {current_user.username}", region="ROUTES")
     total_processes = Process.query.count()
     user_processes = Process.query.filter_by(owner_id=current_user.id).count()
     recent_processes = Process.query.order_by(Process.created_at.desc()).limit(10).all()
+    log_info(f"dashboard() - Total: {total_processes}, Usuário: {user_processes}, Recentes: {len(recent_processes)}", region="ROUTES")
+    log_info("Função dashboard() concluída com sucesso", region="ROUTES")
     return render_template(
         "dashboard.html",
         total_processes=total_processes,
@@ -207,8 +219,11 @@ def dashboard():
 @bp.route("/processos")
 @login_required
 def process_list():
+    log_info("Função process_list() iniciada", region="ROUTES")
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '', type=str)
+    
+    log_info(f"process_list() - Página: {page}, Busca: '{search}'", region="ROUTES")
     
     query = Process.query
     if search:
@@ -222,14 +237,19 @@ def process_list():
     processes = query.order_by(Process.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
+    log_info(f"process_list() - Retornando {len(processes.items)} processos", region="ROUTES")
+    log_info("Função process_list() concluída com sucesso", region="ROUTES")
     return render_template("processes/list.html", processes=processes, search=search)
 
 
 @bp.route("/processos/<int:id>")
 @login_required
 def process_view(id: int):
+    log_info(f"Função process_view() iniciada - id: {id}", region="ROUTES")
     proc = Process.query.get_or_404(id)
     batch_id = request.args.get('batch_id', type=int)
+    log_info(f"process_view() - Visualizando processo #{id}, CNJ: {proc.cnj or 'N/A'}", region="ROUTES")
+    log_info("Função process_view() concluída com sucesso", region="ROUTES")
     return render_template("processes/view.html", process=proc, batch_id=batch_id)
 
 
@@ -237,20 +257,25 @@ def process_view(id: int):
 @login_required
 def process_screenshot(id: int):
     """Serve o screenshot PNG do formulário eLaw preenchido (DEPRECATED - usar /screenshot/before ou /screenshot/after)"""
+    log_info(f"Função process_screenshot() iniciada - id: {id}", region="ROUTES")
     proc = Process.query.get_or_404(id)
     
     # Verificar ownership
     if proc.owner_id != current_user.id:
+        monitor_warn(f"process_screenshot() - Acesso negado para processo #{id}", region="ROUTES")
         abort(403)
     
     # Verificar se screenshot existe
     if not proc.elaw_screenshot_path:
+        monitor_warn(f"process_screenshot() - Screenshot não encontrado para processo #{id}", region="ROUTES")
         abort(404)
     
     # Servir arquivo do diretório rpa_screenshots (NÃO static!)
     screenshot_filename = Path(proc.elaw_screenshot_path).name
     screenshot_dir = Path('/home/runner/workspace/rpa_screenshots')
     
+    log_info(f"process_screenshot() - Servindo screenshot: {screenshot_filename}", region="ROUTES")
+    log_info("Função process_screenshot() concluída com sucesso", region="ROUTES")
     return send_from_directory(
         directory=str(screenshot_dir),
         path=screenshot_filename,
@@ -262,6 +287,7 @@ def process_screenshot(id: int):
 @login_required
 def serve_rpa_screenshot(filename):
     """Serve screenshots do RPA (before/after) - procura em ambos diretórios"""
+    log_info(f"Função serve_rpa_screenshot() iniciada - filename: {filename}", region="ROUTES")
     # Normalizar filename: remover prefixo 'rpa_screenshots/' se presente (legado)
     # Isso garante compatibilidade com paths salvos como "rpa_screenshots/file.png" e "file.png"
     clean_filename = Path(filename).name
@@ -282,6 +308,7 @@ def serve_rpa_screenshot(filename):
     full_path_legacy = screenshot_dir_legacy / clean_filename
     
     if full_path_legacy.exists() and full_path_legacy.is_file():
+        log_info(f"serve_rpa_screenshot() - Arquivo encontrado em diretório legado: {clean_filename}", region="ROUTES")
         return send_from_directory(
             directory=str(screenshot_dir_legacy),
             path=clean_filename,
@@ -289,6 +316,7 @@ def serve_rpa_screenshot(filename):
         )
     
     # Arquivo não encontrado - retornar imagem placeholder SVG
+    monitor_warn(f"serve_rpa_screenshot() - Arquivo não encontrado: {clean_filename}", region="ROUTES")
     svg_placeholder = '''<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
       <rect fill="#f8f9fa" width="400" height="300"/>
       <text x="200" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#6c757d">Screenshot não disponível</text>
@@ -302,11 +330,13 @@ def serve_rpa_screenshot(filename):
 @login_required
 def process_update_field(id: int):
     """Atualiza um campo individual do processo via AJAX (para edição inline)."""
+    log_info(f"Função process_update_field() iniciada - id: {id}", region="ROUTES")
     proc = Process.query.get_or_404(id)
     
     try:
         data = request.get_json()
         if not data:
+            monitor_warn(f"process_update_field() - Dados inválidos para processo #{id}", region="ROUTES")
             return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
         
         field_name = data.get('field')
@@ -334,6 +364,8 @@ def process_update_field(id: int):
         
         db.session.commit()
         
+        log_info(f"process_update_field() - Campo '{field_name}' atualizado no processo #{id}", region="ROUTES")
+        log_info("Função process_update_field() concluída com sucesso", region="ROUTES")
         return jsonify({
             'success': True, 
             'field': field_name, 
@@ -343,18 +375,22 @@ def process_update_field(id: int):
         
     except SQLAlchemyError as e:
         db.session.rollback()
+        log_error(f"process_update_field() - Erro SQL ao atualizar processo #{id}: {e}", exc=e, region="ROUTES")
         return jsonify({'success': False, 'error': str(e)}), 500
     except Exception as e:
+        log_error(f"process_update_field() - Erro ao atualizar processo #{id}: {e}", exc=e, region="ROUTES")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route("/processos/<int:id>/editar", methods=["GET", "POST"])
 @login_required
 def process_edit(id: int):
+    log_info(f"Função process_edit() iniciada - id: {id}", region="ROUTES")
     proc = Process.query.get_or_404(id)
     batch_id = request.args.get('batch_id', type=int)
     
     if request.method == "POST":
+        log_info(f"process_edit() - Salvando alterações no processo #{id}", region="ROUTES")
         form_data = request.form.to_dict(flat=True)
         
         # Atualizar todos os campos do processo
@@ -370,6 +406,7 @@ def process_edit(id: int):
         
         try:
             db.session.commit()
+            log_info(f"process_edit() - Processo #{proc.id} atualizado com sucesso", region="ROUTES")
             flash(f"Processo #{proc.id} atualizado com sucesso!", "success")
             # Redirecionar de volta ao batch se veio de lá
             if batch_id:
@@ -378,6 +415,7 @@ def process_edit(id: int):
                 return redirect(url_for("core.process_view", id=proc.id))
         except SQLAlchemyError as e:
             db.session.rollback()
+            log_error(f"process_edit() - Erro ao atualizar processo #{id}: {e}", exc=e, region="ROUTES")
             flash(f"Erro ao atualizar processo: {e}", "danger")
     
     # GET: preparar dados para o formulário (mesma estrutura do confirm_extracted)
@@ -451,6 +489,7 @@ def process_edit(id: int):
         'subtipo_audiencia': proc.subtipo_audiencia,
         'envolvido_audiencia': proc.envolvido_audiencia,
     }
+    log_info("Função process_edit() concluída com sucesso", region="ROUTES")
     return render_template("processes/edit.html", data=data, process_id=id, batch_id=batch_id)
 
 
@@ -497,6 +536,7 @@ def _launch_rpa_thread(process_id: int) -> None:
 @bp.route("/processos/<int:id>/preencher-elaw", methods=["POST"])
 @login_required
 def process_fill_elaw(id: int):
+    log_info(f"Função process_fill_elaw() iniciada - id: {id}", region="ROUTES")
     import rpa
     from main import app as main_app
     
@@ -515,7 +555,9 @@ def process_fill_elaw(id: int):
     
     try:
         _launch_rpa_thread(process_id=proc.id)
+        log_info(f"process_fill_elaw() - RPA iniciado para processo #{proc.id}", region="ROUTES")
         flash(f"Iniciando preenchimento automático no eLaw para o processo #{proc.id}...", "info")
+        log_info("Função process_fill_elaw() concluída com sucesso", region="ROUTES")
         if batch_id:
             return redirect(url_for("core.rpa_progress", process_id=proc.id, batch_id=batch_id))
         else:
@@ -524,6 +566,7 @@ def process_fill_elaw(id: int):
         proc.elaw_status = 'error'
         proc.elaw_error_message = str(e)
         db.session.commit()
+        log_error(f"process_fill_elaw() - Erro ao iniciar RPA para processo #{id}: {e}", exc=e, region="ROUTES")
         flash(f"Não foi possível iniciar o RPA: {e}", "danger")
         if batch_id:
             return redirect(url_for("core.process_view", id=proc.id, batch_id=batch_id))
@@ -534,26 +577,32 @@ def process_fill_elaw(id: int):
 @bp.route("/processos/<int:id>/deletar", methods=["POST"])
 @login_required
 def process_delete(id: int):
+    log_info(f"Função process_delete() iniciada - id: {id}", region="ROUTES")
     proc = Process.query.get_or_404(id)
     
     # Verificação de autorização: apenas o dono ou admin pode deletar
     if proc.owner_id != current_user.id and not current_user.is_admin:
+        monitor_warn(f"process_delete() - Permissão negada para deletar processo #{id}", region="ROUTES")
         flash("Você não tem permissão para deletar este processo.", "danger")
         return redirect(url_for("core.process_list"))
     
     try:
         cnj = proc.cnj or f"#{proc.id}"
+        log_info(f"process_delete() - Deletando processo {cnj}", region="ROUTES")
         db.session.delete(proc)
         db.session.commit()
         
         # Resetar sequência se tabela ficou vazia
         _reset_process_sequence_if_empty()
         
+        log_info(f"process_delete() - Processo {cnj} deletado com sucesso", region="ROUTES")
         flash(f"Processo {cnj} deletado com sucesso!", "success")
     except SQLAlchemyError as e:
         db.session.rollback()
+        log_error(f"process_delete() - Erro ao deletar processo #{id}: {e}", exc=e, region="ROUTES")
         flash(f"Erro ao deletar processo: {e}", "danger")
     
+    log_info("Função process_delete() concluída", region="ROUTES")
     return redirect(url_for("core.process_list"))
 
 
@@ -561,11 +610,13 @@ def process_delete(id: int):
 @login_required
 def process_delete_multiple():
     """Deletar múltiplos processos de uma vez"""
+    log_info("Função process_delete_multiple() iniciada", region="ROUTES")
     from flask import jsonify
     
     try:
         data = request.get_json()
         process_ids = data.get('process_ids', [])
+        log_info(f"process_delete_multiple() - IDs solicitados: {process_ids}", region="ROUTES")
         
         if not process_ids or not isinstance(process_ids, list):
             return jsonify({'success': False, 'error': 'Lista de IDs inválida'}), 400
@@ -590,6 +641,7 @@ def process_delete_multiple():
                 unauthorized.append(proc.id)
         
         if unauthorized:
+            monitor_warn(f"process_delete_multiple() - Permissão negada para {len(unauthorized)} processos", region="ROUTES")
             return jsonify({
                 'success': False, 
                 'error': f'Você não tem permissão para deletar {len(unauthorized)} processo(s)'
@@ -610,6 +662,8 @@ def process_delete_multiple():
         # Resetar sequência se tabela ficou vazia
         _reset_process_sequence_if_empty()
         
+        log_info(f"process_delete_multiple() - {deleted_count} processo(s) deletado(s)", region="ROUTES")
+        log_info("Função process_delete_multiple() concluída com sucesso", region="ROUTES")
         return jsonify({
             'success': True,
             'message': f'{deleted_count} processo(s) deletado(s) com sucesso!'
@@ -625,7 +679,9 @@ def process_delete_multiple():
 @bp.route("/processos/criar", methods=["GET", "POST"])
 @login_required
 def process_create():
+    log_info("Função process_create() iniciada", region="ROUTES")
     if request.method == "POST":
+        log_info("process_create() - Processando formulário de criação", region="ROUTES")
         form = request.form.to_dict(flat=True)
 
         # checkbox → bool
@@ -656,10 +712,13 @@ def process_create():
         db.session.add(proc)
         db.session.commit()
 
+        log_info(f"process_create() - Processo #{proc.id} criado com sucesso", region="ROUTES")
         session.pop("extracted_data", None)
         flash("Processo criado com sucesso.", "success")
+        log_info("Função process_create() concluída com sucesso", region="ROUTES")
         return redirect(url_for("core.process_view", id=proc.id))
 
+    log_info("process_create() - Renderizando formulário de criação", region="ROUTES")
     return render_template("processes/create.html")
 
 # ============================================================
@@ -710,9 +769,12 @@ def _extract_text_from_pdf(file_storage) -> str:
 @bp.route("/processos/extrair-pdf", methods=["GET", "POST"])
 @login_required
 def extract_from_pdf():
+    log_info("Função extract_from_pdf() iniciada", region="ROUTES")
     if request.method == "POST":
+        log_info("extract_from_pdf() - Processando upload de PDF", region="ROUTES")
         file = request.files.get("pdf_file")
         if not file or file.filename == "":
+            monitor_warn("extract_from_pdf() - Nenhum PDF selecionado", region="ROUTES")
             flash("Selecione um PDF válido.", "danger")
             return redirect(url_for("core.extract_from_pdf"))
 
@@ -755,15 +817,18 @@ def extract_from_pdf():
             logger.info(f"[UPLOAD_PDF] PDF '{unique_filename}' vinculado à sessão")
             log_info(f"PDF '{unique_filename}' vinculado à sessão", region="ROUTES")
 
+            log_info("extract_from_pdf() - Extração concluída com sucesso", region="ROUTES")
             flash("Extração concluída! Revise os dados abaixo antes de salvar.", "success")
             return redirect(url_for("core.confirm_extracted"))
 
         except Exception as e:
             current_app.logger.exception("Erro ao processar PDF: %s", e)
+            log_error(f"extract_from_pdf() - Erro ao processar PDF: {e}", exc=e, region="ROUTES")
             flash(f"Erro ao processar PDF: {e}", "danger")
             return redirect(url_for("core.extract_from_pdf"))
 
     # GET -> renderiza a tela de upload
+    log_info("extract_from_pdf() - Renderizando tela de upload", region="ROUTES")
     return render_template("processes/extract_from_pdf.html")
 
 
@@ -857,7 +922,9 @@ def _pick_uf(data: dict) -> str:
 @bp.route("/processos/confirmar-extracao", methods=["GET", "POST"])
 @login_required
 def confirm_extracted():
+    log_info("Função confirm_extracted() iniciada", region="ROUTES")
     if request.method == "POST":
+        log_info("confirm_extracted() - Processando confirmação de extração", region="ROUTES")
         # 1) mescla os dados extraídos (sessão) com o que veio do form
         base = session.get("extracted_data", {}) or {}
         form = request.form.to_dict(flat=True)
@@ -1000,12 +1067,14 @@ def confirm_extracted():
 
         except SQLAlchemyError as e:
             db.session.rollback()
+            log_error(f"confirm_extracted() - Erro ao salvar processo: {e}", exc=e, region="ROUTES")
             flash(f"Falha ao salvar processo: {e.__class__.__name__}: {e}", "danger")
 
         return redirect(url_for("core.process_list"))
 
     # GET: exibe tela com os dados extraídos
     data = session.get("extracted_data", {}) or {}
+    log_info("confirm_extracted() - Renderizando tela de confirmação", region="ROUTES")
     return render_template("processes/confirm_extracted.html", data=data)
 
 # ============================================================
@@ -1014,6 +1083,7 @@ def confirm_extracted():
 
 def _admin_required():
     if not current_user.is_authenticated or not getattr(current_user, "is_admin", False):
+        monitor_warn(f"_admin_required() - Acesso negado para usuário não-admin", region="ROUTES")
         flash("Acesso permitido apenas para administradores.", "danger")
         return False
     return True
@@ -1022,18 +1092,23 @@ def _admin_required():
 @bp.route("/admin")
 @login_required
 def admin_index():
+    log_info("Função admin_index() iniciada", region="ROUTES")
     if not _admin_required():
         return redirect(url_for("core.dashboard"))
+    log_info("admin_index() - Redirecionando para admin_users", region="ROUTES")
     return redirect(url_for("core.admin_users"))
 
 
 @bp.route("/admin/usuarios")
 @login_required
 def admin_users():
+    log_info("Função admin_users() iniciada", region="ROUTES")
     if not _admin_required():
         return redirect(url_for("core.dashboard"))
     users = User.query.order_by(User.created_at.desc()).all()
+    log_info(f"admin_users() - Listando {len(users)} usuário(s)", region="ROUTES")
     try:
+        log_info("Função admin_users() concluída com sucesso", region="ROUTES")
         return render_template("admin/users.html", users=users)
     except TemplateNotFound:
         rows = "".join(
@@ -1057,6 +1132,7 @@ def admin_users():
 @bp.route("/admin/usuarios/novo", methods=["GET", "POST"])
 @login_required
 def admin_create_user():
+    log_info("Função admin_create_user() iniciada", region="ROUTES")
     if not _admin_required():
         return redirect(url_for("core.dashboard"))
 
@@ -1068,6 +1144,7 @@ def admin_create_user():
         form_obj = None
 
     if request.method == "POST":
+        log_info("admin_create_user() - Processando formulário de criação de usuário", region="ROUTES")
         if form_obj and hasattr(form_obj, "validate_on_submit") and form_obj.validate_on_submit():
             username = form_obj.name.data.strip()      # seu CreateUserForm tem 'name' e 'email'
             email = form_obj.email.data.strip()
@@ -1095,10 +1172,12 @@ def admin_create_user():
 
         db.session.add(user)
         db.session.commit()
+        log_info(f"admin_create_user() - Usuário '{username}' criado com sucesso", region="ROUTES")
         flash("Usuário criado com sucesso.", "success")
         return redirect(url_for("core.admin_users"))
 
     try:
+        log_info("admin_create_user() - Renderizando formulário de criação", region="ROUTES")
         return render_template("admin/create_user.html", form=form_obj)
     except TemplateNotFound:
         html = f"""
@@ -1132,9 +1211,11 @@ def admin_create_user():
 @bp.route("/admin/configuracoes")
 @login_required
 def admin_settings():
+    log_info("Função admin_settings() iniciada", region="ROUTES")
     if not _admin_required():
         return redirect(url_for("core.dashboard"))
     try:
+        log_info("Função admin_settings() concluída com sucesso", region="ROUTES")
         return render_template("admin/settings.html")
     except TemplateNotFound:
         return render_template_string(
@@ -1146,9 +1227,11 @@ def admin_settings():
 @bp.route("/admin/auditoria")
 @login_required
 def admin_audit():
+    log_info("Função admin_audit() iniciada", region="ROUTES")
     if not _admin_required():
         return redirect(url_for("core.dashboard"))
     try:
+        log_info("Função admin_audit() concluída com sucesso", region="ROUTES")
         return render_template("admin/audit.html")
     except TemplateNotFound:
         return render_template_string(
@@ -1165,6 +1248,7 @@ def admin_audit():
 @login_required
 def api_rpa_status(process_id):
     """Endpoint REST que retorna status do RPA em JSON para polling"""
+    log_info(f"Função api_rpa_status() iniciada - process_id: {process_id}", region="ROUTES")
     from rpa_status import get_rpa_status
     
     # 🔧 2025-11-27: FORÇAR dados frescos do banco (evitar cache de sessão SQLAlchemy)
@@ -1173,17 +1257,20 @@ def api_rpa_status(process_id):
     # Verifica se o usuário tem permissão para ver este processo
     process = Process.query.get_or_404(process_id)
     if process.owner_id != current_user.id and not current_user.is_admin:
+        monitor_warn(f"api_rpa_status() - Acesso negado para processo #{process_id}", region="ROUTES")
         return jsonify({"error": "Acesso negado"}), 403
     
     status = get_rpa_status(process_id)
     
     if not status:
+        log_info(f"api_rpa_status() - RPA não iniciado para processo #{process_id}", region="ROUTES")
         return jsonify({
             "process_id": process_id,
             "status": "not_started",
             "message": "RPA ainda não iniciado"
         })
     
+    log_info(f"api_rpa_status() - Retornando status '{status.get('status', 'unknown')}' para processo #{process_id}", region="ROUTES")
     return jsonify(status)
 
 
@@ -1191,14 +1278,18 @@ def api_rpa_status(process_id):
 @login_required
 def api_process_details(process_id):
     """Endpoint REST que retorna dados completos do processo incluindo screenshots"""
+    log_info(f"Função api_process_details() iniciada - process_id: {process_id}", region="ROUTES")
     # Buscar processo
     process = Process.query.get_or_404(process_id)
     
     # Verifica permissão
     if process.owner_id != current_user.id and not current_user.is_admin:
+        monitor_warn(f"api_process_details() - Acesso negado para processo #{process_id}", region="ROUTES")
         return jsonify({"error": "Acesso negado"}), 403
     
     # Retornar dados incluindo screenshots
+    log_info(f"api_process_details() - Retornando detalhes do processo #{process_id}", region="ROUTES")
+    log_info("Função api_process_details() concluída com sucesso", region="ROUTES")
     return jsonify({
         "id": process.id,
         "numero_processo": process.numero_processo,
@@ -1214,15 +1305,19 @@ def api_process_details(process_id):
 @login_required
 def rpa_progress(process_id):
     """Tela de loading dinâmica mostrando progresso do RPA em tempo real"""
+    log_info(f"Função rpa_progress() iniciada - process_id: {process_id}", region="ROUTES")
     process = Process.query.get_or_404(process_id)
     batch_id = request.args.get('batch_id', type=int)
     
     # Verifica permissão
     if process.owner_id != current_user.id and not current_user.is_admin:
+        monitor_warn(f"rpa_progress() - Acesso negado para processo #{process_id}", region="ROUTES")
         flash("Acesso negado.", "danger")
         return redirect(url_for("core.process_list"))
     
     try:
+        log_info(f"rpa_progress() - Renderizando tela de progresso para processo #{process_id}", region="ROUTES")
+        log_info("Função rpa_progress() concluída com sucesso", region="ROUTES")
         return render_template(
             "processes/rpa_progress.html",
             process=process,
@@ -1230,6 +1325,7 @@ def rpa_progress(process_id):
             batch_id=batch_id
         )
     except TemplateNotFound:
+        log_info(f"rpa_progress() - Template não encontrado, usando fallback inline", region="ROUTES")
         # Fallback inline se template não existir ainda
         return render_template_string("""
             <!DOCTYPE html>
