@@ -357,8 +357,8 @@
                     const successCount = data.items.filter(item => item.status === 'ready' || item.status === 'success').length;
                     const errorCount = data.items.filter(item => item.status === 'error').length;
 
-                    // Redirecionar IMEDIATAMENTE para tela de detalhes do batch
-                    window.location.replace(`/processos/batch/${batchId}`);
+                    // Redirecionar para LISTA DE BATCHES (para facilitar adicionar à fila ou criar novo batch)
+                    window.location.replace('/processos/batch/list');
                 } else {
                     // Continuar polling
                     setTimeout(checkProgress, pollInterval);
