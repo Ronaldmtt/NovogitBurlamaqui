@@ -5035,6 +5035,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     
     _must(cnj_flag_ok, "Rádio CNJ (Sim) - OBRIGATÓRIO para exibir campo de número do processo")
     update_field_status("radio_cnj", "Rádio CNJ", "Sim")
+    monitor_log_info(f"✅ Rádio CNJ marcado como Sim (processo #{process_id})", region="RPA")
     await _settle(page, "radio:cnj")
 
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -5087,6 +5088,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     # 🔧 FIX 2025-12-09: OBRIGATÓRIO - Sem rádio Eletrônico, dropdown Sistema Eletrônico não aparece
     _must(tipo_ok, "Rádio Tipo do Processo (Eletrônico) - OBRIGATÓRIO para exibir Sistema Eletrônico")
     update_field_status("tipo_processo", "Tipo do Processo", "Eletrônico")
+    monitor_log_info(f"✅ Tipo do Processo selecionado: Eletrônico (processo #{process_id})", region="RPA")
     
     # 🔧 FIX 2025-12-09: AGUARDAR campo Sistema Eletrônico APARECER após marcar rádio Eletrônico
     # O campo só aparece quando o rádio dispara o AJAX corretamente
@@ -5156,11 +5158,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         if await cnj_input.count() > 0:
             await cnj_input.press("Enter")
             log("[CNJ] ✅ Enter pressionado após preencher número do processo")
+            monitor_log_info(f"✅ Enter pressionado após CNJ (processo #{process_id})", region="RPA")
         else:
             await page.keyboard.press("Enter")
             log("[CNJ] ✅ Enter pressionado via keyboard global")
+            monitor_log_info(f"✅ Enter pressionado via keyboard global (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[CNJ][WARN] Erro ao pressionar Enter: {e}")
+        monitor_log_warning(f"⚠️ Erro ao pressionar Enter após CNJ: {e}", region="RPA")
     
     await _settle(page, "input:cnj")
     await ensure_cnj_still_present(page, cnj)
@@ -5308,6 +5313,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     await _settle(page, "select:area")
     await ensure_cnj_still_present(page, cnj)
     update_field_status("area_direito", "Área do Direito", wanted_area)
+    monitor_log_info(f"✅ Área do Direito selecionada: {wanted_area} (processo #{process_id})", region="RPA")
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 7) ESTADO - verificar se autofill preencheu, senão preencher manualmente
@@ -5331,6 +5337,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     
     if estado:
         update_field_status("estado", "Estado", estado)
+        monitor_log_info(f"✅ Estado selecionado: {estado} (processo #{process_id})", region="RPA")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # 8) COMARCA - verificar se autofill preencheu, senão preencher manualmente
@@ -5352,10 +5359,13 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     if estado and comarca:
         update_status("localizacao_preenchida", f"✅ Localização: {estado} - {comarca}", process_id=process_id)
         update_field_status("comarca", "Comarca", comarca)
+        monitor_log_info(f"✅ Comarca selecionada: {comarca} (processo #{process_id})", region="RPA")
     elif estado:
         update_status("localizacao_parcial", f"⚠️ Estado: {estado} (Comarca não preenchida)", process_id=process_id)
+        monitor_log_warning(f"⚠️ Estado preenchido mas Comarca vazia (processo #{process_id})", region="RPA")
     else:
         log(f"[FORM][WARN] Estado e Comarca não foram preenchidos - possível problema com o CNJ")
+        monitor_log_warning(f"⚠️ Estado e Comarca não preenchidos - possível problema com CNJ (processo #{process_id})", region="RPA")
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 9) ORIGEM
@@ -5385,8 +5395,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             "Origem",
         )
         await _settle(page, "select:origem")
+        update_status("origem_preenchida", f"✅ Origem: {wanted}", process_id=process_id)
+        update_field_status("origem", "Origem", wanted)
+        monitor_log_info(f"✅ Origem selecionada: {wanted} (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Origem][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Origem: {e}", region="RPA")
     await ensure_cnj_still_present(page, cnj)
 
     # 10) Número do Órgão - COM FALLBACK COMPLETO
@@ -5419,10 +5433,15 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 }"""
                 )
             await _settle(page, "input:num_orgao")
+            update_status("numero_orgao_preenchido", f"✅ Número do Órgão: {num_orgao}", process_id=process_id)
+            update_field_status("numero_orgao", "Número do Órgão", num_orgao)
+            monitor_log_info(f"✅ Número do Órgão preenchido: {num_orgao} (processo #{process_id})", region="RPA")
         else:
             log("[NumÓrgão][WARN] Número do órgão não encontrado em data nem PDF")
+            monitor_log_warning(f"⚠️ Número do órgão não encontrado (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[NumÓrgão][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Número do Órgão: {e}", region="RPA")
 
     # 11) Órgão (NaturezaId)
     try:
@@ -5453,8 +5472,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             "Órgão (NaturezaId)",
         )
         await _settle(page, "select:orgao")
+        update_status("orgao_preenchido", f"✅ Órgão: {wanted}", process_id=process_id)
+        update_field_status("orgao", "Órgão", wanted)
+        monitor_log_info(f"✅ Órgão selecionado: {wanted} (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Órgão][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Órgão: {e}", region="RPA")
 
     # 12) Célula (EscritorioId)
     try:
@@ -5492,8 +5515,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         await _settle(page, "select:celula")
         sel_final = (await _get_selected_text(page, "EscritorioId") or "").strip()
         log(f"[CÉLULA] alvo='{wanted}' | selecionada='{sel_final}' | motivo: {why}")
+        update_status("celula_preenchida", f"✅ Célula: {sel_final}", process_id=process_id)
+        update_field_status("celula", "Célula", sel_final)
+        monitor_log_info(f"✅ Célula selecionada: {sel_final} (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Célula][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Célula: {e}", region="RPA")
 
     # 13) Foro (JuizadoId) - COM FALLBACK COMPLETO
     try:
@@ -5540,9 +5567,13 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             ok = await _set_native_select_fuzzy(page, "JuizadoId", wanted)
         _must(ok, "Foro (JuizadoId)")
         await _settle(page, "select:foro")
+        update_status("foro_preenchido", f"✅ Foro: {wanted}", process_id=process_id)
+        update_field_status("foro", "Foro", wanted)
+        monitor_log_info(f"✅ Foro selecionado: {wanted} (processo #{process_id})", region="RPA")
         
     except Exception as e:
         log(f"[Foro][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Foro: {e}", region="RPA")
 
     # 14) Assunto (AreaProcessoId) - COM FALLBACK COMPLETO E GARANTIA DE PREENCHIMENTO
     assunto_preenchido = False
@@ -5581,10 +5612,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 update_field_status("assunto", "Assunto", assunto_wanted)
                 assunto_preenchido = True
                 log(f"[Assunto] ✅ Preenchido: {assunto_wanted}")
+                update_status("assunto_preenchido", f"✅ Assunto: {assunto_wanted}", process_id=process_id)
+                monitor_log_info(f"✅ Assunto selecionado: {assunto_wanted} (processo #{process_id})", region="RPA")
             else:
                 log(f"[Assunto][WARN] Falha ao preencher com set_select_fuzzy_any")
+                monitor_log_warning(f"⚠️ Falha ao preencher Assunto (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Assunto][WARN] Erro durante preenchimento: {e}")
+        monitor_log_warning(f"⚠️ Erro ao preencher Assunto: {e}", region="RPA")
     
     if not assunto_preenchido:
         log(f"[Assunto][RETRY] Tentando preenchimento de emergência...")
@@ -5666,10 +5701,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             )
             await _settle(page, "select:instancia")
             update_field_status("instancia", "Instância", pick)
+            update_status("instancia_preenchida", f"✅ Instância: {pick}", process_id=process_id)
+            monitor_log_info(f"✅ Instância selecionada: {pick} (processo #{process_id})", region="RPA")
         else:
             log("[Instância][WARN] não foi possível determinar; mantendo em branco")
+            monitor_log_warning(f"⚠️ Instância não determinada (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Instância][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Instância: {e}", region="RPA")
 
     # 16) NPC (opcional) - COM FALLBACK COMPLETO
     try:
@@ -5763,12 +5802,17 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 update_field_status("tipo_acao", "Tipo de Ação", wanted)
                 tipo_acao_preenchido = True
                 log(f"[TipoAção] ✅ Preenchido: {wanted}")
+                update_status("tipo_acao_preenchido", f"✅ Tipo de Ação: {wanted}", process_id=process_id)
+                monitor_log_info(f"✅ Tipo de Ação selecionado: {wanted} (processo #{process_id})", region="RPA")
             else:
                 log(f"[TipoAção][WARN] Falha ao preencher com set_select_fuzzy_any")
+                monitor_log_warning(f"⚠️ Falha ao preencher Tipo de Ação (processo #{process_id})", region="RPA")
         else:
             log("[TipoAção][WARN] não foi possível determinar valor")
+            monitor_log_warning(f"⚠️ Tipo de Ação não determinado (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[TipoAção][WARN] Erro durante preenchimento: {e}")
+        monitor_log_warning(f"⚠️ Erro ao preencher Tipo de Ação: {e}", region="RPA")
     
     if not tipo_acao_preenchido:
         log(f"[TipoAção][RETRY] Tentando preenchimento de emergência...")
@@ -5818,12 +5862,16 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 update_field_status("objeto", "Objeto", wanted)
                 objeto_preenchido = True
                 log(f"[Objeto] ✅ Preenchido: {wanted}")
+                update_status("objeto_preenchido", f"✅ Objeto: {wanted}", process_id=process_id)
+                monitor_log_info(f"✅ Objeto selecionado: {wanted} (processo #{process_id})", region="RPA")
             else:
                 log(f"[Objeto][WARN] Falha ao preencher com set_select_fuzzy_any")
+                monitor_log_warning(f"⚠️ Falha ao preencher Objeto (processo #{process_id})", region="RPA")
         else:
             log(f"[Objeto][INFO] Nenhum campo de objeto encontrado (pode não existir neste formulário)")
     except Exception as e:
         log(f"[Objeto][WARN] Erro durante preenchimento: {e}")
+        monitor_log_warning(f"⚠️ Erro ao preencher Objeto: {e}", region="RPA")
     
     if not objeto_preenchido and alvo_id:
         log(f"[Objeto][RETRY] Tentando preenchimento de emergência...")
@@ -6171,11 +6219,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             ok = await set_date_field_by_id(page, "DataAdmissao", data_admissao, "Data de Admissão")
             if ok:
                 update_field_status("data_admissao", "Data de Admissão", data_admissao)
+                update_status("data_admissao_preenchida", f"✅ Data de Admissão: {data_admissao}", process_id=process_id)
+                monitor_log_info(f"✅ Data de Admissão preenchida: {data_admissao} (processo #{process_id})", region="RPA")
             await _settle(page, "#DataAdmissao")
         else:
             log(f"[DEBUG][Data Admissão] Pulado - validação falhou")
     except Exception as e:
         log(f"[Data Admissão][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Data de Admissão: {e}", region="RPA")
     
     # 17.6.2) Data de Demissão
     try:
@@ -6186,11 +6237,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             ok = await set_date_field_by_id(page, "DataDemissao", data_demissao, "Data de Demissão")
             if ok:
                 update_field_status("data_demissao", "Data de Demissão", data_demissao)
+                update_status("data_demissao_preenchida", f"✅ Data de Demissão: {data_demissao}", process_id=process_id)
+                monitor_log_info(f"✅ Data de Demissão preenchida: {data_demissao} (processo #{process_id})", region="RPA")
             await _settle(page, "#DataDemissao")
         else:
             log(f"[DEBUG][Data Demissão] Pulado - validação falhou")
     except Exception as e:
         log(f"[Data Demissão][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Data de Demissão: {e}", region="RPA")
     
     # 17.6.3) Motivo de Demissão
     try:
@@ -6231,11 +6285,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                     log(f"[Salário][WARN] Erro ao verificar valor preenchido: {e}")
                 
                 update_field_status("salario", "Salário", salario_clean)
+                update_status("salario_preenchido", f"✅ Salário: {salario_clean}", process_id=process_id)
+                monitor_log_info(f"✅ Salário preenchido: {salario_clean} (processo #{process_id})", region="RPA")
             await _settle(page, "#Salario")
         else:
             log("[Salário] Campo vazio ou inválido - pulando")
     except Exception as e:
         log(f"[Salário][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Salário: {e}", region="RPA")
     
     # 17.6.5) Cargo
     try:
@@ -6246,11 +6303,14 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             ok = await set_text_field_by_id(page, "Cargo", cargo, "Cargo")
             if ok:
                 update_field_status("cargo", "Cargo", cargo)
+                update_status("cargo_preenchido", f"✅ Cargo: {cargo}", process_id=process_id)
+                monitor_log_info(f"✅ Cargo preenchido: {cargo} (processo #{process_id})", region="RPA")
             await _settle(page, "#Cargo")
         else:
             log(f"[DEBUG][Cargo] Pulado - validação falhou")
     except Exception as e:
         log(f"[Cargo][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Cargo: {e}", region="RPA")
     
     # 17.6.6) Empregador
     try:
@@ -6281,9 +6341,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             ok = await set_text_field_by_id(page, "Pis", pis, "PIS")
             if ok:
                 update_field_status("pis", "PIS", pis)
+                update_status("pis_preenchido", f"✅ PIS: {pis}", process_id=process_id)
+                monitor_log_info(f"✅ PIS preenchido: {pis} (processo #{process_id})", region="RPA")
             await _settle(page, "#Pis")
     except Exception as e:
         log(f"[PIS][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher PIS: {e}", region="RPA")
     
     # 17.6.9) CTPS
     try:
@@ -6292,9 +6355,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             ok = await set_text_field_by_id(page, "Cts", ctps, "CTPS")
             if ok:
                 update_field_status("ctps", "CTPS", ctps)
+                update_status("ctps_preenchido", f"✅ CTPS: {ctps}", process_id=process_id)
+                monitor_log_info(f"✅ CTPS preenchido: {ctps} (processo #{process_id})", region="RPA")
             await _settle(page, "#Cts")
     except Exception as e:
         log(f"[CTPS][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher CTPS: {e}", region="RPA")
 
     # 17.7) Valor da Causa - COM FALLBACK COMPLETO
     try:
@@ -6318,8 +6384,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 await set_input_by_id(page, VALOR_CAUSA_INPUT_ID, valor, "Valor da Causa")
             await _settle(page, "input:valor_causa")
             update_field_status("valor_causa", "Valor da Causa", valor)
+            update_status("valor_causa_preenchido", f"✅ Valor da Causa: {valor}", process_id=process_id)
+            monitor_log_info(f"✅ Valor da Causa preenchido: {valor} (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Valor Causa][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao preencher Valor da Causa: {e}", region="RPA")
 
     # 17.8) Cadastro de Primeira Audiência (condicional)
     try:
@@ -6491,10 +6560,13 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                         log(f"[AUDIÊNCIA][WARN] Erro ao selecionar envolvido: {e_envolvido}")
                 
                 log("[AUDIÊNCIA] Primeira audiência cadastrada com sucesso")
+                update_status("audiencia_cadastrada", "✅ Primeira audiência cadastrada com sucesso", process_id=process_id)
+                monitor_log_info(f"✅ Primeira audiência cadastrada (processo #{process_id})", region="RPA")
                 
             except Exception as e_radio:
                 log(f"[AUDIÊNCIA][WARN] Erro ao marcar rádio ou preencher campos: {e_radio}")
                 update_field_status("cadastrar_audiencia", "Deseja cadastrar primeira audiência?", f"ERRO: {e_radio}")
+                monitor_log_warning(f"⚠️ Erro ao cadastrar audiência: {e_radio}", region="RPA")
         else:
             # Se não há audiência para cadastrar, deixar "Não" marcado (padrão)
             log("[AUDIÊNCIA] Sem audiência inicial para cadastrar - mantendo 'Não' marcado")
@@ -6700,6 +6772,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         if save_result['success']:
             log(f"[FLOW] ✅ Formulário salvo com sucesso! URL: {save_result['url_after']}")
             update_status("processo_salvo", f"✅ Processo salvo com sucesso no eLaw!", process_id=process_id)
+            monitor_log_info(f"✅ Processo salvo com sucesso no eLaw! URL: {save_result['url_after']} (processo #{process_id})", region="RPA")
             
             # ✅ MÚLTIPLAS RECLAMADAS: Verificar se há reclamadas extras para adicionar
             reclamadas = data.get("reclamadas", [])
@@ -6710,6 +6783,8 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 log(f"[RECLAMADAS][DEBUG]   [{idx}] nome={rec.get('nome', 'N/A')[:50]}, posicao={rec.get('posicao', 'N/A')}")
             if len(reclamadas) > 1:
                 log(f"[RECLAMADAS] Detectadas {len(reclamadas)} reclamadas - iniciando inserção de extras")
+                update_status("processando_reclamadas", f"Processando {len(reclamadas)} reclamadas extras...", process_id=process_id)
+                monitor_log_info(f"📋 Iniciando inserção de {len(reclamadas)} reclamadas extras (processo #{process_id})", region="RPA")
                 
                 # Verificar se temos URL de detalhes disponível
                 has_detail_url = False
@@ -6774,8 +6849,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 if has_detail_url and not is_process_encerrado():
                     try:
                         await handle_extra_reclamadas(page, data, process_id)
+                        update_status("reclamadas_inseridas", f"✅ Reclamadas extras inseridas com sucesso", process_id=process_id)
+                        monitor_log_info(f"✅ Reclamadas extras inseridas com sucesso (processo #{process_id})", region="RPA")
                     except Exception as e:
                         log(f"[RECLAMADAS][WARN] Erro ao adicionar reclamadas extras (processo principal OK): {e}")
+                        monitor_log_warning(f"⚠️ Erro ao adicionar reclamadas extras: {e}", region="RPA")
                 elif is_process_encerrado():
                     log("[RECLAMADAS][SKIP] Processo ENCERRADO - reclamadas extras não serão adicionadas")
                 else:
@@ -6839,6 +6917,8 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             log(f"[PEDIDOS][DEBUG] pedidos final: {len(pedidos)} itens")
             if pedidos:
                 log(f"[PEDIDOS] Detectados {len(pedidos)} pedidos para inserir")
+                update_status("processando_pedidos", f"Processando {len(pedidos)} pedidos...", process_id=process_id)
+                monitor_log_info(f"📋 Iniciando inserção de {len(pedidos)} pedidos (processo #{process_id})", region="RPA")
                 
                 # ✅ 2025-12-08 FIX 4: Navegar diretamente via URL hash - MUITO mais confiável
                 log("[PEDIDOS] Navegando para aba Geral via URL...")
@@ -6899,16 +6979,26 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                     # 1. Editar marcações baseado no cliente/reclamada
                     try:
                         log("[PEDIDOS][FLOW] Iniciando fluxo de marcações...")
+                        update_status("processando_marcacoes", "Processando marcações...", process_id=process_id)
+                        monitor_log_info(f"📋 Processando marcações (processo #{process_id})", region="RPA")
                         await handle_marcacoes(page, data, process_id)
+                        update_status("marcacoes_ok", "✅ Marcações processadas", process_id=process_id)
+                        monitor_log_info(f"✅ Marcações processadas (processo #{process_id})", region="RPA")
                     except Exception as e:
                         log(f"[PEDIDOS][FLOW][WARN] Erro ao editar marcações: {e}")
+                        monitor_log_warning(f"⚠️ Erro ao editar marcações: {e}", region="RPA")
                     
                     # 2. Adicionar pedidos
                     try:
                         log("[PEDIDOS][FLOW] Iniciando inserção de pedidos...")
+                        update_status("inserindo_pedidos", "Inserindo pedidos no eLaw...", process_id=process_id)
+                        monitor_log_info(f"📋 Inserindo pedidos no eLaw (processo #{process_id})", region="RPA")
                         await handle_novo_pedido(page, data, process_id)
+                        update_status("pedidos_inseridos", "✅ Pedidos inseridos com sucesso", process_id=process_id)
+                        monitor_log_info(f"✅ Pedidos inseridos com sucesso (processo #{process_id})", region="RPA")
                     except Exception as e:
                         log(f"[PEDIDOS][FLOW][WARN] Erro ao adicionar pedidos: {e}")
+                        monitor_log_warning(f"⚠️ Erro ao adicionar pedidos: {e}", region="RPA")
             else:
                 log("[PEDIDOS] Nenhum pedido detectado para este processo")
             
@@ -6917,15 +7007,19 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 dashboard_url = BASE_URL.rstrip("/") + "/Home/Index"
                 log(f"[FLOW] Navegando de volta ao dashboard: {dashboard_url}")
                 update_status("voltando_dashboard", "Retornando ao dashboard...", process_id=process_id)
+                monitor_log_info(f"🏠 Retornando ao dashboard (processo #{process_id})", region="RPA")
                 await page.goto(dashboard_url, wait_until="domcontentloaded", timeout=30000)  # 30s - tolerante a navegação lenta
                 await asyncio.sleep(0.5)  # Otimizado: 1s→0.5s (economia 0.5s)
                 log(f"[FLOW] ✅ Retornado ao dashboard com sucesso")
                 update_status("dashboard_ok", "✅ Retornado ao dashboard", process_id=process_id)
+                monitor_log_info(f"✅ Processo #{process_id} concluído com sucesso - retornado ao dashboard", region="RPA")
             except Exception as e:
                 log(f"[FLOW][WARN] Erro ao retornar ao dashboard: {e}")
+                monitor_log_warning(f"⚠️ Erro ao retornar ao dashboard: {e}", region="RPA")
         else:
             log(f"[FLOW] ❌ Erro ao salvar: {save_result['message']}")
             update_status("erro_ao_salvar", f"❌ Erro: {save_result['message']}", status="error", process_id=process_id)
+            monitor_log_error(f"❌ Erro ao salvar processo #{process_id}: {save_result['message']}", exc=None, region="RPA", screenshot_path=None)
 
 
 # ============================================================================
