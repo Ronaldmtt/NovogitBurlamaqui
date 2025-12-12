@@ -5,10 +5,16 @@ Permite enviar logs, erros e screenshots para monitoramento remoto em tempo real
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
 LOG = logging.getLogger(__name__)
+
+# Adicionar caminho do rpa_monitor_client ao sys.path antes do import
+_RPA_CLIENT_PATH = '/home/runner/workspace/rpa_monitor_client'
+if _RPA_CLIENT_PATH not in sys.path:
+    sys.path.insert(0, _RPA_CLIENT_PATH)
 
 # Tentar importar cliente do monitor
 try:
