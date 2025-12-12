@@ -1808,11 +1808,9 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
         log(f"[MANUAL] Estado confirmado do DOM: '{estado}'")
         
         # IMPORTANTE: Aguardar AJAX carregar cidades após selecionar Estado
-        log(f"[MANUAL] Aguardando cidades do estado {estado} carregarem (1.5s)...")
-        await page.wait_for_timeout(1500)  # Reduzido de 3s para 1.5s
-        
-        # Verificar se CidadeId tem opções agora
-        await wait_for_select_ready(page, "CidadeId", 2, 10000)  # Reduzido de 20s para 10s
+        # wait_for_select_ready faz polling a cada 140ms, então sai IMEDIATAMENTE quando carrega
+        log(f"[MANUAL] Aguardando cidades do estado {estado} carregarem (máx 20s, sai quando pronto)...")
+        await wait_for_select_ready(page, "CidadeId", 2, 20000)  # 20s máx, mas sai quando carregar
     else:
         log(f"[MANUAL] ❌ Estado não confirmado no DOM (valor atual: '{estado_atual}')")
     
@@ -1878,12 +1876,11 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
             log(f"[MANUAL] Comarca confirmada: {comarca}")
         
         # IMPORTANTE: Aguardar Foro (JuizadoId) carregar após selecionar Comarca
+        # wait_for_select_ready faz polling, sai IMEDIATAMENTE quando carrega
         if comarca:
-            log(f"[MANUAL] Aguardando Foro carregar após comarca {comarca} (1s)...")
-            await page.wait_for_timeout(1000)  # Reduzido de 2s para 1s
-            # Verificar se JuizadoId tem opções
+            log(f"[MANUAL] Aguardando Foro carregar (máx 15s, sai quando pronto)...")
             try:
-                await wait_for_select_ready(page, "JuizadoId", 1, 5000)  # Reduzido de 8s para 5s
+                await wait_for_select_ready(page, "JuizadoId", 1, 15000)  # 15s máx, sai quando carregar
                 log(f"[MANUAL] ✅ Foro (JuizadoId) pronto para seleção")
             except Exception:
                 log(f"[MANUAL] ⚠️ Foro pode não ter carregado completamente")
