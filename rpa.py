@@ -1808,11 +1808,11 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
         log(f"[MANUAL] Estado confirmado do DOM: '{estado}'")
         
         # IMPORTANTE: Aguardar AJAX carregar cidades após selecionar Estado
-        log(f"[MANUAL] Aguardando cidades do estado {estado} carregarem (3s)...")
-        await page.wait_for_timeout(3000)
+        log(f"[MANUAL] Aguardando cidades do estado {estado} carregarem (1.5s)...")
+        await page.wait_for_timeout(1500)  # Reduzido de 3s para 1.5s
         
         # Verificar se CidadeId tem opções agora
-        await wait_for_select_ready(page, "CidadeId", 2, 20000)  # 20s - tolerante a AJAX lento
+        await wait_for_select_ready(page, "CidadeId", 2, 10000)  # Reduzido de 20s para 10s
     else:
         log(f"[MANUAL] ❌ Estado não confirmado no DOM (valor atual: '{estado_atual}')")
     
@@ -1823,8 +1823,7 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
         
         comarca_nome = (data.get("comarca") or data.get("cidade") or data.get("foro") or "").strip()
         
-        # Aguardar select estar pronto (com opções do estado)
-        await wait_for_select_ready(page, "CidadeId", 2, 20000)  # 20s - tolerante a AJAX lento
+        # Nota: Já aguardamos CidadeId na seção anterior, não duplicar espera aqui
         
         # Coletar opções disponíveis para fallback
         comarca_opts = []
@@ -1880,11 +1879,11 @@ async def select_estado_comarca_manual(page, cnj: str, data: dict, process_id: i
         
         # IMPORTANTE: Aguardar Foro (JuizadoId) carregar após selecionar Comarca
         if comarca:
-            log(f"[MANUAL] Aguardando Foro carregar após comarca {comarca} (2s)...")
-            await page.wait_for_timeout(2000)
+            log(f"[MANUAL] Aguardando Foro carregar após comarca {comarca} (1s)...")
+            await page.wait_for_timeout(1000)  # Reduzido de 2s para 1s
             # Verificar se JuizadoId tem opções
             try:
-                await wait_for_select_ready(page, "JuizadoId", 1, 8000)
+                await wait_for_select_ready(page, "JuizadoId", 1, 5000)  # Reduzido de 8s para 5s
                 log(f"[MANUAL] ✅ Foro (JuizadoId) pronto para seleção")
             except Exception:
                 log(f"[MANUAL] ⚠️ Foro pode não ter carregado completamente")
