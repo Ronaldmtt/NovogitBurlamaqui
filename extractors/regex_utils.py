@@ -5,6 +5,16 @@ import os
 import logging
 from typing import Dict, Optional, Tuple, List
 
+# Integração com RPA Monitor Client
+try:
+    from monitor_integration import log_info, log_warning as monitor_warn, log_error
+    MONITOR_AVAILABLE = True
+except ImportError:
+    MONITOR_AVAILABLE = False
+    def log_info(msg, region=""): pass
+    def monitor_warn(msg, region=""): pass
+    def log_error(msg, exc=None, region=""): pass
+
 CNJ_RE = re.compile(r"\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b")
 
 # ===== UTILITÁRIOS DE NORMALIZAÇÃO COMPARTILHADOS =====
@@ -715,6 +725,7 @@ def extract_data_distribuicao(text: str) -> Optional[str]:
     # capturar datas de assinatura/publicação como distribuição
     
     logger.debug("[DATA_DISTRIBUICAO] ❌ Nenhuma data encontrada")
+    monitor_warn("Data de distribuição não encontrada", region="REGEX")
     return None
 
 def extract_valor_causa(text: str) -> Optional[str]:
@@ -1417,6 +1428,7 @@ def extract_data_hora_audiencia(text: str) -> tuple[Optional[str], Optional[str]
             return data, hora
     
     logger.debug("[AUDIENCIA] ❌ Data/hora não encontrada")
+    monitor_warn("Audiência não encontrada no texto", region="REGEX")
     return None, None
 
 

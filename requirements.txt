@@ -31,6 +31,9 @@ requests>=2.31
 # === WebSockets ===
 websockets>=12.0
 
+# === RPA Monitor (dependências) ===
+croniter>=1.4.0
+
 # === Production Server ===
 gunicorn==21.2.0
 jinja2

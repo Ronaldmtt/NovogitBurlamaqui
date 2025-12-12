@@ -22,13 +22,14 @@ from .regex_utils import (
 from .audiencia import parse_audiencia_inicial
 from .brand_map import detect_grupo
 
-# Integração com monitor remoto
+# Integração com RPA Monitor Client
 try:
-    from monitor_integration import log_info, log_error
+    from monitor_integration import log_info, log_warning as monitor_warn, log_error
     MONITOR_AVAILABLE = True
 except ImportError:
     MONITOR_AVAILABLE = False
     def log_info(msg, region=""): pass
+    def monitor_warn(msg, region=""): pass
     def log_error(msg, exc=None, region=""): pass
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ def extract_text_from_pdf(path: str, max_pages: int = 30, max_chars: int = 12000
     """
     import os
     
+    log_info(f"Iniciando extração por zonas: {path}", region="PIPELINE")
     try:
         from PyPDF2 import PdfReader
         
@@ -113,11 +115,12 @@ def extract_text_from_pdf(path: str, max_pages: int = 30, max_chars: int = 12000
         
         logger.info(f"[PDF_EXTRACT] ✅ ZONAS: {len(pages_read)} páginas extraídas de {total_pages} total ({file_size_mb:.1f}MB, {len(result)} chars)")
         logger.info(f"[PDF_EXTRACT]    Início: 1-{min(front_pages, total_pages)}, Fim: {max(front_pages, total_pages - back_pages) + 1}-{total_pages}")
+        log_info(f"Extração por zonas concluída: {len(pages_read)} páginas, {len(result)} chars", region="PIPELINE")
         return result
         
     except Exception as e:
         logger.exception("Falha ao ler PDF")
-        log_error(f"Erro ao ler PDF: {path}", exc=e, region="EXTRACTOR")
+        log_error(f"Erro ao ler PDF: {path}", exc=e, region="PIPELINE")
         return ""
 
 def _infer_tipo_processo(texto: str) -> str | None:
@@ -126,7 +129,7 @@ def _infer_tipo_processo(texto: str) -> str | None:
     return None
 
 def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, filename: Optional[str] = None, celula_options: Optional[List[str]] = None, pdf_path: Optional[str] = None) -> Dict[str, Any]:
-    log_info(f"Iniciando extração de dados: {filename or 'N/A'}", region="EXTRACTOR")
+    log_info(f"Iniciando extração de dados: {filename or 'N/A'}", region="PIPELINE")
     t = texto or ""
     data: Dict[str, Any] = {}
 
@@ -200,6 +203,7 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
     else:
         # ✅ FALLBACK LLM para reclamadas - quando regex não encontra nenhuma
         logger.info("[RECLAMADAS_LLM] Regex não encontrou reclamadas - tentando LLM...")
+        monitor_warn("Fallback REGEX → LLM para reclamadas", region="PIPELINE")
         try:
             from .llm_extractor import extract_reclamadas_with_llm
             reclamadas_llm = extract_reclamadas_with_llm(t)
@@ -507,6 +511,7 @@ def run_extraction_from_text(texto: str, brand_map_path: Optional[str] = None, f
     else:
         # ✅ FALLBACK LLM para pedidos - APENAS quando regex não encontra nenhum
         logger.info("[PEDIDOS_LLM] Regex não encontrou pedidos - tentando LLM...")
+        monitor_warn("Fallback REGEX → LLM para pedidos", region="PIPELINE")
         try:
             from .llm_extractor import extract_pedidos_with_llm
             pedidos_llm = extract_pedidos_with_llm(t)

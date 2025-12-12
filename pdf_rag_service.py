@@ -26,6 +26,16 @@ from utils.gap_filler import gap_fill
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Integração com RPA Monitor Client
+try:
+    from monitor_integration import log_info, log_warning as monitor_warn, log_error
+    MONITOR_AVAILABLE = True
+except ImportError:
+    MONITOR_AVAILABLE = False
+    def log_info(msg, region=""): pass
+    def monitor_warn(msg, region=""): pass
+    def log_error(msg, exc=None, region=""): pass
+
 
 class PDFRAGService:
     def __init__(self):
@@ -143,6 +153,7 @@ class PDFRAGService:
     # =========================
     def extract_text_from_pdf(self, pdf_file_path: str) -> str:
         """Extrai texto de um PDF inteiro."""
+        log_info(f"Iniciando extração de texto do PDF: {pdf_file_path}", region="RAG")
         try:
             with open(pdf_file_path, "rb") as file:
                 reader = PyPDF2.PdfReader(file)
@@ -153,10 +164,13 @@ class PDFRAGService:
                         text += f"\n--- Página {page_num + 1} ---\n{page_text}\n"
                     except Exception as e:
                         logger.warning("Erro ao extrair texto da página %d: %s", page_num + 1, e)
+                        monitor_warn(f"Erro na página {page_num + 1}: {e}", region="RAG")
                         continue
+                log_info(f"Extração concluída: {len(text)} chars, {len(reader.pages)} páginas", region="RAG")
                 return text.strip()
         except Exception as e:
             logger.error("Erro ao extrair texto do PDF: %s", e)
+            log_error(f"Falha ao processar PDF: {pdf_file_path}", exc=e, region="RAG")
             raise Exception(f"Falha ao processar PDF: {str(e)}")
 
     def count_tokens(self, text: str) -> int:
@@ -482,13 +496,17 @@ class PDFRAGService:
         """Extrai dados estruturados a partir do texto completo do PDF."""
         try:
             logger.info("Analisando documento completo: %d caracteres", len(text))
+            log_info(f"Iniciando extração RAG: {len(text)} caracteres", region="RAG")
             if len(text) > 50000:
+                log_info("Documento grande detectado - usando análise em chunks", region="RAG")
                 result = self._analyze_large_document(text)
             else:
                 result = self._analyze_full_document(text)
+            log_info(f"Extração RAG concluída: {len(result)} campos extraídos", region="RAG")
             return result
         except Exception as e:
             logger.error("Erro na extração de dados: %s", e)
+            log_error("Erro na extração de dados do PDF", exc=e, region="RAG")
             return {
                 "cnj": "Não",
                 "tipo_processo": "Eletrônico",
@@ -515,6 +533,7 @@ class PDFRAGService:
 
     def _analyze_full_document(self, text: str) -> Dict[str, Any]:
         """Analisa o documento inteiro em uma única chamada ao LLM."""
+        log_info("Iniciando análise LLM do documento completo", region="RAG")
         try:
             prompt = (
                 "ANÁLISE EXAUSTIVA DE DOCUMENTO JURÍDICO BRASILEIRO\n\n"
@@ -612,10 +631,12 @@ class PDFRAGService:
             )
             result = json.loads(response.choices[0].message.content)
             logger.info("Análise completa - Primeira passada concluída.")
+            log_info("Análise LLM concluída - aplicando fallbacks regex", region="RAG")
             result = self._fill_mandatory_fields(text, result)
             return result
         except Exception as e:
             logger.error("Erro na análise completa: %s", e)
+            log_error("Erro na análise LLM do documento", exc=e, region="RAG")
             return self._get_default_values()
 
     def _analyze_large_document(self, text: str) -> Dict[str, Any]:
@@ -628,6 +649,7 @@ class PDFRAGService:
                 chunks.append(text[i : i + chunk_size])
 
             logger.info("Documento grande dividido em %d partes.", len(chunks))
+            log_info(f"Documento dividido em {len(chunks)} chunks para análise", region="RAG")
             header_result = self._analyze_full_document(chunks[0])
 
             for i, chunk in enumerate(chunks[1:], 1):
@@ -645,9 +667,11 @@ class PDFRAGService:
                         ):
                             header_result[field] = value
 
+            log_info("Análise de documento grande concluída", region="RAG")
             return header_result
         except Exception as e:
             logger.error("Erro na análise de documento grande: %s", e)
+            log_error("Erro na análise de documento grande", exc=e, region="RAG")
             return self._get_default_values()
 
     def _focused_chunk_analysis(self, chunk: str, missing_fields: List[str]) -> Dict[str, Any]:

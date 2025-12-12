@@ -22,6 +22,16 @@ from PIL import Image
 import numpy as np
 import cv2
 
+# Integração com RPA Monitor Client
+try:
+    from monitor_integration import log_info, log_warning as monitor_warn, log_error
+    MONITOR_AVAILABLE = True
+except ImportError:
+    MONITOR_AVAILABLE = False
+    def log_info(msg, region=""): pass
+    def monitor_warn(msg, region=""): pass
+    def log_error(msg, exc=None, region=""): pass
+
 # ============================================================================
 # DETECÇÃO DE GPU E OCR ENGINE
 # ============================================================================
@@ -257,6 +267,7 @@ def _ocr_image_hybrid(img: Image.Image, doc_type: str = "generic") -> str:
             
         except Exception as e:
             logger.warning(f"[OCR] EasyOCR erro, fallback Tesseract: {e}")
+            monitor_warn(f"Fallback EasyOCR → Tesseract: {e}", region="OCR")
     
     # Fallback para Tesseract
     psm_config = _get_psm_for_doc_type(doc_type)
@@ -294,6 +305,7 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
     - PSM otimizado por tipo de documento
     """
     logger = logging.getLogger(__name__)
+    log_info(f"Iniciando OCR para processo {process_id}: campos {missing_fields}", region="OCR")
     result = {}
     campos_faltantes = set(missing_fields)
     
@@ -343,11 +355,13 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
                 )
         except Exception as e:
             logger.warning(f"[OCR-QUEUE] Erro proc {process_id} página {page_num}: {e}")
+            log_error(f"Erro OCR processo {process_id} página {page_num}", exc=e, region="OCR")
         finally:
             OCR_SEMAPHORE.release()
         
         if not texto_pagina:
             logger.warning(f"[OCR-QUEUE] ⚠️ Proc {process_id}: {doc_type.upper()} página {page_num} - sem texto extraído!")
+            monitor_warn(f"OCR sem texto: processo {process_id}, página {page_num}", region="OCR")
             continue
         
         # ✅ DEBUG: Mostrar primeiros 500 chars do texto para diagnóstico
@@ -433,9 +447,11 @@ def _process_ocr_task(process_id: int, pdf_path: str, doc_pages: Dict[str, int],
     # ✅ Log final do resultado
     if result:
         logger.info(f"[OCR-QUEUE] 🎯 Proc {process_id}: Extraído {list(result.keys())}")
+        log_info(f"OCR concluído processo {process_id}: {list(result.keys())}", region="OCR")
     else:
         logger.warning(f"[OCR-QUEUE] ⚠️ Proc {process_id}: NENHUM campo extraído das páginas {list(doc_pages.values())}")
         logger.warning(f"[OCR-QUEUE] ⚠️ Campos faltantes ainda: {list(campos_faltantes)}")
+        monitor_warn(f"OCR sem campos extraídos: processo {process_id}", region="OCR")
     
     return result
 
