@@ -5,25 +5,24 @@ Permite enviar logs, erros e screenshots para monitoramento remoto em tempo real
 
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Optional
 
-# Adicionar caminho do rpa_monitor_client ao sys.path
-sys.path.insert(0, '/home/runner/workspace/rpa_monitor_client/rpa_monitor_client')
+LOG = logging.getLogger(__name__)
 
-# Importar cliente do monitor
+# Tentar importar cliente do monitor
 try:
-    from rpa_monitor_client import auto_setup_rpa_monitor, rpa_log
+    from rpa_monitor_client import setup_rpa_monitor, auto_setup_rpa_monitor, rpa_log, rpa
     MONITOR_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    LOG.warning(f"[MONITOR] rpa-monitor-client não disponível: {e}")
     MONITOR_AVAILABLE = False
     rpa_log = None
-
-LOG = logging.getLogger(__name__)
+    rpa = None
 
 # Estado de inicialização do monitor
 _monitor_initialized = False
+
 
 def init_monitor(rpa_id: Optional[str] = None) -> bool:
     """
@@ -46,7 +45,7 @@ def init_monitor(rpa_id: Optional[str] = None) -> bool:
     
     # Verificar se está habilitado
     enabled = os.getenv("RPA_MONITOR_ENABLED", "false").lower() == "true"
-    monitor_id = rpa_id or os.getenv("RPA_MONITOR_ID", "RPA-FGbularmaci-5")
+    monitor_id = rpa_id or os.getenv("RPA_MONITOR_ID", "")
     monitor_host = os.getenv("RPA_MONITOR_HOST", "")
     monitor_region = os.getenv("RPA_MONITOR_REGION", "Sistema Juridico")
     monitor_transport = os.getenv("RPA_MONITOR_TRANSPORT", "ws")
@@ -59,6 +58,10 @@ def init_monitor(rpa_id: Optional[str] = None) -> bool:
     
     if not monitor_host:
         LOG.warning("[MONITOR] RPA_MONITOR_HOST não configurado")
+        return False
+    
+    if not monitor_id:
+        LOG.warning("[MONITOR] RPA_MONITOR_ID não configurado")
         return False
     
     try:
@@ -87,6 +90,7 @@ def init_monitor(rpa_id: Optional[str] = None) -> bool:
         _monitor_initialized = False
         return False
 
+
 def log_info(message: str, region: str = "SYSTEM"):
     """
     Envia log de informação para o monitor
@@ -99,28 +103,51 @@ def log_info(message: str, region: str = "SYSTEM"):
         try:
             rpa_log.info(f"[{region}] {message}")
         except Exception:
-            pass  # Não quebrar execução se monitor falhar
+            pass
 
-def log_error(message: str, exc: Optional[Exception] = None, region: str = "SYSTEM"):
+
+def log_warning(message: str, region: str = "SYSTEM"):
     """
-    Envia log de erro para o monitor
+    Envia log de warning para o monitor
+    
+    Args:
+        message: Mensagem de warning
+        region: Região/módulo que originou o warning
+    """
+    if _monitor_initialized and rpa_log:
+        try:
+            rpa_log.warn(f"[{region}] {message}")
+        except Exception:
+            pass
+
+
+def log_error(message: str, exc: Optional[Exception] = None, region: str = "SYSTEM", screenshot_path: Optional[str] = None):
+    """
+    Envia log de erro para o monitor COM screenshot obrigatório
     
     Args:
         message: Mensagem de erro
         exc: Exceção capturada (opcional)
         region: Região/módulo que originou o erro
+        screenshot_path: Caminho do screenshot a enviar junto (obrigatório para erros)
     """
     if _monitor_initialized and rpa_log:
         try:
             full_message = f"[{region}] {message}"
             if exc:
-                rpa_log.error(full_message, exc=exc)
+                rpa_log.error(full_message, exc=exc, regiao=region)
             else:
-                rpa_log.error(full_message)
+                rpa_log.error(full_message, regiao=region)
+            
+            # Se tiver screenshot, enviar também
+            if screenshot_path:
+                send_screenshot(screenshot_path, region=region)
+                
         except Exception:
-            pass  # Não quebrar execução se monitor falhar
+            pass
 
-def send_screenshot(screenshot_path: Path, region: str = "SYSTEM"):
+
+def send_screenshot(screenshot_path, region: str = "SYSTEM"):
     """
     Envia screenshot PNG para o monitor
     
@@ -128,7 +155,7 @@ def send_screenshot(screenshot_path: Path, region: str = "SYSTEM"):
         screenshot_path: Caminho do arquivo PNG existente
         region: Região/módulo que gerou o screenshot
     """
-    if not _monitor_initialized:
+    if not _monitor_initialized or not rpa_log:
         return
     
     try:
@@ -141,35 +168,25 @@ def send_screenshot(screenshot_path: Path, region: str = "SYSTEM"):
             LOG.warning(f"[MONITOR] Screenshot não existe: {screenshot_path}")
             return
         
-        # Importar módulo interno do rpa_monitor_client
-        import sys
-        sys.path.insert(0, str(Path(__file__).parent / 'rpa_monitor_client' / 'rpa_monitor_client'))
-        from rpa_monitor_client import _logging_api
-        
-        # Acessar instância do cliente via _logging_api
-        client_instance = _logging_api._client_instance
-        
-        if not client_instance:
-            LOG.warning(f"[MONITOR] Cliente não inicializado para enviar screenshot")
-            return
-        
-        # Ler arquivo PNG do disco
-        image_bytes = screenshot_path.read_bytes()
-        
-        # Enviar diretamente via send_image() do cliente
-        client_instance.send_image(
-            image_bytes=image_bytes,
-            content_type="image/png",
+        # Usar a API de screenshot do rpa_log
+        rpa_log.screenshot(
             filename=screenshot_path.name,
-            regiao=region,
-            nivel="INFO"
+            regiao=region
         )
         
-        LOG.info(f"[MONITOR] 📸 Screenshot enviado: {screenshot_path.name} ({screenshot_path.stat().st_size} bytes)")
+        LOG.debug(f"[MONITOR] 📸 Screenshot enviado: {screenshot_path.name}")
         
     except Exception as e:
         LOG.warning(f"[MONITOR] Erro ao enviar screenshot: {e}")
 
+
 def is_initialized() -> bool:
     """Retorna True se o monitor foi inicializado com sucesso"""
     return _monitor_initialized
+
+
+def get_rpa_log():
+    """Retorna a instância do rpa_log para uso direto"""
+    if _monitor_initialized and rpa_log:
+        return rpa_log
+    return None
