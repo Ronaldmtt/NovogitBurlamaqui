@@ -2038,9 +2038,69 @@ async def select_from_bootstrap_dropdown(
         log(f"[DROPDOWN][ERRO] {label}: {e}")
         return False
 
+async def _fast_select_direct(page, select_id: str, wanted_text: str) -> bool:
+    """
+    Fast-path: tenta seleção direta via JavaScript sem fuzzy matching.
+    Muito mais rápido (~100ms vs ~2s) para casos comuns.
+    
+    Returns:
+        True se conseguiu selecionar, False se precisa fallback para fuzzy
+    """
+    try:
+        result = await page.evaluate(
+            """({sid, wanted})=>{
+            const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/\\s+/g,' ').trim();
+            const wNorm = norm(wanted);
+            
+            const el = document.getElementById(sid);
+            if (!el || !el.options) return {success: false, reason: 'element_not_found'};
+            
+            // Tentar match exato primeiro
+            for (const opt of el.options) {
+                const text = (opt.textContent || '').trim();
+                if (!text || /selecion/i.test(text)) continue;
+                
+                const tNorm = norm(text);
+                // Match exato ou opção contém o texto desejado (mas NÃO o contrário para evitar falsos positivos)
+                // Critério conservador: match exato OU opção >= desejado com substring
+                if (tNorm === wNorm || (tNorm.includes(wNorm) && tNorm.length <= wNorm.length * 1.5)) {
+                    // Selecionar diretamente
+                    el.value = opt.value;
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                    
+                    // Atualizar bootstrap-select se existir
+                    try {
+                        const $ = window.jQuery || window.$;
+                        if ($ && $(el).selectpicker) {
+                            $(el).selectpicker('val', opt.value);
+                            $(el).selectpicker('refresh');
+                            $(el).trigger('changed.bs.select');
+                        }
+                    } catch(e) {}
+                    
+                    return {success: true, selected: text};
+                }
+            }
+            return {success: false, reason: 'no_match'};
+        }""",
+            {"sid": select_id, "wanted": wanted_text},
+        )
+        
+        if result.get("success"):
+            dlog(f"[FAST_SELECT] ✅ {select_id}: '{result.get('selected')}' (direto)")
+            return True
+        return False
+    except Exception:
+        return False
+
 async def set_select_fuzzy_any(
     page, select_id: str, wanted_text: str, fallbacks: Optional[List[str]] = None, prefer_words: Optional[List[str]] = None
 ) -> bool:
+    # 🚀 FAST-PATH: Tentar seleção direta primeiro (muito mais rápido)
+    if await _fast_select_direct(page, select_id, wanted_text):
+        return True
+    
+    # Fallback para fuzzy matching se fast-path falhar
     try:
         has_bs = await page.locator(f"button.btn.dropdown-toggle[data-id='{select_id}']").count() > 0
     except Exception:
