@@ -15,6 +15,7 @@ IMPORTANTE: Usa PostgreSQL advisory locks para garantir que apenas
 um runner execute por vez, mesmo com múltiplos workers Gunicorn.
 """
 
+import os
 import threading
 import time
 import logging
@@ -578,7 +579,7 @@ class GlobalBatchQueueRunner:
         import rpa
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
-        MAX_RPA_WORKERS = 5
+        MAX_RPA_WORKERS = int(os.getenv("MAX_RPA_WORKERS", "5"))
         
         try:
             with self._flask_app.app_context():
