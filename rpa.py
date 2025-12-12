@@ -2080,6 +2080,71 @@ async def wait_for_select_ready(page, select_id: str, min_opts: int = 1, timeout
             return False
         await short_sleep_ms(140)
 
+
+# 🔧 2025-12-12: OTIMIZAÇÃO DE TIMEOUTS - Nova função para campos "pais" que liberam filhos
+async def wait_after_parent_field(page, child_select_id: str, initial_delay_ms: int = 1500, poll_ms: int = 50, max_poll_ms: int = 5000) -> bool:
+    """
+    Aguarda após preencher campo "pai" para que campo "filho" fique disponível.
+    
+    Lógica:
+    1. Aguarda initial_delay_ms fixo (tempo para sistema liberar dependentes)
+    2. Verifica se campo filho está disponível
+    3. Se não, faz polling rápido (poll_ms) até max_poll_ms
+    
+    Args:
+        page: Playwright page
+        child_select_id: ID do select filho que deve ficar disponível
+        initial_delay_ms: Delay inicial fixo após preencher pai (default: 1500ms)
+        poll_ms: Intervalo de polling rápido se filho não disponível (default: 50ms)
+        max_poll_ms: Timeout máximo para polling adicional (default: 5000ms)
+    
+    Returns:
+        True se campo filho disponível, False se timeout
+    """
+    # Passo 1: Delay inicial fixo
+    log(f"[PARENT→CHILD] Aguardando {initial_delay_ms}ms após campo pai...")
+    await short_sleep_ms(initial_delay_ms)
+    
+    # Passo 2: Verificar se já está disponível
+    try:
+        count = await page.evaluate(
+            """sid=>{
+          const el=document.getElementById(sid);
+          if(!el||!el.options) return 0;
+          return [...el.options].filter(o=> (o.textContent||'').trim() && !/selecion/i.test(o.textContent||'')).length;
+        }""",
+            child_select_id,
+        )
+        if (count or 0) >= 1:
+            log(f"[PARENT→CHILD] ✅ Filho #{child_select_id} já disponível com {count} opções")
+            return True
+    except Exception:
+        pass
+    
+    # Passo 3: Polling rápido se não disponível
+    log(f"[PARENT→CHILD] Filho não disponível, iniciando polling rápido ({poll_ms}ms)...")
+    deadline = asyncio.get_event_loop().time() + max_poll_ms / 1000.0
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            count = await page.evaluate(
+                """sid=>{
+              const el=document.getElementById(sid);
+              if(!el||!el.options) return 0;
+              return [...el.options].filter(o=> (o.textContent||'').trim() && !/selecion/i.test(o.textContent||'')).length;
+            }""",
+                child_select_id,
+            )
+            if (count or 0) >= 1:
+                log(f"[PARENT→CHILD] ✅ Filho #{child_select_id} liberado após polling ({count} opções)")
+                return True
+        except Exception:
+            pass
+        await short_sleep_ms(poll_ms)
+    
+    log(f"[PARENT→CHILD] ⚠️ Timeout aguardando filho #{child_select_id}")
+    return False
+
+
 async def _get_selected_text(page, select_id: str) -> str:
     try:
         return (
@@ -5309,6 +5374,9 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     await ensure_cnj_still_present(page, cnj)
     update_field_status("area_direito", "Área do Direito", wanted_area)
     monitor_log_info(f"✅ Área do Direito selecionada: {wanted_area} (processo #{process_id})", region="RPA")
+    
+    # 🔧 2025-12-12: CADEIA DE DEPENDÊNCIAS - Área Direito → libera Origem
+    _origem_ready = await wait_after_parent_field(page, "OrigemId", initial_delay_ms=1500)
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 7) ESTADO E COMARCA - verificar autofill, senão preencher manualmente UMA VEZ
@@ -5358,9 +5426,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # 9) ORIGEM
+    # 🔧 2025-12-12: timeout dinâmico baseado no resultado do wait_after_parent_field
     # ═══════════════════════════════════════════════════════════════════════════════
     try:
-        await wait_for_select_ready(page, "OrigemId", 1, 7000)
+        _origem_timeout = 2000 if _origem_ready else 7000  # 🔧 Fallback para timeout original se parent timeout
+        await wait_for_select_ready(page, "OrigemId", 1, _origem_timeout)
         btn, cont = await _open_bs_and_get_container(page, "OrigemId")
         origem_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         if btn:
@@ -5387,8 +5457,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         update_status("origem_preenchida", f"✅ Origem: {wanted}", process_id=process_id)
         update_field_status("origem", "Origem", wanted)
         monitor_log_info(f"✅ Origem selecionada: {wanted} (processo #{process_id})", region="RPA")
+        
+        # 🔧 2025-12-12: CADEIA DE DEPENDÊNCIAS - Origem → libera Órgão/Foro
+        _orgao_ready = await wait_after_parent_field(page, "NaturezaId", initial_delay_ms=1500)
     except Exception as e:
         log(f"[Origem][WARN] {e}")
+        _orgao_ready = False  # 🔧 Fallback seguro se exceção
         monitor_log_warning(f"⚠️ Aviso ao preencher Origem: {e}", region="RPA")
     await ensure_cnj_still_present(page, cnj)
 
@@ -5433,8 +5507,10 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         monitor_log_warning(f"⚠️ Aviso ao preencher Número do Órgão: {e}", region="RPA")
 
     # 11) Órgão (NaturezaId)
+    # 🔧 2025-12-12: timeout dinâmico baseado no resultado do wait_after_parent_field
     try:
-        await wait_for_select_ready(page, "NaturezaId", 1, 7000)
+        _orgao_timeout = 2000 if _orgao_ready else 7000  # 🔧 Fallback para timeout original se parent timeout
+        await wait_for_select_ready(page, "NaturezaId", 1, _orgao_timeout)
         btn, cont = await _open_bs_and_get_container(page, "NaturezaId")
         org_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         if btn:
@@ -5464,13 +5540,19 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         update_status("orgao_preenchido", f"✅ Órgão: {wanted}", process_id=process_id)
         update_field_status("orgao", "Órgão", wanted)
         monitor_log_info(f"✅ Órgão selecionado: {wanted} (processo #{process_id})", region="RPA")
+        
+        # 🔧 2025-12-12: CADEIA DE DEPENDÊNCIAS - Órgão → libera Célula/Instância
+        _celula_ready = await wait_after_parent_field(page, "EscritorioId", initial_delay_ms=1500)
     except Exception as e:
         log(f"[Órgão][WARN] {e}")
+        _celula_ready = False  # 🔧 Fallback seguro se exceção
         monitor_log_warning(f"⚠️ Aviso ao preencher Órgão: {e}", region="RPA")
 
     # 12) Célula (EscritorioId)
+    # 🔧 2025-12-12: timeout dinâmico baseado no resultado do wait_after_parent_field
     try:
-        await wait_for_select_ready(page, "EscritorioId", 1, 8000)
+        _celula_timeout = 2000 if _celula_ready else 8000  # 🔧 Fallback para timeout original se parent timeout
+        await wait_for_select_ready(page, "EscritorioId", 1, _celula_timeout)
         btn, cont = await _open_bs_and_get_container(page, "EscritorioId")
         cel_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         if btn:
@@ -5507,13 +5589,18 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         update_status("celula_preenchida", f"✅ Célula: {sel_final}", process_id=process_id)
         update_field_status("celula", "Célula", sel_final)
         monitor_log_info(f"✅ Célula selecionada: {sel_final} (processo #{process_id})", region="RPA")
+        
+        # 🔧 2025-12-12: CADEIA DE DEPENDÊNCIAS - Célula → libera Assunto/Objeto/Tipo Ação
+        _assunto_ready = await wait_after_parent_field(page, "AreaProcessoId", initial_delay_ms=1500)
     except Exception as e:
         log(f"[Célula][WARN] {e}")
+        _assunto_ready = False  # 🔧 Fallback seguro se exceção
         monitor_log_warning(f"⚠️ Aviso ao preencher Célula: {e}", region="RPA")
 
     # 13) Foro (JuizadoId) - COM FALLBACK COMPLETO
+    # 🔧 2025-12-12: Campo final - timeout curto (não libera dependentes)
     try:
-        await wait_for_select_ready(page, "JuizadoId", 1, 7000)
+        await wait_for_select_ready(page, "JuizadoId", 1, 3000)  # 🔧 Reduzido: campo final
         raw_opts = await page.evaluate(
             """sid=>{
           const el=document.getElementById(sid); if(!el||!el.options) return [];
@@ -5569,7 +5656,8 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     assunto_wanted = None
     try:
         log(f"[Assunto] Iniciando preenchimento do Assunto (AreaProcessoId)...")
-        await wait_for_select_ready(page, "AreaProcessoId", 1, 7000)
+        _assunto_timeout = 2000 if _assunto_ready else 7000  # 🔧 2025-12-12: Fallback para timeout original se parent timeout
+        await wait_for_select_ready(page, "AreaProcessoId", 1, _assunto_timeout)
         btn, cont = await _open_bs_and_get_container(page, "AreaProcessoId")
         assunto_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         log(f"[Assunto] Opções do dropdown: {len(assunto_opts)} itens")
@@ -5720,7 +5808,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
 
     # 17) Classe/Objeto (quando houver campo à parte)
     try:
-        ready = await wait_for_select_ready(page, "ClasseId", 1, 7000)
+        ready = await wait_for_select_ready(page, "ClasseId", 1, 3000)  # 🔧 2025-12-12: Reduzido - campo final
         if ready:
             btn, cont = await _open_bs_and_get_container(page, "ClasseId")
             obj_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
@@ -5883,7 +5971,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
 
     # 17.1) Cliente (GrupoClienteId) - COM FALLBACK COMPLETO
     try:
-        await wait_for_select_ready(page, GRUPO_CLIENTE_SELECT_ID, 1, 7000)
+        await wait_for_select_ready(page, GRUPO_CLIENTE_SELECT_ID, 1, 3000)  # 🔧 2025-12-12: Reduzido - campo final
         btn, cont = await _open_bs_and_get_container(page, GRUPO_CLIENTE_SELECT_ID)
         grp_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         if btn:
@@ -5936,7 +6024,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
 
     # 17.3) Posição Parte Interessada (PosicaoClienteId)
     try:
-        await wait_for_select_ready(page, POSICAO_CLIENTE_SELECT_ID, 1, 7000)
+        await wait_for_select_ready(page, POSICAO_CLIENTE_SELECT_ID, 1, 3000)  # 🔧 2025-12-12: Reduzido - campo final
         
         # 🔒 CRITICAL: Filtra placeholders inválidos ANTES de usar fallback do banco
         # Sincronizado com filtro em infer_cliente_grupo_and_parte() (linhas 2821-2836)
