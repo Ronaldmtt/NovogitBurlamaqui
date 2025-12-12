@@ -5180,7 +5180,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     # 4) SISTEMA ELETRÔNICO
     # ═══════════════════════════════════════════════════════════════════════════════
     update_status("aguardando_sistema_eletronico", "Aguardando dropdown Sistema Eletrônico ficar pronto...", process_id=process_id)
-    await wait_for_select_ready(page, "SistemaEletronicoId", 1, 8000)  # 🔧 2025-12-12: Reduzido de 15s→8s
+    await wait_for_select_ready(page, "SistemaEletronicoId", 1, 4000)  # 🔧 2025-12-12: Otimizado para 4s
     update_status("abrindo_sistema_eletronico", "Abrindo dropdown Sistema Eletrônico...", process_id=process_id)
     
     # 🔧 FIX 2025-12-09: Verificar se campo está oculto e usar JS direto se necessário
@@ -5301,7 +5301,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     # 6) ÁREA DO DIREITO
     # ═══════════════════════════════════════════════════════════════════════════════
     update_status("area_direito", "Preenchendo Área do Direito...", process_id=process_id)
-    await wait_for_select_ready(page, "AreaDireitoId", 1, 5000)  # 🔧 2025-12-12: Reduzido de 10s→5s
+    await wait_for_select_ready(page, "AreaDireitoId", 1, 3000)  # 🔧 2025-12-12: Otimizado para 3s
     wanted_area = resolve_area_direito(data)
     _must(
         await set_select_fuzzy_any(page, "AreaDireitoId", wanted_area, fallbacks=AREA_LIST),
@@ -5810,7 +5810,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     tipo_acao_preenchido = False
     try:
         log(f"[TipoAção] Iniciando preenchimento do Tipo de Ação (TipoAcaoId)...")
-        await wait_for_select_ready(page, "TipoAcaoId", 1, 7000)  # 🔧 2025-12-12: Reduzido de 9s→7s
+        await wait_for_select_ready(page, "TipoAcaoId", 1, 4000)  # 🔧 2025-12-12: Otimizado para 4s
         btn, cont = await _open_bs_and_get_container(page, "TipoAcaoId")
         tp_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         log(f"[TipoAção] Opções do dropdown: {len(tp_opts)} itens")
