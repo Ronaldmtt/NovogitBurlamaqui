@@ -3608,10 +3608,11 @@ def load_process_data_for_fill(process_id: Optional[int] = None) -> Dict[str, An
             if process_id:
                 p = Process.query.get(process_id)
                 if p:
+                    # 🔧 2025-12-12: Adicionados campos faltantes: foro, instancia, pedidos_json, outras_reclamadas_json
                     data = {k: getattr(p, k, "") or "" for k in [
                         "numero_processo", "tipo_processo", "sistema_eletronico", "numero_processo_antigo",
                         "area_direito", "sub_area_direito", "origem", "orgao", "numero_orgao",
-                        "comarca", "estado", "assunto", "objeto", "celula",
+                        "comarca", "estado", "foro", "instancia", "assunto", "objeto", "celula",
                         "cliente", "parte_interessada", "parte_adversa_nome", "empresa", "grupo",
                         "posicao_parte_interessada", "parte_adversa_tipo", "valor_causa", "estrategia",
                         "escritorio_parte_adversa", "cpf_cnpj_parte_adversa", "telefone_parte_adversa",
@@ -3620,7 +3621,7 @@ def load_process_data_for_fill(process_id: Optional[int] = None) -> Dict[str, An
                         "link_audiencia", "subtipo_audiencia", "envolvido_audiencia",
                         "data_distribuicao", "data_admissao", "data_demissao", "motivo_demissao", "salario", 
                         "cargo_funcao", "cargo", "empregador", "local_trabalho", "pis", "ctps",
-                        "outra_reclamada_cliente"  # ✅ Adicionado para reclamadas extras do banco
+                        "outra_reclamada_cliente", "pedidos_json", "outras_reclamadas_json"
                     ]}
                     
                     # MÚLTIPLAS RECLAMADAS: Extrair do PDF se existir

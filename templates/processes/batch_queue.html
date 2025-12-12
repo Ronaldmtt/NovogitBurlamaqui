@@ -238,6 +238,27 @@ function updateQueueStatus() {
                 stopBtn.style.display = 'none';
             }
             
+            // 🔧 2025-12-12: Remover batches que não estão mais na fila (foram concluídos)
+            const currentBatchIds = new Set((data.queued_batches || []).map(b => b.id));
+            document.querySelectorAll('.batch-queue-item').forEach(item => {
+                const batchId = parseInt(item.getAttribute('data-batch-id'));
+                if (!currentBatchIds.has(batchId)) {
+                    // Batch foi removido da fila - remover da UI
+                    item.remove();
+                }
+            });
+            
+            // Mostrar mensagem de fila vazia se não houver mais batches
+            const queuedList = document.getElementById('queuedBatchesList');
+            if (queuedList && data.queued_batches?.length === 0) {
+                const listGroup = queuedList.querySelector('.list-group');
+                if (listGroup) listGroup.remove();
+                const emptyMsg = document.getElementById('emptyQueueMsg');
+                if (!emptyMsg) {
+                    queuedList.innerHTML = '<div class="text-center text-muted py-4" id="emptyQueueMsg"><i class="fas fa-inbox fa-3x mb-3"></i><p>Nenhum batch na fila</p></div>';
+                }
+            }
+            
             // Atualizar progresso de cada batch na lista
             if (data.queued_batches) {
                 data.queued_batches.forEach(batch => {

@@ -182,6 +182,9 @@ class GlobalBatchQueueRunner:
                 with self._flask_app.app_context():
                     from models import BatchUpload, BatchItem, db
                     
+                    # 🔧 2025-12-12: Forçar dados frescos do banco (evitar cache de sessão SQLAlchemy)
+                    db.session.expire_all()
+                    
                     queued_batches = BatchUpload.query.filter(
                         BatchUpload.queue_position.isnot(None)
                     ).order_by(BatchUpload.queue_position.asc()).all()
