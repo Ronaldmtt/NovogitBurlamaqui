@@ -2061,9 +2061,9 @@ async def _fast_select_direct(page, select_id: str, wanted_text: str) -> bool:
                 if (!text || /selecion/i.test(text)) continue;
                 
                 const tNorm = norm(text);
-                // Match exato ou opção contém o texto desejado (mas NÃO o contrário para evitar falsos positivos)
-                // Critério conservador: match exato OU opção >= desejado com substring
-                if (tNorm === wNorm || (tNorm.includes(wNorm) && tNorm.length <= wNorm.length * 1.5)) {
+                // Fast-path: APENAS match exato (norm já faz lowercase)
+                // Foro geralmente é mesmo valor da Comarca em minúsculo
+                if (tNorm === wNorm) {
                     // Selecionar diretamente
                     el.value = opt.value;
                     el.dispatchEvent(new Event('change', {bubbles: true}));
