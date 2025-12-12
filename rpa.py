@@ -4977,8 +4977,8 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     log(f"[FORM][DEBUG] len(data) = {len(data)} campos")
     log(f"[FORM][DEBUG] ═══ FIM DEBUG #{process_id} ═══")
 
-    # ORDEM CORRETA: Tipo → CNJ → Número
-    # O campo #ProtocoloInicial é CRIADO pelo eLaw quando marcamos Tipo=Eletrônico
+    # 🔧 2025-12-12: ORDEM CORRETA DO ELAW (conforme fluxo manual):
+    # CNJ Radio Sim → Tipo Eletrônico → Número do Processo → Sistema Eletrônico
     import re as regex_module  # Force reimport to avoid async scope issues
     cnj = extract_cnj_from_anywhere(data)
     cnj_digits = regex_module.sub(r'\D', '', cnj or '')
@@ -4992,7 +4992,54 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             cnj = _cnj_normalize(RPA_EXPECT_CNJ)
     _must(bool(cnj), "numero_processo vazio")
 
-    # 1) Tipo do processo = Eletrônico - COM VERIFICAÇÃO OBRIGATÓRIA
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 1) CNJ RADIO SIM - PRIMEIRO! (libera campo de número do processo)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    update_status("radio_cnj", "Marcando CNJ: Sim", process_id=process_id)
+    log(f"[CNJ] ═══ MARCANDO RÁDIO CNJ=SIM PARA PROCESSO #{process_id} ═══")
+    
+    cnj_flag_ok = await ensure_cnj_flag_on(page)
+    if not cnj_flag_ok:
+        log("[CNJ][RETRY] ensure_cnj_flag_on falhou - forçando via JS direto...")
+        cnj_flag_ok = await page.evaluate("""() => {
+            const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+            const radioNames = ['IsJudicial', 'IsCNJ', 'PossuiCNJ', 'HasCNJ', 'Cnj', 'PossuiNumeroCNJ'];
+            for (const name of radioNames) {
+                const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
+                for (const r of radios) {
+                    const val = (r.value || '').toLowerCase();
+                    if (['1', 'true', 'sim', 'yes', 's'].includes(val)) {
+                        r.checked = true;
+                        r.click();
+                        r.dispatchEvent(new Event('change', {bubbles: true}));
+                        return true;
+                    }
+                }
+            }
+            for (const label of document.querySelectorAll('label')) {
+                const txt = norm(label.textContent || '');
+                if (txt === 'sim' || txt.includes('cnj') && txt.includes('sim')) {
+                    const input = label.control || label.querySelector('input');
+                    if (input && (input.type === 'radio' || input.type === 'checkbox')) {
+                        input.checked = true;
+                        input.click();
+                        input.dispatchEvent(new Event('change', {bubbles: true}));
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }""")
+        if cnj_flag_ok:
+            log("[CNJ] ✅ Rádio CNJ forçado via JS direto")
+    
+    _must(cnj_flag_ok, "Rádio CNJ (Sim) - OBRIGATÓRIO para exibir campo de número do processo")
+    update_field_status("radio_cnj", "Rádio CNJ", "Sim")
+    await _settle(page, "radio:cnj")
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 2) TIPO DO PROCESSO = ELETRÔNICO (libera dropdown Sistema Eletrônico)
+    # ═══════════════════════════════════════════════════════════════════════════════
     update_status("tipo_processo", "Selecionando tipo: Eletrônico", process_id=process_id)
     tipo_ok = await set_tipo_processo_virtual(page, want_virtual=True)
     
@@ -5092,58 +5139,13 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     if not sistema_apareceu:
         log("[TIPO_PROCESSO][WARN] Campo Sistema Eletrônico não apareceu após 3 tentativas - continuando...")
     
-    # 2) CNJ
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 3) NÚMERO DO PROCESSO (CNJ) - dispara auto-fill de Estado/Comarca!
+    # ═══════════════════════════════════════════════════════════════════════════════
     update_status("preenchendo_cnj", f"Preenchendo número do processo (CNJ): {cnj}", process_id=process_id)
-    log(f"[CNJ] ═══ INICIANDO PREENCHIMENTO CNJ PARA PROCESSO #{process_id} ═══")
     
-    # 🔧 FIX 2025-12-09: Garantir que o rádio CNJ seja marcado COM VERIFICAÇÃO
-    cnj_flag_ok = await ensure_cnj_flag_on(page)
-    if not cnj_flag_ok:
-        log("[CNJ][RETRY] ensure_cnj_flag_on falhou - forçando via JS direto...")
-        cnj_flag_ok = await page.evaluate("""() => {
-            // Procurar checkboxes/radios com CNJ no nome ou label
-            const norm = s => (s||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
-            
-            // 1) Tentar radios com name contendo CNJ, Judicial, etc
-            const radioNames = ['IsJudicial', 'IsCNJ', 'PossuiCNJ', 'HasCNJ', 'Cnj', 'PossuiNumeroCNJ'];
-            for (const name of radioNames) {
-                const radios = document.querySelectorAll(`input[type='radio'][name='${name}']`);
-                for (const r of radios) {
-                    const val = (r.value || '').toLowerCase();
-                    if (['1', 'true', 'sim', 'yes', 's'].includes(val)) {
-                        r.checked = true;
-                        r.click();
-                        r.dispatchEvent(new Event('change', {bubbles: true}));
-                        return true;
-                    }
-                }
-            }
-            
-            // 2) Tentar por label com "Sim"
-            for (const label of document.querySelectorAll('label')) {
-                const txt = norm(label.textContent || '');
-                if (txt === 'sim' || txt.includes('cnj') && txt.includes('sim')) {
-                    const input = label.control || label.querySelector('input');
-                    if (input && (input.type === 'radio' || input.type === 'checkbox')) {
-                        input.checked = true;
-                        input.click();
-                        input.dispatchEvent(new Event('change', {bubbles: true}));
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }""")
-        if cnj_flag_ok:
-            log("[CNJ] ✅ Rádio CNJ forçado via JS direto")
-    
-    # 🔧 FIX 2025-12-09: OBRIGATÓRIO - Sem rádio CNJ, campo de número não aparece
-    _must(cnj_flag_ok, "Rádio CNJ (Sim) - OBRIGATÓRIO para exibir campo de número do processo")
-    update_field_status("radio_cnj", "Rádio CNJ", "Sim")
-    
-    # 🔧 FIX CRÍTICO: Aguardar campo CNJ aparecer no DOM após AJAX do tipo Eletrônico
-    await _settle(page, "cnj_flag_settle")  # Espera adicional após marcar flag CNJ
-    _must(await wait_for_cnj_container(page), "Campo CNJ não apareceu no DOM após AJAX")
+    # Aguardar campo CNJ aparecer no DOM
+    _must(await wait_for_cnj_container(page), "Campo CNJ não apareceu no DOM")
     
     _must(await set_cnj_value(page, cnj), "Número do Processo (CNJ)")
     await _settle(page, "input:cnj")
@@ -5152,19 +5154,15 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     update_status("cnj_preenchido", f"CNJ preenchido com sucesso: {cnj}", process_id=process_id)
     monitor_log_info(f"✅ CNJ preenchido: {cnj} (processo #{process_id})", region="RPA")
     
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # FIM DO FLUXO CNJ (2 etapas concluídas: Radio Sim + Textbox preenchido)
-    # ═══════════════════════════════════════════════════════════════════════════════
-    
-    # 🔧 2025-11-27: AGUARDAR AUTOFILL - O eLaw preenche Estado/Comarca automaticamente via AJAX
-    # Isso substitui o wait fixo de 2.5s por uma espera inteligente que verifica os campos
-    autofill_ok = await wait_for_cnj_autofill(page, timeout_ms=12000, process_id=process_id)
+    # 🔧 2025-12-12: AGUARDAR AUTOFILL RÁPIDO - O eLaw preenche Estado/Comarca instantaneamente
+    # Timeout reduzido de 12s para 2s - autofill é praticamente instantâneo
+    autofill_ok = await wait_for_cnj_autofill(page, timeout_ms=2000, process_id=process_id)
     if not autofill_ok:
-        log(f"[FORM][WARN] Campos automáticos não preenchidos - continuando mesmo assim...")
-        # Espera adicional como fallback se autofill não detectou nada
-        await page.wait_for_timeout(2000)
+        log(f"[FORM][INFO] Autofill não detectado em 2s - verificar Estado/Comarca depois")
 
-    # 3) Sistema Eletrônico
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 4) SISTEMA ELETRÔNICO
+    # ═══════════════════════════════════════════════════════════════════════════════
     update_status("aguardando_sistema_eletronico", "Aguardando dropdown Sistema Eletrônico ficar pronto...", process_id=process_id)
     await wait_for_select_ready(page, "SistemaEletronicoId", 1, 15000)  # Aumentado de 7s para 15s
     update_status("abrindo_sistema_eletronico", "Abrindo dropdown Sistema Eletrônico...", process_id=process_id)
@@ -5274,17 +5272,20 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     update_field_status("sistema_eletronico", "Sistema Eletrônico", wanted_sys)
     monitor_log_info(f"✅ Sistema Eletrônico selecionado: {wanted_sys} (processo #{process_id})", region="RPA")
 
-    # 4) Número Processo Antigo
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 5) NÚMERO PROCESSO ANTIGO (opcional)
+    # ═══════════════════════════════════════════════════════════════════════════════
     old_num = (data.get("numero_processo_antigo") or "").strip()
     if old_num:
         await set_input_by_id(page, "NumeroProcessoAntigo", old_num, "Número Processo Antigo")
         await _settle(page, "input:cnj_old")
         update_field_status("numero_processo_antigo", "Número Processo Antigo", old_num)
 
-    # 5) Área do Direito
-    # 🔧 2025-12-12: Otimizado para não abrir dropdown 2x - seleciona diretamente
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 6) ÁREA DO DIREITO
+    # ═══════════════════════════════════════════════════════════════════════════════
     update_status("area_direito", "Preenchendo Área do Direito...", process_id=process_id)
-    await wait_for_select_ready(page, "AreaDireitoId", 1, 15000)
+    await wait_for_select_ready(page, "AreaDireitoId", 1, 10000)
     wanted_area = resolve_area_direito(data)
     _must(
         await set_select_fuzzy_any(page, "AreaDireitoId", wanted_area, fallbacks=AREA_LIST),
@@ -5294,46 +5295,57 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     await ensure_cnj_still_present(page, cnj)
     update_field_status("area_direito", "Área do Direito", wanted_area)
 
-    # 6) Estado/Comarca (auto OU manual se autofill falhou)
-    # 🔧 2025-11-27: Refatorado para usar helper robusto force_select_bootstrap_by_text
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 7) ESTADO - verificar se autofill preencheu, senão preencher manualmente
+    # 🔧 2025-12-12: Fluxo otimizado - autofill já deve ter preenchido após CNJ
+    # ═══════════════════════════════════════════════════════════════════════════════
     estado = ""
     comarca = ""
     
-    # Primeiro, verificar se o autofill do eLaw preencheu Estado/Comarca
-    if await wait_for_select_ready(page, "EstadoId", 1, 9000):
+    # Verificar se autofill preencheu Estado (deve ser rápido, já passou 2s desde CNJ)
+    if await wait_for_select_ready(page, "EstadoId", 1, 3000):
         estado = await _get_selected_text(page, "EstadoId")
         log(f"[FORM] Estado (autofill): '{estado}'")
     
-    if await wait_for_select_ready(page, "CidadeId", 1, 5000):
+    estado_vazio = not estado or estado.lower() in ["selecione", "--", "---", ""]
+    
+    if estado_vazio:
+        log(f"[FORM] Estado não preenchido pelo autofill - usando preenchimento manual...")
+        estado_manual, _ = await select_estado_comarca_manual(page, cnj, data, process_id)
+        if estado_manual:
+            estado = estado_manual
+    
+    if estado:
+        update_field_status("estado", "Estado", estado)
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 8) COMARCA - verificar se autofill preencheu, senão preencher manualmente
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if await wait_for_select_ready(page, "CidadeId", 1, 3000):
         comarca = await _get_selected_text(page, "CidadeId")
         log(f"[FORM] Comarca (autofill): '{comarca}'")
     
-    # Se autofill não preencheu, usar helper manual robusto
-    estado_vazio = not estado or estado.lower() in ["selecione", "--", "---", ""]
     comarca_vazia = not comarca or comarca.lower() in ["selecione", "--", "---", ""]
     
-    if estado_vazio or comarca_vazia:
-        log(f"[FORM] Autofill falhou (Estado vazio: {estado_vazio}, Comarca vazia: {comarca_vazia}) - usando preenchimento manual...")
-        estado_manual, comarca_manual = await select_estado_comarca_manual(page, cnj, data, process_id)
-        
-        # Usar valores manuais se autofill estava vazio
-        if estado_vazio and estado_manual:
-            estado = estado_manual
-        if comarca_vazia and comarca_manual:
+    if comarca_vazia and estado:
+        log(f"[FORM] Comarca não preenchida pelo autofill - usando preenchimento manual...")
+        # Só precisamos preencher Comarca se Estado já está OK
+        _, comarca_manual = await select_estado_comarca_manual(page, cnj, data, process_id)
+        if comarca_manual:
             comarca = comarca_manual
     
     # Log e status final
     if estado and comarca:
         update_status("localizacao_preenchida", f"✅ Localização: {estado} - {comarca}", process_id=process_id)
-        update_field_status("estado", "Estado", estado)
         update_field_status("comarca", "Comarca", comarca)
     elif estado:
         update_status("localizacao_parcial", f"⚠️ Estado: {estado} (Comarca não preenchida)", process_id=process_id)
-        update_field_status("estado", "Estado", estado)
     else:
         log(f"[FORM][WARN] Estado e Comarca não foram preenchidos - possível problema com o CNJ")
 
-    # 7) Origem
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 9) ORIGEM
+    # ═══════════════════════════════════════════════════════════════════════════════
     try:
         await wait_for_select_ready(page, "OrigemId", 1, 7000)
         btn, cont = await _open_bs_and_get_container(page, "OrigemId")
@@ -5363,7 +5375,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         log(f"[Origem][WARN] {e}")
     await ensure_cnj_still_present(page, cnj)
 
-    # 8) Número do Órgão - COM FALLBACK COMPLETO
+    # 10) Número do Órgão - COM FALLBACK COMPLETO
     try:
         pdf_text = data.get("_pdf_text", "")
         
@@ -5398,7 +5410,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[NumÓrgão][WARN] {e}")
 
-    # 9) Órgão (NaturezaId)
+    # 11) Órgão (NaturezaId)
     try:
         await wait_for_select_ready(page, "NaturezaId", 1, 7000)
         btn, cont = await _open_bs_and_get_container(page, "NaturezaId")
@@ -5430,7 +5442,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[Órgão][WARN] {e}")
 
-    # 10) Célula (EscritorioId)
+    # 12) Célula (EscritorioId)
     try:
         await wait_for_select_ready(page, "EscritorioId", 1, 8000)
         btn, cont = await _open_bs_and_get_container(page, "EscritorioId")
@@ -5469,7 +5481,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[Célula][WARN] {e}")
 
-    # 11) Foro (JuizadoId) - COM FALLBACK COMPLETO
+    # 13) Foro (JuizadoId) - COM FALLBACK COMPLETO
     try:
         await wait_for_select_ready(page, "JuizadoId", 1, 7000)
         raw_opts = await page.evaluate(
@@ -5518,7 +5530,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[Foro][WARN] {e}")
 
-    # 12) Assunto (AreaProcessoId) - COM FALLBACK COMPLETO E GARANTIA DE PREENCHIMENTO
+    # 14) Assunto (AreaProcessoId) - COM FALLBACK COMPLETO E GARANTIA DE PREENCHIMENTO
     assunto_preenchido = False
     assunto_wanted = None
     try:
@@ -5575,7 +5587,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         except Exception as e2:
             log(f"[Assunto][ERROR] Falha total: {e2}")
 
-    # 13) Instância - COM FALLBACK COMPLETO
+    # 15) Instância - COM FALLBACK COMPLETO
     try:
         ready = await wait_for_select_ready(page, INSTANCIA_SELECT_ID, 1, 9000)
         if not ready:
@@ -5645,7 +5657,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[Instância][WARN] {e}")
 
-    # 14) NPC (opcional) - COM FALLBACK COMPLETO
+    # 16) NPC (opcional) - COM FALLBACK COMPLETO
     try:
         pdf_text = data.get("_pdf_text", "")
         
@@ -5664,7 +5676,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[NPC][WARN] {e}")
 
-    # 15) Classe/Objeto (quando houver campo à parte)
+    # 17) Classe/Objeto (quando houver campo à parte)
     try:
         ready = await wait_for_select_ready(page, "ClasseId", 1, 7000)
         if ready:
@@ -5691,7 +5703,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[Classe][WARN] {e}")
 
-    # 16) Tipo de Ação (⭐ garante execução) - COM GARANTIA DE PREENCHIMENTO
+    # 18) Tipo de Ação (⭐ garante execução) - COM GARANTIA DE PREENCHIMENTO
     tipo_acao_preenchido = False
     try:
         log(f"[TipoAção] Iniciando preenchimento do Tipo de Ação (TipoAcaoId)...")
@@ -5813,7 +5825,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         except Exception as e2:
             log(f"[Objeto][ERROR] Falha total: {e2}")
 
-    # 17) A PARTIR DAQUI: ordem pedida (cliente→parte etc.)
+    # 19) A PARTIR DAQUI: ordem pedida (cliente→parte etc.)
     pdf_text = data.get("_pdf_text", "")
     inferred = infer_cliente_grupo_and_parte(pdf_text, data)
 
@@ -6476,7 +6488,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[AUDIÊNCIA][WARN] {e}")
 
-    # 18) Estratégia (opcional)
+    # 20) Estratégia (opcional)
     try:
         if await page.locator(f"button.btn.dropdown-toggle[data-id='{ESTRATEGIA_SELECT_ID}']").count() > 0:
             btn, cont = await _open_bs_and_get_container(page, ESTRATEGIA_SELECT_ID)
