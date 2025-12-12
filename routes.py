@@ -32,14 +32,16 @@ except ImportError:
     def log_warning(*args, **kwargs): pass
     def log_debug(*args, **kwargs): pass
 
-# Integração com monitor remoto
+# Integração com monitor remoto (RPA Monitor Client)
 try:
-    from monitor_integration import log_info, log_error
+    from monitor_integration import log_info, log_warning as monitor_warn, log_error, send_screenshot
     MONITOR_AVAILABLE = True
 except ImportError:
     MONITOR_AVAILABLE = False
     def log_info(msg, region=""): pass
-    def log_error(msg, exc=None, region=""): pass
+    def monitor_warn(msg, region=""): pass
+    def log_error(msg, exc=None, region="", screenshot_path=None): pass
+    def send_screenshot(path, region=""): pass
 
 from flask import (
     Blueprint, render_template, render_template_string, request, redirect,
@@ -79,9 +81,11 @@ def _reset_process_sequence_if_empty():
             db.session.execute(text("ALTER SEQUENCE process_id_seq RESTART WITH 1"))
             db.session.commit()
             logger.info("[RESET_SEQ] ✅ Sequência process_id_seq resetada para 1")
+            log_info("Sequência process_id_seq resetada para 1", region="ROUTES")
             return True
     except Exception as e:
         logger.warning(f"[RESET_SEQ] Não foi possível resetar sequência de process: {e}")
+        monitor_warn(f"Não foi possível resetar sequência de process: {e}", region="ROUTES")
         db.session.rollback()
     
     return False
@@ -137,6 +141,7 @@ def login():
             if not user or not ok:
                 auth.login_failed(username_or_email, reason="Credenciais inválidas")
                 log_end("LOGIN", "Login falhou - credenciais inválidas", username=username_or_email)
+                monitor_warn(f"Login falhou para usuário: {username_or_email}", region="ROUTES")
                 flash("Credenciais inválidas.", "danger")
                 return render_template("login.html", form=form, next_url=next_url)
 
@@ -144,6 +149,7 @@ def login():
             auth.login_success(username_or_email, user_id=user.id)
             log_success("LOGIN", f"Login realizado com sucesso", username=user.username, user_id=user.id)
             log_end("LOGIN", "Processo de login concluído com sucesso")
+            log_info(f"Login realizado com sucesso: {user.username}", region="ROUTES")
             flash("Login efetuado com sucesso.", "success")
             return redirect(next_url)
         else:
@@ -164,6 +170,7 @@ def logout():
     logout_user()
     log_success("LOGOUT", f"Logout realizado com sucesso")
     log_end("LOGOUT", "Sessão encerrada")
+    log_info(f"Logout realizado: {username}", region="ROUTES")
     flash("Você saiu da sessão.", "success")
     return redirect(url_for("core.login"))
 
@@ -458,10 +465,13 @@ def _launch_rpa_thread(process_id: int) -> None:
         try:
             with app.app_context():
                 logger.info(f"[SINGLE RPA] Iniciando RPA para processo {proc_id}")
+                log_info(f"Iniciando RPA para processo {proc_id}", region="ROUTES")
                 rpa.execute_rpa(proc_id)
                 logger.info(f"[SINGLE RPA] ✅ Processo {proc_id} concluído")
+                log_info(f"RPA concluído para processo {proc_id}", region="ROUTES")
         except Exception as e:
             logger.error(f"[SINGLE RPA] ❌ Erro: {e}", exc_info=True)
+            log_error(f"Erro no RPA para processo {proc_id}: {e}", exc=e, region="ROUTES")
             try:
                 from main import app as app_err
                 with app_err.app_context():
@@ -472,6 +482,7 @@ def _launch_rpa_thread(process_id: int) -> None:
                         db.session.commit()
             except Exception as db_err:
                 logger.error(f"[SINGLE RPA] Erro ao marcar erro: {db_err}")
+                log_error(f"Erro ao marcar erro no banco: {db_err}", exc=db_err, region="ROUTES")
     
     thread = threading.Thread(
         target=run_rpa_in_background,
@@ -481,6 +492,7 @@ def _launch_rpa_thread(process_id: int) -> None:
     )
     thread.start()
     logger.info(f"[SINGLE RPA] Thread iniciada para processo {process_id}")
+    log_info(f"Thread RPA iniciada para processo {process_id}", region="ROUTES")
 
 @bp.route("/processos/<int:id>/preencher-elaw", methods=["POST"])
 @login_required
@@ -494,6 +506,7 @@ def process_fill_elaw(id: int):
     # ✅ CRITICAL: Configurar flask_app globalmente ANTES de lançar thread
     rpa.flask_app = main_app._get_current_object() if hasattr(main_app, '_get_current_object') else main_app
     logger.info(f"[SINGLE RPA] Flask app configurado para processo {proc.id}")
+    log_info(f"Flask app configurado para RPA processo {proc.id}", region="ROUTES")
     
     # Atualizar status para 'running'
     proc.elaw_status = 'running'
@@ -590,6 +603,7 @@ def process_delete_multiple():
                 deleted_count += 1
             except Exception as e:
                 logger.error(f"Erro ao deletar processo {proc.id}: {e}")
+                log_error(f"Erro ao deletar processo {proc.id}: {e}", exc=e, region="ROUTES")
         
         db.session.commit()
         
@@ -604,6 +618,7 @@ def process_delete_multiple():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao deletar processos múltiplos: {e}", exc_info=True)
+        log_error(f"Erro ao deletar processos múltiplos: {e}", exc=e, region="ROUTES")
         return jsonify({'success': False, 'error': f'Erro ao deletar processos: {str(e)}'}), 500
 
 
@@ -717,6 +732,7 @@ def extract_from_pdf():
             # Salvar arquivo fisicamente
             file.save(pdf_path)
             logger.info(f"[UPLOAD_PDF] PDF salvo: {unique_filename}")
+            log_info(f"PDF salvo: {unique_filename}", region="ROUTES")
             
             # ✅ MUDANÇA: Usar run_extraction_from_file que já tem OCR/LLM integrado
             # Passa o caminho do PDF salvo para habilitar OCR quando necessário
@@ -737,6 +753,7 @@ def extract_from_pdf():
             session.modified = True
             current_app.logger.debug("Dados extraídos (pipeline): %s", extracted)
             logger.info(f"[UPLOAD_PDF] PDF '{unique_filename}' vinculado à sessão")
+            log_info(f"PDF '{unique_filename}' vinculado à sessão", region="ROUTES")
 
             flash("Extração concluída! Revise os dados abaixo antes de salvar.", "success")
             return redirect(url_for("core.confirm_extracted"))
@@ -958,9 +975,11 @@ def confirm_extracted():
             if uploaded_pdf:
                 kwargs['pdf_filename'] = uploaded_pdf
                 logger.info(f"[CREATE_PROCESS] PDF vinculado ao processo: {uploaded_pdf}")
+                log_info(f"PDF vinculado ao processo: {uploaded_pdf}", region="ROUTES")
             else:
                 kwargs['pdf_filename'] = None
                 logger.warning("[CREATE_PROCESS] Processo criado sem PDF vinculado (entrada manual)")
+                monitor_warn("Processo criado sem PDF vinculado (entrada manual)", region="ROUTES")
         
         if hasattr(Process, 'elaw_status'):
             kwargs['elaw_status'] = 'pending'
@@ -974,6 +993,7 @@ def confirm_extracted():
             if uploaded_pdf:
                 session.pop('uploaded_pdf_filename', None)
                 logger.info(f"[CREATE_PROCESS] Sessão limpa após vincular PDF ao processo #{proc.id}")
+                log_info(f"Processo #{proc.id} criado com sucesso", region="ROUTES")
             
             flash(f"Processo #{proc.id} salvo com sucesso!", "success")
             return redirect(url_for("core.process_view", id=proc.id))

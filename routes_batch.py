@@ -44,14 +44,16 @@ except ImportError:
         @staticmethod
         def thread_end(*args, **kwargs): pass
 
-# Integração com monitor remoto
+# Integração com monitor remoto (RPA Monitor Client)
 try:
-    from monitor_integration import log_info, log_error
+    from monitor_integration import log_info, log_warning as monitor_warn, log_error, send_screenshot
     MONITOR_AVAILABLE = True
 except ImportError:
     MONITOR_AVAILABLE = False
     def log_info(msg, region=""): pass
-    def log_error(msg, exc=None, region=""): pass
+    def monitor_warn(msg, region=""): pass
+    def log_error(msg, exc=None, region="", screenshot_path=None): pass
+    def send_screenshot(path, region=""): pass
 
 batch_bp = Blueprint("batch", __name__, url_prefix="/processos/batch")
 
@@ -87,6 +89,7 @@ def cleanup_stuck_processes():
             return 0
         
         logger.warning(f"[CLEANUP] Detectados {len(stuck_items)} processos travados")
+        monitor_warn(f"Detectados {len(stuck_items)} processos travados", region="BATCH")
         
         for item in stuck_items:
             logger.warning(f"[CLEANUP] Cancelando item #{item.id} (batch #{item.batch_id}) travado desde {item.updated_at}")
@@ -104,10 +107,12 @@ def cleanup_stuck_processes():
         
         db.session.commit()
         logger.info(f"[CLEANUP] ✅ {len(stuck_items)} processos travados foram cancelados")
+        log_info(f"{len(stuck_items)} processos travados foram cancelados", region="BATCH")
         return len(stuck_items)
         
     except Exception as e:
         logger.error(f"[CLEANUP] Erro ao limpar processos travados: {e}", exc_info=True)
+        log_error(f"Erro ao limpar processos travados: {e}", exc=e, region="BATCH")
         db.session.rollback()
         return 0
 
@@ -273,6 +278,7 @@ def _extract_single_item(item_id: int, upload_path: str, source_filename: str, u
     
     try:
         logger.info(f"[EXTRACT][THREAD] Iniciando extração do item {item_id}: {source_filename}")
+        log_info(f"Extração item {item_id}: {source_filename}", region="BATCH")
         
         # ✅ CRÍTICO: Cada thread precisa de seu próprio app_context para sessão DB isolada
         with app.app_context():
@@ -326,6 +332,7 @@ def _extract_single_item(item_id: int, upload_path: str, source_filename: str, u
                 result['success'] = True
                 result['process_id'] = process_id
                 logger.info(f"[EXTRACT][THREAD] ✅ Item {item_id} processado! Process ID: {process_id}")
+                log_info(f"Item {item_id} extraído com sucesso -> Process {process_id}", region="BATCH")
             else:
                 item.status = 'error'
                 item.last_error = 'Falha na extração de dados'
@@ -334,12 +341,14 @@ def _extract_single_item(item_id: int, upload_path: str, source_filename: str, u
                 
                 result['error'] = 'Falha na extração de dados'
                 logger.warning(f"[EXTRACT][THREAD] ❌ Erro na extração do item {item_id}")
+                monitor_warn(f"Falha na extração do item {item_id}", region="BATCH")
                 
     except Exception as ex:
         import traceback
         tb = traceback.format_exc()
         logger.error(f"[EXTRACT][THREAD] ❌ Exceção ao processar item {item_id}: {ex}")
         logger.error(f"[EXTRACT][THREAD][TRACEBACK] {tb}")
+        log_error(f"Exceção ao processar item {item_id}: {ex}", exc=ex, region="BATCH")
         
         result['error'] = str(ex)[:500]
         
@@ -376,6 +385,7 @@ def process_batch_async(batch_id, user_id):
             return
         
         logger.info(f"[BATCH] Iniciando processamento PARALELO do batch {batch_id}")
+        log_info(f"Batch {batch_id}: Iniciando processamento paralelo", region="BATCH")
         batch.status = 'processing'
         db.session.commit()
         
@@ -386,6 +396,7 @@ def process_batch_async(batch_id, user_id):
             .all()
         total_items = len(pending_items)
         logger.info(f"[BATCH] {total_items} itens pendentes ordenados por tamanho (menor→maior, max {MAX_EXTRACTION_WORKERS} workers)")
+        log_info(f"Batch {batch_id}: {total_items} itens pendentes para extração", region="BATCH")
         
         if total_items == 0:
             batch.status = 'ready'
@@ -441,20 +452,24 @@ def process_batch_async(batch_id, user_id):
                     if result['success']:
                         processed += 1
                         logger.info(f"[BATCH] ✅ Concluído: item {result['item_id']} -> process {result['process_id']}")
+                        log_info(f"Extração concluída: item {result['item_id']} -> process {result['process_id']}", region="BATCH")
                     else:
                         errors += 1
                         logger.warning(f"[BATCH] ❌ Falhou: item {result['item_id']} -> {result['error']}")
+                        monitor_warn(f"Extração falhou: item {result['item_id']} -> {result['error']}", region="BATCH")
                     
                     # Atualizar progresso do batch em tempo real
                     batch.processed_count = processed + errors
                     db.session.commit()
                     
                     logger.info(f"[BATCH] Progresso: {processed + errors}/{total_items} ({processed} sucesso, {errors} erros)")
+                    log_info(f"Batch progresso: {processed + errors}/{total_items} ({processed} sucesso, {errors} erros)", region="BATCH")
                 
                 except (TimeoutError, Exception) as ex:
                     errors += 1
                     error_type = "TIMEOUT" if "Timeout" in str(type(ex).__name__) else "ERRO"
                     logger.error(f"[BATCH] ⏱️ {error_type}: item {item_data['item_id']} - {ex}")
+                    log_error(f"{error_type}: item {item_data['item_id']} - {ex}", exc=ex, region="BATCH")
                     
                     # Marcar item como erro
                     try:
@@ -473,6 +488,7 @@ def process_batch_async(batch_id, user_id):
                 stuck.last_error = 'Travou durante processamento'
                 errors += 1
                 logger.error(f"[BATCH] ⚠️ Item {stuck.id} estava travado em 'extracting' - marcado como erro")
+                log_error(f"Item {stuck.id} travado em 'extracting' - marcado como erro", region="BATCH")
             if stuck_items:
                 db.session.commit()
         
@@ -492,6 +508,7 @@ def process_batch_async(batch_id, user_id):
         db.session.commit()
         
         logger.info(f"[BATCH] ✅ Batch {batch_id} finalizado: status={batch.status}, {processed} sucesso(s), {errors} erro(s) em {total_items} itens")
+        log_info(f"Batch {batch_id} finalizado: {processed} sucesso(s), {errors} erro(s) em {total_items} itens", region="BATCH")
 
 
 @batch_bp.route("/new", methods=["GET", "POST"])
@@ -864,6 +881,7 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
     
     try:
         logger.info(f"[RPA][WORKER-{worker_id}] Iniciando RPA para item {item_id}, processo {process_id}")
+        log_info(f"RPA Worker-{worker_id} iniciando item {item_id}, processo {process_id}", region="BATCH")
         log_event("RPA_WORKER", f"Worker-{worker_id} processando item", 
                   item_id=item_id, process_id=process_id)
         
@@ -903,6 +921,7 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
                                 item_id=item_id, process_id=process_id, worker_id=worker_id)
                     batch_log.item_end(batch_id=0, item_id=item_id, status='success', process_id=process_id)
                     logger.info(f"[RPA][WORKER-{worker_id}] ✅ Item {item_id} processado com sucesso!")
+                    log_info(f"RPA Worker-{worker_id}: Item {item_id} processado com sucesso", region="BATCH")
                 else:
                     item.status = 'error'
                     item.last_error = rpa_result.get('error', rpa_result.get('message', 'Erro desconhecido'))[:500]
@@ -911,6 +930,7 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
                             item_id=item_id, process_id=process_id, worker_id=worker_id)
                     batch_log.item_end(batch_id=0, item_id=item_id, status='error', process_id=process_id)
                     logger.warning(f"[RPA][WORKER-{worker_id}] ❌ Item {item_id} com erro: {item.last_error}")
+                    monitor_warn(f"RPA Worker-{worker_id}: Item {item_id} com erro: {item.last_error}", region="BATCH")
                 
                 item.updated_at = datetime.utcnow()
                 db.session.commit()
@@ -926,6 +946,7 @@ def _execute_single_rpa(item_id: int, process_id: int, worker_id: int = 0) -> di
         duration_ms = (time.time() - start_time) * 1000
         logger.error(f"[RPA][WORKER-{worker_id}] ❌ Exceção ao processar item {item_id}: {ex}")
         logger.error(f"[RPA][WORKER-{worker_id}][TRACEBACK] {tb}")
+        log_error(f"RPA Worker-{worker_id}: Exceção ao processar item {item_id}: {ex}", exc=ex, region="BATCH")
         log_err("RPA_SINGLE", f"Exceção no Worker-{worker_id}", error=str(ex),
                 item_id=item_id, process_id=process_id, include_traceback=True)
         
@@ -1033,6 +1054,7 @@ def batch_start(id):
                 with app.app_context():
                     try:
                         logger.info(f"[BATCH RPA] Iniciando processamento PARALELO em thread background")
+                        log_info(f"Batch RPA {id}: Iniciando processamento paralelo em background", region="BATCH")
                         
                         batch_reload = BatchUpload.query.get(id)
                         if not batch_reload:
@@ -1049,6 +1071,7 @@ def batch_start(id):
                         total_items = len(items)
                         
                         logger.info(f"[BATCH RPA] {total_items} itens prontos para processar em paralelo (max {MAX_RPA_WORKERS} workers)")
+                        log_info(f"Batch RPA {id}: {total_items} itens prontos para RPA paralelo", region="BATCH")
                         
                         if total_items == 0:
                             batch_reload.status = 'completed'
@@ -1147,19 +1170,23 @@ def batch_start(id):
                                     if result['success']:
                                         success_count += 1
                                         logger.info(f"[BATCH RPA] ✅ Concluído: item {result['item_id']} -> processo {result['process_id']}")
+                                        log_info(f"Batch RPA: Item {result['item_id']} concluído -> processo {result['process_id']}", region="BATCH")
                                     else:
                                         error_count += 1
                                         logger.warning(f"[BATCH RPA] ❌ Falhou: item {result['item_id']} -> {result['error']}")
+                                        monitor_warn(f"Batch RPA: Item {result['item_id']} falhou -> {result['error']}", region="BATCH")
                                     
                                     # Atualizar progresso do batch em tempo real
                                     batch_reload.processed_count = success_count + error_count
                                     db.session.commit()
                                     
                                     logger.info(f"[BATCH RPA] Progresso: {success_count + error_count}/{total_items} ({success_count} sucesso, {error_count} erros)")
+                                    log_info(f"Batch RPA progresso: {success_count + error_count}/{total_items} ({success_count} sucesso, {error_count} erros)", region="BATCH")
                                     
                                 except Exception as ex:
                                     error_count += 1
                                     logger.error(f"[BATCH RPA] ❌ Exceção no future do item {item_data['item_id']}: {ex}")
+                                    log_error(f"Batch RPA: Exceção no item {item_data['item_id']}: {ex}", exc=ex, region="BATCH")
                         
                         # Finalizar batch
                         batch_reload.status = 'completed' if error_count == 0 else 'partial_completed'
@@ -1173,12 +1200,14 @@ def batch_start(id):
                         log_success("BATCH_RPA", f"Batch finalizado com sucesso", 
                                    batch_id=id, total=total_items, success=success_count, errors=error_count)
                         logger.info(f"[BATCH RPA] ✅ Batch {id} finalizado: {success_count} sucesso(s), {error_count} erro(s) em {total_items} itens")
+                        log_info(f"Batch RPA {id} finalizado: {success_count} sucesso(s), {error_count} erro(s) em {total_items} itens", region="BATCH")
                         
                     except Exception as e:
                         import traceback
                         tb = traceback.format_exc()
                         logger.error(f"[BATCH RPA] ❌ Erro fatal ao processar batch {id}: {e}")
                         logger.error(f"[BATCH RPA][TRACEBACK] {tb}")
+                        log_error(f"Batch RPA {id}: Erro fatal: {e}", exc=e, region="BATCH")
                         log_err("BATCH_RPA", f"Erro fatal ao processar batch", error=str(e), 
                                batch_id=id, include_traceback=True)
                         try:
@@ -1707,6 +1736,7 @@ def batch_reextract(id):
             return redirect(url_for('batch.batch_detail', id=id))
         
         logger.info(f"[REEXTRACT] Iniciando reextração de {len(items_to_reextract)} itens do batch {id}")
+        log_info(f"Reextração iniciada: {len(items_to_reextract)} itens do batch {id}", region="BATCH")
         
         for item in items_to_reextract:
             item.status = 'pending'
@@ -1740,6 +1770,7 @@ def batch_reextract(id):
                     db.session.commit()
                     
                     logger.info(f"[REEXTRACT] Iniciando extração paralela de {len(items_data)} PDFs")
+                    log_info(f"Reextração: Iniciando extração paralela de {len(items_data)} PDFs", region="BATCH")
                     
                     extracted_count = 0
                     extraction_errors = 0
@@ -1760,20 +1791,25 @@ def batch_reextract(id):
                                 if result.get('success'):
                                     extracted_count += 1
                                     logger.info(f"[REEXTRACT] ✅ Item {item_id} extraído!")
+                                    log_info(f"Reextração: Item {item_id} extraído com sucesso", region="BATCH")
                                 else:
                                     extraction_errors += 1
                                     logger.warning(f"[REEXTRACT] ❌ Item {item_id} falhou: {result.get('error')}")
+                                    monitor_warn(f"Reextração: Item {item_id} falhou: {result.get('error')}", region="BATCH")
                             except Exception as ex:
                                 extraction_errors += 1
                                 logger.error(f"[REEXTRACT] Erro no item {item_id}: {ex}")
+                                log_error(f"Reextração: Erro no item {item_id}: {ex}", exc=ex, region="BATCH")
                     
                     batch_reload.status = 'ready' if extraction_errors == 0 else 'partial_ready'
                     db.session.commit()
                     
                     logger.info(f"[REEXTRACT] ✅ Finalizado: {extracted_count} sucesso(s), {extraction_errors} erro(s)")
+                    log_info(f"Reextração finalizada: {extracted_count} sucesso(s), {extraction_errors} erro(s)", region="BATCH")
                     
                 except Exception as e:
                     logger.error(f"[REEXTRACT] Erro fatal: {e}", exc_info=True)
+                    log_error(f"Reextração: Erro fatal: {e}", exc=e, region="BATCH")
                     try:
                         batch_reload = BatchUpload.query.get(id)
                         if batch_reload:
@@ -1839,6 +1875,7 @@ def batch_rerpa(id):
             return redirect(url_for('batch.batch_detail', id=id))
         
         logger.info(f"[RERPA] Iniciando RPA para {len(items_to_rerpa)} itens do batch {id}")
+        log_info(f"ReRPA: Iniciando RPA para {len(items_to_rerpa)} itens do batch {id}", region="BATCH")
         
         for item in items_to_rerpa:
             item.status = 'ready'
@@ -1906,6 +1943,7 @@ def batch_rerpa(id):
                     db.session.commit()
                     
                     logger.info(f"[RERPA] Iniciando RPA para {len(process_ids)} processos (ordenados por peso)")
+                    log_info(f"ReRPA: Iniciando RPA para {len(process_ids)} processos", region="BATCH")
                     
                     success_count = 0
                     error_count = 0
@@ -1936,27 +1974,32 @@ def batch_rerpa(id):
                                     batch_item.status = 'success'
                                     batch_item.last_error = None
                                 logger.info(f"[RERPA] ✅ Processo #{process_id} preenchido com sucesso")
+                                log_info(f"ReRPA: Processo #{process_id} preenchido com sucesso", region="BATCH")
                             else:
                                 error_count += 1
                                 if batch_item:
                                     batch_item.status = 'error'
                                     batch_item.last_error = rpa_result.get('error', rpa_result.get('message', 'Falha no RPA'))[:500]
                                 logger.warning(f"[RERPA] ❌ Processo #{process_id} falhou: {rpa_result.get('error', 'desconhecido')}")
+                                monitor_warn(f"ReRPA: Processo #{process_id} falhou: {rpa_result.get('error', 'desconhecido')}", region="BATCH")
                             
                             db.session.commit()
                             
                         except Exception as ex:
                             error_count += 1
                             logger.error(f"[RERPA] Erro no processo {process_id}: {ex}")
+                            log_error(f"ReRPA: Erro no processo {process_id}: {ex}", exc=ex, region="BATCH")
                     
                     batch_reload.status = 'completed' if error_count == 0 else 'partial_completed'
                     batch_reload.finished_at = datetime.utcnow()
                     db.session.commit()
                     
                     logger.info(f"[RERPA] ✅ Finalizado: {success_count} sucesso(s), {error_count} erro(s)")
+                    log_info(f"ReRPA finalizado: {success_count} sucesso(s), {error_count} erro(s)", region="BATCH")
                     
                 except Exception as e:
                     logger.error(f"[RERPA] Erro fatal: {e}", exc_info=True)
+                    log_error(f"ReRPA: Erro fatal: {e}", exc=e, region="BATCH")
                     try:
                         batch_reload = BatchUpload.query.get(id)
                         if batch_reload:
@@ -2003,6 +2046,7 @@ def batch_delete(id):
         if process_ids:
             Process.query.filter(Process.id.in_(process_ids)).delete(synchronize_session=False)
             logger.info(f"[BATCH DELETE] Deletados {len(process_ids)} processos do batch #{id}")
+        log_info(f"Batch {id}: Deletados {len(process_ids)} processos", region="BATCH")
         
         # Deletar batch (BatchItems serão deletados por CASCADE)
         db.session.delete(batch)
@@ -2013,10 +2057,12 @@ def batch_delete(id):
         
         flash(f"Batch #{id} e {len(process_ids)} processo(s) deletados com sucesso!", "success")
         logger.info(f"[BATCH DELETE] Batch #{id} deletado pelo usuário #{current_user.id}")
+        log_info(f"Batch #{id} deletado com sucesso", region="BATCH")
         
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao deletar batch {id}: {e}", exc_info=True)
+        log_error(f"Erro ao deletar batch {id}: {e}", exc=e, region="BATCH")
         flash(f"Erro ao deletar batch: {str(e)}", "danger")
     
     return redirect(url_for('batch.batch_list'))
@@ -2068,10 +2114,12 @@ def batch_delete_multiple():
         
         flash(f"{len(batches)} batch(es) e {total_processes} processo(s) deletados com sucesso!", "success")
         logger.info(f"[BATCH DELETE MULTIPLE] {len(batches)} batches deletados pelo usuário #{current_user.id}")
+        log_info(f"{len(batches)} batches deletados com sucesso", region="BATCH")
         
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao deletar batches múltiplos: {e}", exc_info=True)
+        log_error(f"Erro ao deletar batches múltiplos: {e}", exc=e, region="BATCH")
         flash(f"Erro ao deletar batches: {str(e)}", "danger")
     
     return redirect(url_for('batch.batch_list'))

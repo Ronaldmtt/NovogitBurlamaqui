@@ -30,18 +30,26 @@ from playwright.async_api import async_playwright, Page
 
 # RPA Monitor - Monitoramento remoto via monitor_integration
 try:
-    from monitor_integration import init_monitor, log_info as monitor_log_info, log_error as monitor_log_error, send_screenshot as monitor_send_screenshot, is_initialized as monitor_is_initialized
+    from monitor_integration import (
+        log_info as monitor_log_info, 
+        log_warning as monitor_log_warning,
+        log_error as monitor_log_error, 
+        send_screenshot as monitor_send_screenshot, 
+        is_initialized as monitor_is_initialized,
+        get_rpa_log
+    )
     RPA_MONITOR_AVAILABLE = True
 except ImportError:
     RPA_MONITOR_AVAILABLE = False
     def monitor_log_info(msg, region=""): pass
-    def monitor_log_error(msg, exc=None, region=""): pass
+    def monitor_log_warning(msg, region=""): pass
+    def monitor_log_error(msg, exc=None, region="", screenshot_path=None): pass
     def monitor_send_screenshot(path, region=""): pass
     def monitor_is_initialized(): return False
+    def get_rpa_log(): return None
 
 # RPA Log - Acesso direto ao rpa_log para screenshots
 try:
-    sys.path.insert(0, '/home/runner/workspace/rpa_monitor_client/rpa_monitor_client')
     from rpa_monitor_client import rpa_log
     RPA_LOG_AVAILABLE = True
 except ImportError:

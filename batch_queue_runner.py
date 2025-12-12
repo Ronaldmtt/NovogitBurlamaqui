@@ -35,6 +35,16 @@ except ImportError:
     def log_err(op, msg, **kw): pass
     def log_event(op, msg, **kw): pass
 
+# Integração com RPA Monitor Client
+try:
+    from monitor_integration import log_info as monitor_log_info, log_warning as monitor_log_warning, log_error as monitor_log_error
+    MONITOR_AVAILABLE = True
+except ImportError:
+    MONITOR_AVAILABLE = False
+    def monitor_log_info(msg, region=""): pass
+    def monitor_log_warning(msg, region=""): pass
+    def monitor_log_error(msg, exc=None, region=""): pass
+
 
 class GlobalBatchQueueRunner:
     """
