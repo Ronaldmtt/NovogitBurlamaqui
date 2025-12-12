@@ -5158,14 +5158,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         if await cnj_input.count() > 0:
             await cnj_input.press("Enter")
             log("[CNJ] ✅ Enter pressionado após preencher número do processo")
-            monitor_log_info(f"✅ Enter pressionado após CNJ (processo #{process_id})", region="RPA")
         else:
             await page.keyboard.press("Enter")
             log("[CNJ] ✅ Enter pressionado via keyboard global")
-            monitor_log_info(f"✅ Enter pressionado via keyboard global (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[CNJ][WARN] Erro ao pressionar Enter: {e}")
-        monitor_log_warning(f"⚠️ Erro ao pressionar Enter após CNJ: {e}", region="RPA")
     
     await _settle(page, "input:cnj")
     await ensure_cnj_still_present(page, cnj)
@@ -5183,7 +5180,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     # 4) SISTEMA ELETRÔNICO
     # ═══════════════════════════════════════════════════════════════════════════════
     update_status("aguardando_sistema_eletronico", "Aguardando dropdown Sistema Eletrônico ficar pronto...", process_id=process_id)
-    await wait_for_select_ready(page, "SistemaEletronicoId", 1, 15000)  # Aumentado de 7s para 15s
+    await wait_for_select_ready(page, "SistemaEletronicoId", 1, 8000)  # 🔧 2025-12-12: Reduzido de 15s→8s
     update_status("abrindo_sistema_eletronico", "Abrindo dropdown Sistema Eletrônico...", process_id=process_id)
     
     # 🔧 FIX 2025-12-09: Verificar se campo está oculto e usar JS direto se necessário
@@ -5304,7 +5301,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     # 6) ÁREA DO DIREITO
     # ═══════════════════════════════════════════════════════════════════════════════
     update_status("area_direito", "Preenchendo Área do Direito...", process_id=process_id)
-    await wait_for_select_ready(page, "AreaDireitoId", 1, 10000)
+    await wait_for_select_ready(page, "AreaDireitoId", 1, 5000)  # 🔧 2025-12-12: Reduzido de 10s→5s
     wanted_area = resolve_area_direito(data)
     _must(
         await set_select_fuzzy_any(page, "AreaDireitoId", wanted_area, fallbacks=AREA_LIST),
@@ -5316,46 +5313,40 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     monitor_log_info(f"✅ Área do Direito selecionada: {wanted_area} (processo #{process_id})", region="RPA")
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # 7) ESTADO - verificar se autofill preencheu, senão preencher manualmente
-    # 🔧 2025-12-12: Fluxo otimizado - autofill já deve ter preenchido após CNJ
+    # 7) ESTADO E COMARCA - verificar autofill, senão preencher manualmente UMA VEZ
+    # 🔧 2025-12-12: Fluxo otimizado - chamada ÚNICA de select_estado_comarca_manual
     # ═══════════════════════════════════════════════════════════════════════════════
     estado = ""
     comarca = ""
     
-    # Verificar se autofill preencheu Estado (deve ser rápido, já passou 2s desde CNJ)
+    # Verificar se autofill preencheu Estado
     if await wait_for_select_ready(page, "EstadoId", 1, 3000):
         estado = await _get_selected_text(page, "EstadoId")
         log(f"[FORM] Estado (autofill): '{estado}'")
     
-    estado_vazio = not estado or estado.lower() in ["selecione", "--", "---", ""]
-    
-    if estado_vazio:
-        log(f"[FORM] Estado não preenchido pelo autofill - usando preenchimento manual...")
-        estado_manual, _ = await select_estado_comarca_manual(page, cnj, data, process_id)
-        if estado_manual:
-            estado = estado_manual
-    
-    if estado:
-        update_field_status("estado", "Estado", estado)
-        monitor_log_info(f"✅ Estado selecionado: {estado} (processo #{process_id})", region="RPA")
-    
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # 8) COMARCA - verificar se autofill preencheu, senão preencher manualmente
-    # ═══════════════════════════════════════════════════════════════════════════════
+    # Verificar se autofill preencheu Comarca
     if await wait_for_select_ready(page, "CidadeId", 1, 3000):
         comarca = await _get_selected_text(page, "CidadeId")
         log(f"[FORM] Comarca (autofill): '{comarca}'")
     
+    estado_vazio = not estado or estado.lower() in ["selecione", "--", "---", ""]
     comarca_vazia = not comarca or comarca.lower() in ["selecione", "--", "---", ""]
     
-    if comarca_vazia and estado:
-        log(f"[FORM] Comarca não preenchida pelo autofill - usando preenchimento manual...")
-        # Só precisamos preencher Comarca se Estado já está OK
-        _, comarca_manual = await select_estado_comarca_manual(page, cnj, data, process_id)
-        if comarca_manual:
+    # 🔧 FIX 2025-12-12: Chamada ÚNICA de select_estado_comarca_manual
+    # Antes chamava DUAS vezes (uma para estado, outra para comarca) - ineficiente!
+    if estado_vazio or comarca_vazia:
+        log(f"[FORM] Autofill incompleto (Estado: {'vazio' if estado_vazio else 'OK'}, Comarca: {'vazia' if comarca_vazia else 'OK'}) - preenchimento manual...")
+        estado_manual, comarca_manual = await select_estado_comarca_manual(page, cnj, data, process_id)
+        if estado_vazio and estado_manual:
+            estado = estado_manual
+        if comarca_vazia and comarca_manual:
             comarca = comarca_manual
     
     # Log e status final
+    if estado:
+        update_field_status("estado", "Estado", estado)
+        monitor_log_info(f"✅ Estado selecionado: {estado} (processo #{process_id})", region="RPA")
+    
     if estado and comarca:
         update_status("localizacao_preenchida", f"✅ Localização: {estado} - {comarca}", process_id=process_id)
         update_field_status("comarca", "Comarca", comarca)
@@ -5756,11 +5747,70 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     except Exception as e:
         log(f"[Classe][WARN] {e}")
 
-    # 18) Tipo de Ação (⭐ garante execução) - COM GARANTIA DE PREENCHIMENTO
+    # 🔧 2025-12-12: ORDEM CORRIGIDA - Objeto ANTES de Tipo de Ação (conforme fluxo eLaw)
+    
+    # 18) Objeto/Classe correlata (ObjetoId/Objeto/ClasseId) - COM GARANTIA DE PREENCHIMENTO
+    objeto_preenchido = False
+    alvo_id = ""
+    try:
+        log(f"[Objeto] Iniciando preenchimento do Objeto...")
+        candidatos = ["ObjetoId", "Objeto", "ClasseId"]
+        opts = []
+        for sid in candidatos:
+            if await wait_for_select_ready(page, sid, 1, 3000):
+                btn, cont = await _open_bs_and_get_container(page, sid)
+                opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
+                if btn:
+                    try:
+                        await btn.press("Escape")
+                    except Exception:
+                        pass
+                if opts:
+                    alvo_id = sid
+                    log(f"[Objeto] Encontrado campo: {alvo_id} com {len(opts)} opções")
+                    break
+        if alvo_id:
+            assunto_sel = (await _get_selected_text(page, "AreaProcessoId")) or ""
+            pdf_text = data.get("_pdf_text", "")
+            wanted = pick_objeto_smart(opts, data, pdf_text, assunto_sel, "")  # Tipo de Ação ainda não preenchido
+            if not wanted:
+                wanted = data.get("objeto") or "Verbas rescisórias"
+            ok = await set_select_fuzzy_any(page, alvo_id, wanted, fallbacks=opts[:10] if opts else None)
+            if ok:
+                await _settle(page, "select:objeto")
+                update_field_status("objeto", "Objeto", wanted)
+                objeto_preenchido = True
+                log(f"[Objeto] ✅ Preenchido: {wanted}")
+                update_status("objeto_preenchido", f"✅ Objeto: {wanted}", process_id=process_id)
+                monitor_log_info(f"✅ Objeto selecionado: {wanted} (processo #{process_id})", region="RPA")
+            else:
+                log(f"[Objeto][WARN] Falha ao preencher com set_select_fuzzy_any")
+                monitor_log_warning(f"⚠️ Falha ao preencher Objeto (processo #{process_id})", region="RPA")
+        else:
+            log(f"[Objeto][INFO] Nenhum campo de objeto encontrado (pode não existir neste formulário)")
+    except Exception as e:
+        log(f"[Objeto][WARN] Erro durante preenchimento: {e}")
+        monitor_log_warning(f"⚠️ Erro ao preencher Objeto: {e}", region="RPA")
+    
+    if not objeto_preenchido and alvo_id:
+        log(f"[Objeto][RETRY] Tentando preenchimento de emergência...")
+        try:
+            fallback_objeto = data.get("objeto") or "Verbas rescisórias"
+            ok = await set_select_fuzzy_any(page, alvo_id, fallback_objeto,
+                fallbacks=["Verbas rescisórias", "Verbas Salariais", "Verbas Rescisórias e Salariais"])
+            if ok:
+                await _settle(page, "select:objeto")
+                update_field_status("objeto", "Objeto", fallback_objeto)
+                objeto_preenchido = True
+                log(f"[Objeto] ✅ Preenchido via emergência: {fallback_objeto}")
+        except Exception as e2:
+            log(f"[Objeto][ERROR] Falha total: {e2}")
+
+    # 19) Tipo de Ação (⭐ garante execução) - COM GARANTIA DE PREENCHIMENTO
     tipo_acao_preenchido = False
     try:
         log(f"[TipoAção] Iniciando preenchimento do Tipo de Ação (TipoAcaoId)...")
-        await wait_for_select_ready(page, "TipoAcaoId", 1, 9000)
+        await wait_for_select_ready(page, "TipoAcaoId", 1, 7000)  # 🔧 2025-12-12: Reduzido de 9s→7s
         btn, cont = await _open_bs_and_get_container(page, "TipoAcaoId")
         tp_opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
         log(f"[TipoAção] Opções do dropdown: {len(tp_opts)} itens")
@@ -5829,64 +5879,6 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         except Exception as e2:
             log(f"[TipoAção][ERROR] Falha total: {e2}")
 
-    # 16.b) Objeto/Classe correlata (ObjetoId/Objeto/ClasseId) - COM GARANTIA DE PREENCHIMENTO
-    objeto_preenchido = False
-    try:
-        log(f"[Objeto] Iniciando preenchimento do Objeto...")
-        candidatos = ["ObjetoId", "Objeto", "ClasseId"]
-        alvo_id = ""
-        opts = []
-        for sid in candidatos:
-            if await wait_for_select_ready(page, sid, 1, 3000):
-                btn, cont = await _open_bs_and_get_container(page, sid)
-                opts = _clean_choices(await _collect_options_from_container(cont)) if cont else []
-                if btn:
-                    try:
-                        await btn.press("Escape")
-                    except Exception:
-                        pass
-                if opts:
-                    alvo_id = sid
-                    log(f"[Objeto] Encontrado campo: {alvo_id} com {len(opts)} opções")
-                    break
-        if alvo_id:
-            assunto_sel = (await _get_selected_text(page, "AreaProcessoId")) or ""
-            tipo_sel = (await _get_selected_text(page, "TipoAcaoId")) or ""
-            pdf_text = data.get("_pdf_text", "")
-            wanted = pick_objeto_smart(opts, data, pdf_text, assunto_sel, tipo_sel)
-            if not wanted:
-                wanted = data.get("objeto") or "Verbas rescisórias"
-            ok = await set_select_fuzzy_any(page, alvo_id, wanted, fallbacks=opts[:10] if opts else None)
-            if ok:
-                await _settle(page, "select:objeto")
-                update_field_status("objeto", "Objeto", wanted)
-                objeto_preenchido = True
-                log(f"[Objeto] ✅ Preenchido: {wanted}")
-                update_status("objeto_preenchido", f"✅ Objeto: {wanted}", process_id=process_id)
-                monitor_log_info(f"✅ Objeto selecionado: {wanted} (processo #{process_id})", region="RPA")
-            else:
-                log(f"[Objeto][WARN] Falha ao preencher com set_select_fuzzy_any")
-                monitor_log_warning(f"⚠️ Falha ao preencher Objeto (processo #{process_id})", region="RPA")
-        else:
-            log(f"[Objeto][INFO] Nenhum campo de objeto encontrado (pode não existir neste formulário)")
-    except Exception as e:
-        log(f"[Objeto][WARN] Erro durante preenchimento: {e}")
-        monitor_log_warning(f"⚠️ Erro ao preencher Objeto: {e}", region="RPA")
-    
-    if not objeto_preenchido and alvo_id:
-        log(f"[Objeto][RETRY] Tentando preenchimento de emergência...")
-        try:
-            fallback_objeto = data.get("objeto") or "Verbas rescisórias"
-            ok = await set_select_fuzzy_any(page, alvo_id, fallback_objeto,
-                fallbacks=["Verbas rescisórias", "Verbas Salariais", "Verbas Rescisórias e Salariais"])
-            if ok:
-                await _settle(page, "select:objeto")
-                update_field_status("objeto", "Objeto", fallback_objeto)
-                objeto_preenchido = True
-                log(f"[Objeto] ✅ Preenchido via emergência: {fallback_objeto}")
-        except Exception as e2:
-            log(f"[Objeto][ERROR] Falha total: {e2}")
-
     # 19) A PARTIR DAQUI: ordem pedida (cliente→parte etc.)
     pdf_text = data.get("_pdf_text", "")
     inferred = infer_cliente_grupo_and_parte(pdf_text, data)
@@ -5938,8 +5930,11 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
         await set_radio_by_name(page, PARTE_ADVERSA_TIPO_NAME, val, "Parte Adversa (Tipo)")
         await _settle(page, "radio:adverso_tipo")
         update_field_status("parte_adversa_tipo", "Tipo Parte Adversa", tipo)
+        update_status("parte_adversa_tipo_preenchido", f"✅ Tipo Parte Adversa: {tipo}", process_id=process_id)
+        monitor_log_info(f"✅ Tipo Parte Adversa selecionado: {tipo} (processo #{process_id})", region="RPA")
     except Exception as e:
         log(f"[Adverso Tipo][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao selecionar Tipo Parte Adversa: {e}", region="RPA")
 
     # 17.3) Posição Parte Interessada (PosicaoClienteId)
     try:
@@ -5999,10 +5994,13 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             if ok:
                 log(f"[POSIÇÃO] Posição Parte Interessada (fuzzy): '{pos_target}'")
                 update_field_status("posicao", "Posição Cliente", pos_target)
+                update_status("posicao_preenchida", f"✅ Posição Parte Interessada: {pos_target}", process_id=process_id)
+                monitor_log_info(f"✅ Posição Parte Interessada selecionada: {pos_target} (processo #{process_id})", region="RPA")
         
         await _settle(page, "select:posicao_cliente")
     except Exception as e:
         log(f"[Posição Interessada][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao selecionar Posição Parte Interessada: {e}", region="RPA")
 
     # 17.4) Parte Adversa (Nome)
     try:
@@ -6119,12 +6117,16 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
                 """)
                 log(f"[UF OAB Adverso] ✅ Selecionado via JS: {uf_value} ({uf_adv_upper})")
                 update_field_status("uf_oab_adverso", "UF OAB Advogado Adverso", uf_adv_upper)
+                update_status("uf_oab_preenchida", f"✅ UF OAB Advogado Adverso: {uf_adv_upper}", process_id=process_id)
+                monitor_log_info(f"✅ UF OAB Advogado Adverso selecionada: {uf_adv_upper} (processo #{process_id})", region="RPA")
             
             await _settle(page, f"#{dropdown_id}")
         except Exception as e:
             log(f"[UF OAB Adverso][WARN] Erro ao selecionar dropdown: {e}")
+            monitor_log_warning(f"⚠️ Erro ao selecionar UF OAB Advogado Adverso: {e}", region="RPA")
     except Exception as e:
         log(f"[UF OAB Adverso][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso UF OAB Advogado Adverso: {e}", region="RPA")
 
     # 17.5) Parte Interessada (ClienteId) - COM FALLBACK COMPLETO
     try:
@@ -6172,9 +6174,12 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
             if ok:
                 log(f"[PARTE INTERESSADA] {PARTE_INTERESSADA_SELECT_ID}: '{pick}'")
                 update_field_status("parte_interessada", "Parte Interessada", pick)
+                update_status("parte_interessada_preenchida", f"✅ Parte Interessada: {pick}", process_id=process_id)
+                monitor_log_info(f"✅ Parte Interessada selecionada: {pick} (processo #{process_id})", region="RPA")
         await _settle(page, "select:parte_interessada")
     except Exception as e:
         log(f"[Parte Interessada][WARN] {e}")
+        monitor_log_warning(f"⚠️ Aviso ao selecionar Parte Interessada: {e}", region="RPA")
 
     # 17.5.1) Data de Distribuição
     try:
