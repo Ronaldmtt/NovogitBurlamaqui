@@ -1090,8 +1090,8 @@ async def _check_login_success(page) -> bool:
                 if await toast.is_visible(timeout=500):
                     log("[LOGIN] ✅ Toast de sucesso detectado - login aprovado!")
                     return True
-            except:
-                pass
+            except Exception as e:
+                dlog(f"[LOGIN_CHECK] Erro ao verificar {selector}: {e}")
         
         url = page.url
         # Rejeitar about:blank e URLs de login
@@ -1106,7 +1106,8 @@ async def _check_login_success(page) -> bool:
             return True
         
         return False
-    except:
+    except Exception as e:
+        dlog(f"[LOGIN_CHECK] Erro geral em _check_login_success: {e}")
         return False
 
 async def _check_login_failure(page) -> bool:
@@ -1130,14 +1131,15 @@ async def _check_login_failure(page) -> bool:
                     if msg_text and len(msg_text.strip()) > 0:
                         log(f"[LOGIN] ❌ Erro do eLaw: {msg_text.strip()[:200]}")
                         return True
-            except:
-                pass
+            except Exception as e:
+                dlog(f"[LOGIN_CHECK] Erro ao verificar erro {selector}: {e}")
         
         # REMOVIDO: "Formulário visível" não é mais indicador de falha!
         # eLaw agora mantém formulário visível com overlay "Processando..." durante sucesso
         
         return False  # Apenas retorna True se houver MENSAGEM DE ERRO explícita
-    except:
+    except Exception as e:
+        dlog(f"[LOGIN_CHECK] Erro geral em _check_login_failure: {e}")
         return False
 
 async def login_elaw(page, user: str, password: str, url: str) -> bool:
