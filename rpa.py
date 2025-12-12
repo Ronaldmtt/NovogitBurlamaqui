@@ -5179,9 +5179,8 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     # ═══════════════════════════════════════════════════════════════════════════════
     # 4) SISTEMA ELETRÔNICO
     # ═══════════════════════════════════════════════════════════════════════════════
-    update_status("aguardando_sistema_eletronico", "Aguardando dropdown Sistema Eletrônico ficar pronto...", process_id=process_id)
-    await wait_for_select_ready(page, "SistemaEletronicoId", 1, 4000)  # 🔧 2025-12-12: Otimizado para 4s
-    update_status("abrindo_sistema_eletronico", "Abrindo dropdown Sistema Eletrônico...", process_id=process_id)
+    update_status("sistema_eletronico", "Preenchendo Sistema Eletrônico...", process_id=process_id)
+    await wait_for_select_ready(page, "SistemaEletronicoId", 1, 2000)  # 🔧 2025-12-12: Otimizado para 2s
     
     # 🔧 FIX 2025-12-09: Verificar se campo está oculto e usar JS direto se necessário
     sistema_preenchido = False
@@ -5191,7 +5190,7 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     btn_visible = True
     try:
         btn_test = page.locator(f"button.btn.dropdown-toggle[data-id='SistemaEletronicoId']").first
-        await btn_test.wait_for(state="attached", timeout=3000)
+        await btn_test.wait_for(state="attached", timeout=1000)  # 🔧 2025-12-12: Reduzido de 3s→1s
         btn_visible = await btn_test.evaluate("el => el.offsetParent !== null && getComputedStyle(el).display !== 'none'")
     except Exception:
         btn_visible = False
@@ -5221,7 +5220,6 @@ async def fill_new_process_form(page, data: Dict[str, Any], process_id: int):  #
     else:
         # Campo OCULTO - usar JavaScript direto para FORÇAR preenchimento
         log(f"[SISTEMA_ELETRONICO] Campo OCULTO - forçando preenchimento via JS direto...")
-        update_status("forcando_sistema_eletronico", "Campo oculto - forçando preenchimento via JS...", process_id=process_id)
         
         # Tentar com force_select_bootstrap_by_text primeiro
         sistema_preenchido = await force_select_bootstrap_by_text(page, "SistemaEletronicoId", wanted_sys)
