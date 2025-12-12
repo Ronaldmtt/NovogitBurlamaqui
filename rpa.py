@@ -11,7 +11,6 @@
 import os
 import re
 import json
-import math
 import sys
 import asyncio
 import logging
@@ -119,7 +118,6 @@ STATUS_ENABLED = True
 
 import contextvars
 from dataclasses import dataclass, field
-from typing import Optional
 
 @dataclass
 class RPAExecutionContext:
@@ -733,13 +731,6 @@ async def wait_network_quiet(page, timeout_ms: int):
         await page.wait_for_load_state("networkidle", timeout=timeout_ms)
     except Exception:
         pass
-
-def _fmt_ptbr(n: float | int | str) -> str:
-    """Formata número como moeda pt-BR (sem símbolo R$)."""
-    if isinstance(n, str):
-        return n.strip()
-    s = f"{float(n):,.2f}"
-    return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 # =========================
 # PDF utils
